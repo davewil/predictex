@@ -84,3 +84,40 @@ the First Player to Score prediction.
 - Players can also:
   - Create or join **Public Leagues** (no invite required), or
   - Set up a **Private League** with friends.
+
+## 9. Domain notes — implementation contract
+
+These resolve ambiguities in the player-facing rules above. They are the contract the
+scoring engine tests assert against. Settled by advisor review on 2026-06-14.
+
+### Settled rulings
+
+1. **Scoring components are additive.** A correct exact score fires Correct Outcome (+10),
+   Correct Home Goals (+5), Correct Away Goals (+5), Correct Goal Difference (+5) and
+   Correct Score Bonus (+5) simultaneously — base +30 before booster/round bonus.
+2. **Risky Bonus cohort = FIFA's global %**, entered by the admin per fixture (FIFA blocks
+   scraping, so this is manual). The bonus is skipped when the cohort % is absent. It
+   applies only to a correct **Home or Away win** prediction (never a draw) when the
+   relevant side's cohort % is `< 20`.
+3. **Booster 2× doubles the fixture total only** — *not* the +20 Round Bonus. Booster usage
+   mirrors FIFA: boosters a player already spent (we join mid-tournament) are captured on
+   import / manual entry, not re-chosen in-app.
+4. **Knockout scoring uses the full-time (regulation) result, excluding extra time and
+   penalties.** Verified against openfootball: `score.ft` is regulation-only (2022 final =
+   `ft:[2,2]`, with `et:[3,3]` and `p:[4,2]` held separately and ignored).
+5. **Own goals:** void **First Player to Score** (+0), but **First Team to Score still
+   scores**, credited to the beneficiary side.
+6. **Scoring window:** only fixtures from our mid-tournament join onward are scored (first
+   scored fixture: Egypt–Belgium, 20:00 UK, 2026-06-14). Earlier fixtures are excluded.
+
+### openfootball data contract (`openfootball/worldcup.json`)
+
+- `score: {ft, ht, et?, p?}` — arrays `[team1, team2]`. Use **`ft`** for all scoring.
+- Goals live in `goals1` (team1) / `goals2` (team2), **listed under the team the goal
+  counts for** (the beneficiary) — including own goals. An `owngoal: true` entry names the
+  player who scored into their own net but sits in the **opponent's** (beneficiary's) array.
+- Derive **first team to score** = the side whose array holds the earliest goal, ordered by
+  `(minute, offset || 0)` (`offset` = stoppage-time minutes). Derive **first player to
+  score** from that same goal, voided if it is `owngoal: true`.
+- This derivation belongs to the **ingestion layer**, not the scoring engine. The scoring
+  engine is a **pure function** over already-derived fields.

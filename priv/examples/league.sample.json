@@ -1,0 +1,31 @@
+{
+  "players": [
+    {
+      "name": "Dave",
+      "predictions": [
+        {"home_team": "Mexico", "away_team": "South Africa", "home": 2, "away": 0, "booster": true},
+        {"home_team": "South Korea", "away_team": "Czech Republic", "home": 2, "away": 1},
+        {"home_team": "Brazil", "away_team": "Morocco", "home": 1, "away": 1}
+      ]
+    },
+    {
+      "name": "Sam",
+      "predictions": [
+        {"home_team": "Mexico", "away_team": "South Africa", "home": 1, "away": 0},
+        {"home_team": "Canada", "away_team": "Bosnia & Herzegovina", "home": 1, "away": 1},
+        {"home_team": "Haiti", "away_team": "Scotland", "home": 0, "away": 1}
+      ]
+    },
+    {
+      "name": "Lou",
+      "predictions": [
+        {"home_team": "Mexico", "away_team": "South Africa", "home": 0, "away": 2},
+        {"home_team": "Mexica", "away_team": "South Africa", "home": 1, "away": 1}
+      ]
+    }
+  ],
+  "cohort": [
+    {"home_team": "Mexico", "away_team": "South Africa", "home": 80, "draw": 12, "away": 8},
+    {"home_team": "Haiti", "away_team": "Scotland", "home": 60, "draw": 28, "away": 12}
+  ]
+}

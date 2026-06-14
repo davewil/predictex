@@ -1,7 +1,0 @@
-{
-  "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"grep \\\"There are the rules\\\" /Volumes/Personal/Users/davidwilliams/.claude/projects/-Volumes-Personal-Users-davidwilliams-dev-elixir-predictex/94178d4c-bf81-4d08-b1c3-66441c11ccdf.jsonl | ...",
-  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n  File \"/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/__init__.py\", line 346, in loads\n    return _default_decoder.decode(s)\n  File \"/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/json/decoder.py\", line 340, in decode\n    raise JSONDecodeError(\"Extra data\", s, end)\njson.decoder.JSONDecodeError: Extra ...",
-  "timestamp": "2026-06-14T21:57:38.513Z",
-  "retry_count": 1
-}
