@@ -4,39 +4,36 @@
 # GitHub Actions secrets. Run it in a real terminal (the master-password prompt
 # needs a TTY):
 #
-#   ./scripts/sync-secrets-from-vault.sh list   # discover your vault item names
+#   ./scripts/sync-secrets-from-vault.sh list   # show matching vault items
 #   ./scripts/sync-secrets-from-vault.sh         # copy the secrets to GitHub
 #
-# Values are piped straight into `gh secret set` via stdin — never printed, never
-# placed on the command line. SECRET_KEY_BASE and POSTGRES_PASSWORD are already set
-# (generated), so this only handles the four homelab-shared ones.
+# Each vault item is named exactly after its GitHub secret; the value is read from
+# the item's password, notes, or SSH-key field (whichever is present). Values are
+# piped straight into `gh secret set` via stdin — never printed, never in argv.
+# SECRET_KEY_BASE and POSTGRES_PASSWORD are already set, so this handles the four
+# homelab-shared secrets only.
 #
 set -euo pipefail
 
 REPO="davewil/predictex"
-
-# ---------------------------------------------------------------------------
-# EDIT THESE to match your Vaultwarden items. Each function must echo the value.
-# Common forms:
-#   bw get username "Item Name"           # the login username field
-#   bw get password "Item Name"           # the login password field
-#   bw get notes    "Item Name"           # the notes field (good for multi-line keys)
-#   bw get item "Item Name" | jq -r '.sshKey.privateKey'   # a Bitwarden SSH-key item
-#   bw get item "Item Name" | jq -r '.fields[] | select(.name=="host").value'  # custom field
-# Run the `list` mode first to find the exact item names.
-# ---------------------------------------------------------------------------
-get_DEPLOY_HOST()        { bw get username "Homelab Docker Host"; }
-get_DEPLOY_SSH_KEY()     { bw get notes    "Homelab Deploy SSH Key"; }
-get_TS_OAUTH_CLIENT_ID() { bw get username "Tailscale CI OAuth"; }
-get_TAILSCALE_AUTHKEY()  { bw get password "Tailscale CI OAuth"; }
-# ---------------------------------------------------------------------------
-
 SECRETS="DEPLOY_HOST DEPLOY_SSH_KEY TS_OAUTH_CLIENT_ID TAILSCALE_AUTHKEY"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "error: '$1' not installed"; exit 1; }; }
 need bw
 need gh
 need jq
+
+# Resolve a vault item's value: password field, else notes, else SSH-key private key.
+fetch_secret() {
+  local item="$1" v
+  v="$(bw get password "$item" 2>/dev/null || true)"
+  [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+  v="$(bw get notes "$item" 2>/dev/null || true)"
+  [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+  v="$(bw get item "$item" 2>/dev/null | jq -r '.sshKey.privateKey // empty' 2>/dev/null || true)"
+  [ -n "$v" ] && { printf '%s' "$v"; return 0; }
+  return 1
+}
 
 unlock() {
   local status
@@ -50,8 +47,7 @@ unlock() {
 
   # IMPORTANT: bw writes the "Master password:" prompt to stderr. Do NOT redirect
   # it — otherwise the prompt vanishes and the script just appears to hang. On a
-  # stale login `bw unlock` exits non-zero (after printing a 401 to stderr); we
-  # catch the non-zero exit and point at the fix.
+  # stale login `bw unlock` exits non-zero (after printing a 401 to stderr).
   if ! BW_SESSION="$(bw unlock --raw)"; then
     echo >&2
     echo "Unlock failed — your bw login is likely stale (expired refresh token)." >&2
@@ -64,18 +60,18 @@ unlock() {
   bw sync >/dev/null
 }
 
-# `list` mode: print candidate items so you can fill in the getters above.
+# `list` mode: show items whose name matches a secret (or related keyword).
 if [ "${1:-}" = "list" ]; then
   unlock
   echo
-  echo "Candidate items (name — username):"
-  for kw in tailscale deploy ssh host homelab docker; do
+  echo "Vault items (name [type] — username):"
+  for kw in $SECRETS DEPLOY TAILSCALE TS_OAUTH OAUTH tailscale deploy ssh host homelab docker; do
     bw list items --search "$kw" \
-      | jq -r '.[] | "  \(.name) — \(.login.username // "(no username)")"'
+      | jq -r '.[] | "  \(.name) [\(.type)] — \(.login.username // "")"'
   done | sort -u
   bw lock >/dev/null 2>&1 || true
   echo
-  echo "Edit get_*() in this script to match, then re-run without 'list'."
+  echo "Item types: 1=login  2=secure note  4=SSH key. Re-run without 'list' to copy."
   exit 0
 fi
 
@@ -86,12 +82,12 @@ ok=0
 missing=0
 for name in $SECRETS; do
   printf 'Fetching %s... ' "$name"
-  if value="$("get_$name" 2>/dev/null)" && [ -n "$value" ]; then
+  if value="$(fetch_secret "$name")" && [ -n "$value" ]; then
     printf '%s' "$value" | gh secret set "$name" -R "$REPO" >/dev/null
     echo "set ✓"
     ok=$((ok + 1))
   else
-    echo "NOT FOUND — fix get_${name}() in this script"
+    echo "NOT FOUND — no vault item named '$name' with a readable value"
     missing=$((missing + 1))
   fi
 done
