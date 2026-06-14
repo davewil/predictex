@@ -56,11 +56,19 @@ defmodule Predictex.Results.IngestTest do
 
     ko = Tournament.get_fixture_by_ref("2026-07-04 Brazil v Spain")
     assert ko.status == :scheduled
-    {:ok, _} = Tournament.update_fixture(ko, %{cohort_home_pct: 55, cohort_draw_pct: 25, cohort_away_pct: 20})
+
+    {:ok, _} =
+      Tournament.update_fixture(ko, %{
+        cohort_home_pct: 55,
+        cohort_draw_pct: 25,
+        cohort_away_pct: 20
+      })
 
     # A later feed now carries the result for that knockout match.
     doc2 =
-      update_in(@doc_fixture, ["matches"], fn [m1, m2] -> [m1, Map.put(m2, "score", %{"ft" => [1, 0]})] end)
+      update_in(@doc_fixture, ["matches"], fn [m1, m2] ->
+        [m1, Map.put(m2, "score", %{"ft" => [1, 0]})]
+      end)
 
     Ingest.sync(doc2)
 

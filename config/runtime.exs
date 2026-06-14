@@ -53,7 +53,7 @@ if config_env() == :prod do
       You can generate one by calling: mix phx.gen.secret
       """
 
-  host = System.get_env("PHX_HOST") || "example.com"
+  host = System.get_env("PHX_HOST") || "wc-predict.davewil.dev"
 
   config :predictex, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
@@ -66,7 +66,10 @@ if config_env() == :prod do
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
       ip: {0, 0, 0, 0, 0, 0, 0, 0}
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    # TLS is terminated at caddy-docker-proxy; trust its X-Forwarded-Proto header
+    # and redirect any plain-http traffic to https.
+    force_ssl: [hsts: true, rewrite_on: [:x_forwarded_proto]]
 
   # ## SSL Support
   #

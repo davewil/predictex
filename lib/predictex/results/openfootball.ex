@@ -63,7 +63,11 @@ defmodule Predictex.Results.Openfootball do
   goals are listed under the team they count *for*, so the side is taken directly
   from which array holds the goal — even for own goals (player from the other team).
   """
-  @spec first_scorer(list(), list()) :: %{side: :home | :away | nil, player: String.t() | nil, owngoal: boolean()}
+  @spec first_scorer(list(), list()) :: %{
+          side: :home | :away | nil,
+          player: String.t() | nil,
+          owngoal: boolean()
+        }
   def first_scorer(goals1, goals2) do
     events =
       Enum.map(goals1 || [], &event(&1, :home)) ++ Enum.map(goals2 || [], &event(&1, :away))

@@ -20,6 +20,12 @@ defmodule PredictexWeb.Router do
     get "/", PageController, :home
   end
 
+  scope "/", PredictexWeb do
+    pipe_through :api
+
+    get "/health", HealthController, :index
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", PredictexWeb do
   #   pipe_through :api

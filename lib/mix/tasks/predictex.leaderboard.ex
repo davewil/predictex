@@ -58,7 +58,13 @@ defmodule Mix.Tasks.Predictex.Leaderboard do
 
   @requirements ["compile"]
 
-  @switches [predictions: :string, results: :string, results_url: :string, top: :integer, breakdown: :boolean]
+  @switches [
+    predictions: :string,
+    results: :string,
+    results_url: :string,
+    top: :integer,
+    breakdown: :boolean
+  ]
 
   @impl Mix.Task
   def run(argv) do
@@ -75,7 +81,9 @@ defmodule Mix.Tasks.Predictex.Leaderboard do
 
     predictions_path = opts[:predictions] || Mix.raise("--predictions PATH is required")
     league = predictions_path |> File.read!() |> Jason.decode!()
-    unless is_map(league) and is_list(league["players"]), do: Mix.raise(~s|predictions JSON must have a "players" list|)
+
+    unless is_map(league) and is_list(league["players"]),
+      do: Mix.raise(~s|predictions JSON must have a "players" list|)
 
     %{league: league, results_doc: load_results(opts), opts: opts}
   end
@@ -171,7 +179,13 @@ defmodule Mix.Tasks.Predictex.Leaderboard do
     standings
     |> Enum.with_index(1)
     |> Enum.map(fn {s, rank} ->
-      row(Integer.to_string(rank), s.name, to_string(s.fixtures_total), to_string(s.round_bonus_total), to_string(s.total))
+      row(
+        Integer.to_string(rank),
+        s.name,
+        to_string(s.fixtures_total),
+        to_string(s.round_bonus_total),
+        to_string(s.total)
+      )
     end)
   end
 
@@ -199,8 +213,12 @@ defmodule Mix.Tasks.Predictex.Leaderboard do
           do: "#{p.name}: #{pred.home_team} v #{pred.away_team}"
 
     case Enum.uniq(miss) do
-      [] -> [""]
-      misses -> ["", "[!] #{length(misses)} prediction(s) matched no fixture (check team names):"] ++ Enum.map(misses, &"    - #{&1}") ++ [""]
+      [] ->
+        [""]
+
+      misses ->
+        ["", "[!] #{length(misses)} prediction(s) matched no fixture (check team names):"] ++
+          Enum.map(misses, &"    - #{&1}") ++ [""]
     end
   end
 

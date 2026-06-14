@@ -1,0 +1,55 @@
+services:
+  app:
+    image: ghcr.io/davewil/predictex:latest
+    container_name: predictex-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+    environment:
+      DATABASE_URL: "ecto://postgres:${POSTGRES_PASSWORD}@postgres/predictex_prod"
+      PHX_HOST: "wc-predict.davewil.dev"
+      PHX_SERVER: "true"
+      PORT: "4000"
+      POOL_SIZE: "10"
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
+    expose:
+      - "4000"
+    labels:
+      # caddy-docker-proxy auto-discovers this; TLS via the existing Cloudflare DNS
+      # challenge (CF_API_TOKEN lives in /root/caddy/.env on the host).
+      caddy: wc-predict.davewil.dev
+      caddy.tls.dns: cloudflare {env.CF_API_TOKEN}
+      caddy.reverse_proxy: "{{upstreams 4000}}"
+      caddy.reverse_proxy.health_uri: /health
+      caddy.reverse_proxy.health_interval: 10s
+      caddy.reverse_proxy.health_timeout: 3s
+      caddy.reverse_proxy.fail_duration: 15s
+      caddy.reverse_proxy.health_headers.X-Forwarded-Proto: https
+    networks:
+      - default
+      - proxy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: predictex-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+      POSTGRES_DB: predictex_prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+
+networks:
+  proxy:
+    external: true

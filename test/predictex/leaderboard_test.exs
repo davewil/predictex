@@ -36,7 +36,10 @@ defmodule Predictex.LeaderboardTest do
 
     test "team-name matching is case/whitespace insensitive" do
       fixtures = [fx(%{team1: "Egypt", team2: "Belgium", home_goals: 1, away_goals: 2})]
-      players = [player("Dave", [%{home_team: "  egypt ", away_team: "BELGIUM", home: 1, away: 2}])]
+
+      players = [
+        player("Dave", [%{home_team: "  egypt ", away_team: "BELGIUM", home: 1, away: 2}])
+      ]
 
       assert [%{fixtures_total: 30}] = Leaderboard.build(fixtures, players)
     end
@@ -52,7 +55,12 @@ defmodule Predictex.LeaderboardTest do
 
     test "booster doubles the fixture total" do
       fixtures = [fx(%{team1: "Egypt", team2: "Belgium", home_goals: 1, away_goals: 2})]
-      players = [player("Dave", [%{home_team: "Egypt", away_team: "Belgium", home: 1, away: 2, booster: true}])]
+
+      players = [
+        player("Dave", [
+          %{home_team: "Egypt", away_team: "Belgium", home: 1, away: 2, booster: true}
+        ])
+      ]
 
       assert [%{fixtures_total: 60}] = Leaderboard.build(fixtures, players)
     end
@@ -125,12 +133,58 @@ defmodule Predictex.LeaderboardTest do
     # Group A, Round 1 = {A v B, C v D}; later rounds scheduled.
     defp group_a(round1_status) do
       [
-        fx(%{group: "Group A", date: "2026-06-11", time: "13:00", team1: "A", team2: "B", home_goals: 1, away_goals: 0, status: round1_status}),
-        fx(%{group: "Group A", date: "2026-06-11", time: "20:00", team1: "C", team2: "D", home_goals: 2, away_goals: 2, status: round1_status}),
-        fx(%{group: "Group A", date: "2026-06-15", time: "13:00", team1: "A", team2: "C", status: :scheduled}),
-        fx(%{group: "Group A", date: "2026-06-15", time: "20:00", team1: "B", team2: "D", status: :scheduled}),
-        fx(%{group: "Group A", date: "2026-06-19", time: "13:00", team1: "A", team2: "D", status: :scheduled}),
-        fx(%{group: "Group A", date: "2026-06-19", time: "20:00", team1: "B", team2: "C", status: :scheduled})
+        fx(%{
+          group: "Group A",
+          date: "2026-06-11",
+          time: "13:00",
+          team1: "A",
+          team2: "B",
+          home_goals: 1,
+          away_goals: 0,
+          status: round1_status
+        }),
+        fx(%{
+          group: "Group A",
+          date: "2026-06-11",
+          time: "20:00",
+          team1: "C",
+          team2: "D",
+          home_goals: 2,
+          away_goals: 2,
+          status: round1_status
+        }),
+        fx(%{
+          group: "Group A",
+          date: "2026-06-15",
+          time: "13:00",
+          team1: "A",
+          team2: "C",
+          status: :scheduled
+        }),
+        fx(%{
+          group: "Group A",
+          date: "2026-06-15",
+          time: "20:00",
+          team1: "B",
+          team2: "D",
+          status: :scheduled
+        }),
+        fx(%{
+          group: "Group A",
+          date: "2026-06-19",
+          time: "13:00",
+          team1: "A",
+          team2: "D",
+          status: :scheduled
+        }),
+        fx(%{
+          group: "Group A",
+          date: "2026-06-19",
+          time: "20:00",
+          team1: "B",
+          team2: "C",
+          status: :scheduled
+        })
       ]
     end
 
@@ -180,7 +234,9 @@ defmodule Predictex.LeaderboardTest do
       # Round 1 still has a fixture not completed
       fixtures =
         group_a(:completed)
-        |> Enum.map(fn f -> if {f.team1, f.team2} == {"C", "D"}, do: %{f | status: :scheduled}, else: f end)
+        |> Enum.map(fn f ->
+          if {f.team1, f.team2} == {"C", "D"}, do: %{f | status: :scheduled}, else: f
+        end)
 
       [dave] = Leaderboard.build(fixtures, players)
       assert dave.round_bonus_total == 0

@@ -66,7 +66,8 @@ defmodule Predictex.Tournament.Fixture do
   end
 
   defp validate_cohort(changeset) do
-    Enum.reduce([:cohort_home_pct, :cohort_draw_pct, :cohort_away_pct], changeset, fn field, acc ->
+    Enum.reduce([:cohort_home_pct, :cohort_draw_pct, :cohort_away_pct], changeset, fn field,
+                                                                                      acc ->
       validate_number(acc, field, greater_than_or_equal_to: 0, less_than_or_equal_to: 100)
     end)
   end

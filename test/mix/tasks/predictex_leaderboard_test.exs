@@ -24,7 +24,12 @@ defmodule Mix.Tasks.Predictex.LeaderboardTest do
 
       league = %{
         "players" => [
-          %{"name" => "Dave", "predictions" => [%{"home_team" => "Egypt", "away_team" => "Belgium", "home" => 1, "away" => 2}]}
+          %{
+            "name" => "Dave",
+            "predictions" => [
+              %{"home_team" => "Egypt", "away_team" => "Belgium", "home" => 1, "away" => 2}
+            ]
+          }
         ]
       }
 
@@ -32,6 +37,7 @@ defmodule Mix.Tasks.Predictex.LeaderboardTest do
       text = Enum.join(lines, "\n")
 
       assert text =~ "Completed fixtures available: 1 of 1"
+
       # exact score 30; the single-fixture round is complete and fully predicted → +20 bonus → 50
       assert Enum.any?(lines, &(&1 =~ ~r/Dave\s+30\s+20\s+50/))
     end
@@ -41,7 +47,12 @@ defmodule Mix.Tasks.Predictex.LeaderboardTest do
 
       league = %{
         "players" => [
-          %{"name" => "Lou", "predictions" => [%{"home_team" => "Narnia", "away_team" => "Mordor", "home" => 1, "away" => 1}]}
+          %{
+            "name" => "Lou",
+            "predictions" => [
+              %{"home_team" => "Narnia", "away_team" => "Mordor", "home" => 1, "away" => 1}
+            ]
+          }
         ]
       }
 

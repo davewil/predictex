@@ -4,7 +4,9 @@ defmodule Predictex.TournamentTest do
   alias Predictex.Tournament
 
   defp round!(attrs \\ %{}) do
-    {:ok, r} = Tournament.create_round(Map.merge(%{name: "Round 1", stage: :group, ordinal: 1}, attrs))
+    {:ok, r} =
+      Tournament.create_round(Map.merge(%{name: "Round 1", stage: :group, ordinal: 1}, attrs))
+
     r
   end
 
@@ -61,7 +63,13 @@ defmodule Predictex.TournamentTest do
       fixture!(r, %{external_ref: "dup"})
 
       assert {:error, cs} =
-               Tournament.create_fixture(%{external_ref: "dup", team1: "A", team2: "B", status: :scheduled, round_id: r.id})
+               Tournament.create_fixture(%{
+                 external_ref: "dup",
+                 team1: "A",
+                 team2: "B",
+                 status: :scheduled,
+                 round_id: r.id
+               })
 
       assert %{external_ref: ["has already been taken"]} = errors_on(cs)
     end

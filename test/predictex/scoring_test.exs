@@ -39,7 +39,12 @@ defmodule Predictex.ScoringTest do
 
   describe "score/3 — scoreline components are additive" do
     test "exact correct score stacks outcome + home + away + GD + score bonus = 30" do
-      r = Scoring.score(pred(%{home_goals: 2, away_goals: 1}), fixture(%{home_goals: 2, away_goals: 1}), :group)
+      r =
+        Scoring.score(
+          pred(%{home_goals: 2, away_goals: 1}),
+          fixture(%{home_goals: 2, away_goals: 1}),
+          :group
+        )
 
       assert r.components == %{
                correct_outcome: 10,
@@ -58,7 +63,12 @@ defmodule Predictex.ScoringTest do
     end
 
     test "correct outcome + goal difference but wrong exact score = 15" do
-      r = Scoring.score(pred(%{home_goals: 2, away_goals: 1}), fixture(%{home_goals: 3, away_goals: 2}), :group)
+      r =
+        Scoring.score(
+          pred(%{home_goals: 2, away_goals: 1}),
+          fixture(%{home_goals: 3, away_goals: 2}),
+          :group
+        )
 
       assert r.components.correct_outcome == 10
       assert r.components.correct_goal_difference == 5
@@ -69,25 +79,49 @@ defmodule Predictex.ScoringTest do
     end
 
     test "correct outcome only = 10" do
-      r = Scoring.score(pred(%{home_goals: 1, away_goals: 0}), fixture(%{home_goals: 3, away_goals: 1}), :group)
+      r =
+        Scoring.score(
+          pred(%{home_goals: 1, away_goals: 0}),
+          fixture(%{home_goals: 3, away_goals: 1}),
+          :group
+        )
+
       assert r.base_total == 10
     end
 
     test "wrong outcome with nothing else matching = 0" do
-      r = Scoring.score(pred(%{home_goals: 2, away_goals: 1}), fixture(%{home_goals: 0, away_goals: 2}), :group)
+      r =
+        Scoring.score(
+          pred(%{home_goals: 2, away_goals: 1}),
+          fixture(%{home_goals: 0, away_goals: 2}),
+          :group
+        )
+
       assert r.base_total == 0
       refute r.outcome_correct
     end
 
     test "correct home goals only (wrong outcome) = 5" do
-      r = Scoring.score(pred(%{home_goals: 2, away_goals: 3}), fixture(%{home_goals: 2, away_goals: 0}), :group)
+      r =
+        Scoring.score(
+          pred(%{home_goals: 2, away_goals: 3}),
+          fixture(%{home_goals: 2, away_goals: 0}),
+          :group
+        )
+
       assert r.components.correct_home_goals == 5
       assert r.components.correct_outcome == 0
       assert r.base_total == 5
     end
 
     test "exact draw stacks to 30" do
-      r = Scoring.score(pred(%{home_goals: 1, away_goals: 1}), fixture(%{home_goals: 1, away_goals: 1}), :group)
+      r =
+        Scoring.score(
+          pred(%{home_goals: 1, away_goals: 1}),
+          fixture(%{home_goals: 1, away_goals: 1}),
+          :group
+        )
+
       assert r.base_total == 30
     end
   end
@@ -143,7 +177,13 @@ defmodule Predictex.ScoringTest do
     end
 
     test "skipped when cohort % is nil" do
-      r = Scoring.score(pred(%{home_goals: 1, away_goals: 0}), fixture(%{home_goals: 1, away_goals: 0}), :group)
+      r =
+        Scoring.score(
+          pred(%{home_goals: 1, away_goals: 0}),
+          fixture(%{home_goals: 1, away_goals: 0}),
+          :group
+        )
+
       assert r.components.risky_bonus == 0
     end
 
@@ -186,8 +226,18 @@ defmodule Predictex.ScoringTest do
     test "first player to score correct (no own goal) = +10" do
       r =
         Scoring.score(
-          pred(%{home_goals: 1, away_goals: 0, first_scorer_side: :home, first_scorer_player: "Messi"}),
-          fixture(%{home_goals: 1, away_goals: 0, first_scorer_side: :home, first_scorer_player: "Messi"}),
+          pred(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "Messi"
+          }),
+          fixture(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "Messi"
+          }),
           :knockout
         )
 
@@ -197,7 +247,12 @@ defmodule Predictex.ScoringTest do
     test "own goal voids the first PLAYER but the first TEAM still scores" do
       r =
         Scoring.score(
-          pred(%{home_goals: 0, away_goals: 1, first_scorer_side: :away, first_scorer_player: "Enzo Fernández"}),
+          pred(%{
+            home_goals: 0,
+            away_goals: 1,
+            first_scorer_side: :away,
+            first_scorer_player: "Enzo Fernández"
+          }),
           fixture(%{
             home_goals: 0,
             away_goals: 1,
@@ -215,8 +270,18 @@ defmodule Predictex.ScoringTest do
     test "player name match is whitespace/case insensitive" do
       r =
         Scoring.score(
-          pred(%{home_goals: 1, away_goals: 0, first_scorer_side: :home, first_scorer_player: "  messi "}),
-          fixture(%{home_goals: 1, away_goals: 0, first_scorer_side: :home, first_scorer_player: "Messi"}),
+          pred(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "  messi "
+          }),
+          fixture(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "Messi"
+          }),
           :knockout
         )
 
@@ -226,8 +291,18 @@ defmodule Predictex.ScoringTest do
     test "group stage ignores first team / player even when predicted" do
       r =
         Scoring.score(
-          pred(%{home_goals: 1, away_goals: 0, first_scorer_side: :home, first_scorer_player: "Messi"}),
-          fixture(%{home_goals: 1, away_goals: 0, first_scorer_side: :home, first_scorer_player: "Messi"}),
+          pred(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "Messi"
+          }),
+          fixture(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "Messi"
+          }),
           :group
         )
 

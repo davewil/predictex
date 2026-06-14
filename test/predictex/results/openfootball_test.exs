@@ -10,7 +10,14 @@ defmodule Predictex.Results.OpenfootballTest do
     end
 
     test "every knockout round name classifies as :knockout" do
-      for r <- ["Round of 32", "Round of 16", "Quarter-final", "Semi-final", "Match for third place", "Final"] do
+      for r <- [
+            "Round of 32",
+            "Round of 16",
+            "Quarter-final",
+            "Semi-final",
+            "Match for third place",
+            "Final"
+          ] do
         assert Openfootball.stage_for(r) == :knockout, "expected #{inspect(r)} to be knockout"
       end
     end
@@ -43,7 +50,14 @@ defmodule Predictex.Results.OpenfootballTest do
     end
 
     test "no FT score => scheduled with nil goals" do
-      f = Openfootball.parse_match(%{"round" => "Matchday 1", "team1" => "A", "team2" => "B", "score" => %{}})
+      f =
+        Openfootball.parse_match(%{
+          "round" => "Matchday 1",
+          "team1" => "A",
+          "team2" => "B",
+          "score" => %{}
+        })
+
       assert f.status == :scheduled
       assert {f.home_goals, f.away_goals} == {nil, nil}
     end
@@ -132,7 +146,12 @@ defmodule Predictex.Results.OpenfootballTest do
 
   describe "parse/1" do
     test "parses a document's matches list" do
-      doc = %{"matches" => [%{"round" => "Final", "team1" => "A", "team2" => "B", "score" => %{"ft" => [0, 0]}}]}
+      doc = %{
+        "matches" => [
+          %{"round" => "Final", "team1" => "A", "team2" => "B", "score" => %{"ft" => [0, 0]}}
+        ]
+      }
+
       assert [%{stage: :knockout, status: :completed}] = Openfootball.parse(doc)
     end
 

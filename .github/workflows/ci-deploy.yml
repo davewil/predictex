@@ -1,0 +1,194 @@
+name: CI / Deploy
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+
+    env:
+      MIX_ENV: test
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: predictex_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Elixir
+        id: setup
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.1"
+          otp-version: "28.5"
+
+      - name: Cache deps
+        uses: actions/cache@v5
+        with:
+          path: deps
+          key: deps-${{ runner.os }}-${{ hashFiles('mix.lock') }}
+          restore-keys: deps-${{ runner.os }}-
+
+      - name: Cache build
+        uses: actions/cache@v5
+        with:
+          path: _build
+          key: build-${{ runner.os }}-${{ env.MIX_ENV }}-otp${{ steps.setup.outputs.otp-version }}-${{ hashFiles('mix.lock') }}
+          restore-keys: build-${{ runner.os }}-${{ env.MIX_ENV }}-otp${{ steps.setup.outputs.otp-version }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Check unused deps
+        run: mix deps.unlock --check-unused
+
+      - name: Tests
+        run: mix test
+
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: quality
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version tag
+        id: meta
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/davewil/predictex:latest
+            ghcr.io/davewil/predictex:${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_AUTHKEY }}
+          tags: tag:ci
+
+      - name: Deploy to Docker host
+        env:
+          SECRET_KEY_BASE: ${{ secrets.SECRET_KEY_BASE }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Sync the compose file to the server (keeps it in step with the repo)
+          ssh -o StrictHostKeyChecking=accept-new root@${{ secrets.DEPLOY_HOST }} "mkdir -p /root/predictex"
+          scp docker-compose.prod.yml root@${{ secrets.DEPLOY_HOST }}:/root/predictex/docker-compose.prod.yml
+
+          # Upsert app secrets into the server .env (never committed)
+          ssh root@${{ secrets.DEPLOY_HOST }} "
+            cd /root/predictex
+            touch .env && chmod 600 .env
+            grep -q '^SECRET_KEY_BASE=' .env \
+              && sed -i 's|^SECRET_KEY_BASE=.*|SECRET_KEY_BASE=${SECRET_KEY_BASE}|' .env \
+              || echo 'SECRET_KEY_BASE=${SECRET_KEY_BASE}' >> .env
+            grep -q '^POSTGRES_PASSWORD=' .env \
+              && sed -i 's|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${POSTGRES_PASSWORD}|' .env \
+              || echo 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD}' >> .env
+          "
+
+          # Authenticate Docker on the host to pull from GHCR (only if it can't already)
+          ssh root@${{ secrets.DEPLOY_HOST }} "docker pull ghcr.io/davewil/predictex:latest --quiet 2>/dev/null" \
+            || echo "${{ secrets.GITHUB_TOKEN }}" | ssh root@${{ secrets.DEPLOY_HOST }} docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          ssh root@${{ secrets.DEPLOY_HOST }} << 'EOF'
+            set -e
+            cd /root/predictex
+
+            # Pre-deploy DB backup (best-effort — don't fail the deploy on backup error)
+            mkdir -p backups
+            docker compose -f docker-compose.prod.yml exec -T postgres \
+              pg_dump -U postgres -Fc predictex_prod < /dev/null > "backups/pre_deploy_$(date +%Y%m%d_%H%M%S).dump" \
+              && echo "Backup complete." || echo "Backup skipped/failed (non-fatal)."
+            ls -t backups/pre_deploy_*.dump 2>/dev/null | tail -n +11 | xargs -r rm --
+
+            # Ensure the database is up before touching the app
+            docker compose -f docker-compose.prod.yml up -d postgres
+
+            # Pull the freshly built image
+            echo "Pulling latest image..."
+            docker compose -f docker-compose.prod.yml pull app
+
+            # Boot check — verify the release starts before migrating or restarting
+            echo "Verifying release boot..."
+            if ! docker compose -f docker-compose.prod.yml run --rm --no-TTY app bin/predictex eval "IO.puts(:boot_ok)" < /dev/null 2>&1 | grep -q "boot_ok"; then
+              echo "ERROR: Release failed to boot. Aborting deploy — no changes made."
+              exit 1
+            fi
+
+            # Run migrations
+            echo "Running migrations..."
+            docker compose -f docker-compose.prod.yml run --rm --no-TTY app bin/predictex eval "Predictex.Release.migrate()" < /dev/null 2>&1
+
+            # Recreate the app container with the new image
+            echo "Recreating app..."
+            docker compose -f docker-compose.prod.yml up -d --force-recreate --no-build app
+
+            # Smoke test against the in-container health endpoint
+            echo "Waiting for app health..."
+            for i in $(seq 1 30); do
+              if docker compose -f docker-compose.prod.yml exec -T app curl -sf http://localhost:4000/health < /dev/null 2>&1 | grep -q '"status":"ok"'; then
+                echo "app healthy after $((i * 2))s"
+                docker compose -f docker-compose.prod.yml ps
+                echo "Deploy complete."
+                exit 0
+              fi
+              sleep 2
+            done
+
+            echo "Smoke test FAILED — app did not become healthy"
+            docker compose -f docker-compose.prod.yml logs --tail 80 app
+            exit 1
+          EOF

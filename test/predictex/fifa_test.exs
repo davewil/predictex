@@ -22,7 +22,8 @@ defmodule Predictex.FifaTest do
     end
 
     test "third place and final share the Final round (ordinal 8)" do
-      assert Fifa.knockout_round("Match for third place").name == Fifa.knockout_round("Final").name
+      assert Fifa.knockout_round("Match for third place").name ==
+               Fifa.knockout_round("Final").name
     end
   end
 

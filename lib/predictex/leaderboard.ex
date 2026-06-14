@@ -68,7 +68,13 @@ defmodule Predictex.Leaderboard do
       |> Enum.flat_map(fn input ->
         case Map.get(fixture_idx, match_key(input.home_team, input.away_team)) do
           %{status: :completed} = fx ->
-            [%{fixture: fx, ordinal: fx.game_round.ordinal, result: Scoring.score(to_pred(input), fx, fx.stage)}]
+            [
+              %{
+                fixture: fx,
+                ordinal: fx.game_round.ordinal,
+                result: Scoring.score(to_pred(input), fx, fx.stage)
+              }
+            ]
 
           _ ->
             []
