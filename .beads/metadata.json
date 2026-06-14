@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "predictex",
+  "project_id": "9afd3987-c9a4-459b-a1ae-53df6fea39fa"
+}
