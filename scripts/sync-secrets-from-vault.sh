@@ -48,18 +48,17 @@ unlock() {
 
   echo "Unlocking Vaultwarden ($(bw status 2>/dev/null | jq -r '.serverUrl'))..." >&2
 
-  # A stale login (expired refresh token) fails here with a 401 even though
-  # status reads "locked". Catch it and point at the fix instead of crashing.
-  if ! BW_SESSION="$(bw unlock --raw 2>/tmp/bw_unlock_err)"; then
+  # IMPORTANT: bw writes the "Master password:" prompt to stderr. Do NOT redirect
+  # it — otherwise the prompt vanishes and the script just appears to hang. On a
+  # stale login `bw unlock` exits non-zero (after printing a 401 to stderr); we
+  # catch the non-zero exit and point at the fix.
+  if ! BW_SESSION="$(bw unlock --raw)"; then
     echo >&2
-    echo "Unlock failed. Your bw login is likely stale (Invalid refresh token)." >&2
+    echo "Unlock failed — your bw login is likely stale (expired refresh token)." >&2
     echo "Re-authenticate, then re-run this script:" >&2
     echo "    bw logout && bw login" >&2
-    sed -n '1,3p' /tmp/bw_unlock_err >&2 2>/dev/null || true
-    rm -f /tmp/bw_unlock_err
     exit 1
   fi
-  rm -f /tmp/bw_unlock_err
 
   export BW_SESSION
   bw sync >/dev/null
