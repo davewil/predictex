@@ -38,6 +38,7 @@ defmodule Predictex.Results.Openfootball do
       group: Map.get(m, "group"),
       date: Map.get(m, "date"),
       time: Map.get(m, "time"),
+      kickoff_at: kickoff_at(Map.get(m, "date"), Map.get(m, "time")),
       status: status,
       home_goals: home_goals,
       away_goals: away_goals,
@@ -138,6 +139,37 @@ defmodule Predictex.Results.Openfootball do
   end
 
   defp to_int(_), do: nil
+
+  @doc """
+  Parse an openfootball `date` ("2026-06-11") and `time` ("13:00 UTC-6") into a UTC
+  `DateTime` for lockout. Returns `nil` when either is missing or unparseable.
+  """
+  @spec kickoff_at(String.t() | nil, String.t() | nil) :: DateTime.t() | nil
+  def kickoff_at(date, time) when is_binary(date) and is_binary(time) do
+    with {:ok, d} <- Date.from_iso8601(date),
+         {h, m, offset_hours} <- parse_time(time),
+         {:ok, t} <- Time.new(h, m, 0),
+         {:ok, naive} <- NaiveDateTime.new(d, t) do
+      naive
+      |> NaiveDateTime.add(-offset_hours * 3600, :second)
+      |> DateTime.from_naive!("Etc/UTC")
+      |> DateTime.truncate(:second)
+    else
+      _ -> nil
+    end
+  end
+
+  def kickoff_at(_, _), do: nil
+
+  # "13:00 UTC-6" → {13, 0, -6}; "20:00" → {20, 0, 0}. The offset is the venue's
+  # hours from UTC, so UTC = local - offset.
+  defp parse_time(time) do
+    case Regex.run(~r/^\s*(\d{1,2}):(\d{2})(?:\s+UTC\s*([+-]\d{1,2}))?/, time) do
+      [_, h, m] -> {String.to_integer(h), String.to_integer(m), 0}
+      [_, h, m, offset] -> {String.to_integer(h), String.to_integer(m), String.to_integer(offset)}
+      _ -> :error
+    end
+  end
 
   defp ref(date, t1, t2), do: "#{date} #{t1} v #{t2}"
 end

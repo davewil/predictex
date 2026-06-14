@@ -1,11 +1,21 @@
-# Script for populating the database. You can run it as:
+# Seed the database with the World Cup schedule + results from openfootball.
 #
-#     mix run priv/repo/seeds.exs
+#   mix run priv/repo/seeds.exs                                       # fetch the live 2026 feed
+#   WORLDCUP_JSON=path/to/worldcup.json mix run priv/repo/seeds.exs   # use a local file (offline)
 #
-# Inside the script, you can read and write to any of your
-# repositories directly:
-#
-#     Predictex.Repo.insert!(%Predictex.SomeSchema{})
-#
-# We recommend using the bang functions (`insert!`, `update!`
-# and so on) as they will fail if something goes wrong.
+# Idempotent: re-running upserts rounds/fixtures and preserves admin-entered cohort %.
+
+alias Predictex.Results.Ingest
+
+result =
+  case System.get_env("WORLDCUP_JSON") do
+    nil ->
+      IO.puts("Seeding from the live openfootball 2026 feed…")
+      Ingest.sync_from_url()
+
+    path ->
+      IO.puts("Seeding from #{path}…")
+      Ingest.sync_from_file(path)
+  end
+
+IO.inspect(result, label: "ingest")

@@ -113,6 +113,23 @@ defmodule Predictex.Results.OpenfootballTest do
     end
   end
 
+  describe "kickoff_at/2" do
+    test "converts the feed's local time to UTC using the venue offset" do
+      assert Openfootball.kickoff_at("2026-06-11", "13:00 UTC-6") == ~U[2026-06-11 19:00:00Z]
+      assert Openfootball.kickoff_at("2026-07-04", "16:00 UTC-4") == ~U[2026-07-04 20:00:00Z]
+    end
+
+    test "with no offset, treats the time as UTC" do
+      assert Openfootball.kickoff_at("2026-06-11", "20:00") == ~U[2026-06-11 20:00:00Z]
+    end
+
+    test "returns nil for missing or unparseable input" do
+      assert Openfootball.kickoff_at(nil, "20:00") == nil
+      assert Openfootball.kickoff_at("2026-06-11", nil) == nil
+      assert Openfootball.kickoff_at("bad-date", "nope") == nil
+    end
+  end
+
   describe "parse/1" do
     test "parses a document's matches list" do
       doc = %{"matches" => [%{"round" => "Final", "team1" => "A", "team2" => "B", "score" => %{"ft" => [0, 0]}}]}
