@@ -66,10 +66,11 @@ if config_env() == :prod do
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
       ip: {0, 0, 0, 0, 0, 0, 0, 0}
     ],
-    secret_key_base: secret_key_base,
-    # TLS is terminated at caddy-docker-proxy; trust its X-Forwarded-Proto header
-    # and redirect any plain-http traffic to https.
-    force_ssl: [hsts: true, rewrite_on: [:x_forwarded_proto]]
+    secret_key_base: secret_key_base
+
+  # NOTE: force_ssl is a compile-time setting and lives in config/prod.exs
+  # (rewrite_on: [:x_forwarded_proto] trusts caddy's header; HSTS is on by default).
+  # Setting it here too would mismatch the compile-time value and abort the release boot.
 
   # ## SSL Support
   #

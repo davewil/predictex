@@ -167,8 +167,11 @@ jobs:
 
             # Boot check — verify the release starts before migrating or restarting
             echo "Verifying release boot..."
-            if ! docker compose -f docker-compose.prod.yml run --rm --no-TTY app bin/predictex eval "IO.puts(:boot_ok)" < /dev/null 2>&1 | grep -q "boot_ok"; then
+            boot_out=$(docker compose -f docker-compose.prod.yml run --rm --no-TTY app bin/predictex eval "IO.puts(:boot_ok)" < /dev/null 2>&1 || true)
+            if ! echo "$boot_out" | grep -q "boot_ok"; then
               echo "ERROR: Release failed to boot. Aborting deploy — no changes made."
+              echo "--- boot output ---"
+              echo "$boot_out" | tail -30
               exit 1
             fi
 
