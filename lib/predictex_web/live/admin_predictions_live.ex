@@ -22,6 +22,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
      |> assign(:selected_round_id, nil)
      |> assign(:selected_fixture_id, nil)
      |> assign(:fixtures, [])
+     |> assign(:knockout?, false)
      |> assign(:all_fixtures, all_fixtures())
      |> assign(:existing, %{})
      |> assign(:fixture_preds, [])
@@ -42,13 +43,15 @@ defmodule PredictexWeb.AdminPredictionsLive do
     round_id = to_int(rid)
     fixtures = fixtures_for_round(round_id)
     existing = existing_for(player_id, fixtures)
+    knockout? = knockout_round?(socket.assigns.rounds, round_id)
 
     {:noreply,
      socket
      |> assign(:selected_player_id, player_id)
      |> assign(:selected_round_id, round_id)
      |> assign(:fixtures, fixtures)
-     |> assign(:existing, existing)}
+     |> assign(:existing, existing)
+     |> assign(:knockout?, knockout?)}
   end
 
   def handle_event("save_player_round", params, socket) do
@@ -135,6 +138,14 @@ defmodule PredictexWeb.AdminPredictionsLive do
 
   defp all_fixtures, do: Tournament.list_fixtures() |> Enum.sort_by(& &1.id)
 
+  # First-team / first-player picks only exist in knockout rounds (rules.md §2).
+  defp knockout_round?(rounds, round_id) do
+    case Enum.find(rounds, &(&1.id == round_id)) do
+      %{stage: :knockout} -> true
+      _ -> false
+    end
+  end
+
   defp to_int(nil), do: nil
   defp to_int(""), do: nil
   defp to_int(i) when is_integer(i), do: i
@@ -218,8 +229,8 @@ defmodule PredictexWeb.AdminPredictionsLive do
                 <th>Fixture</th>
                 <th>H</th>
                 <th>A</th>
-                <th>1st side</th>
-                <th>1st player</th>
+                <th :if={@knockout?}>1st side</th>
+                <th :if={@knockout?}>1st player</th>
                 <th>⚡</th>
               </tr>
             </thead>
@@ -244,7 +255,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
                     value={existing_val(@existing, f.id, :away_goals)}
                   />
                 </td>
-                <td>
+                <td :if={@knockout?}>
                   <select name={"rows[#{f.id}][first_scorer_side]"} class="select select-bordered">
                     <option value="">—</option>
                     <option
@@ -261,7 +272,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
                     </option>
                   </select>
                 </td>
-                <td>
+                <td :if={@knockout?}>
                   <input
                     type="text"
                     class="input input-bordered"

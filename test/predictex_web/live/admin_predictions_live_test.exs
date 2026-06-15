@@ -115,4 +115,26 @@ defmodule PredictexWeb.AdminPredictionsLiveTest do
     assert html =~ "Sam"
     assert html =~ "no pick"
   end
+
+  test "first-scorer inputs appear only for knockout rounds, not group rounds", %{
+    conn: conn,
+    round: group_round,
+    player: player
+  } do
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+
+    _g = fixture!(group_round)
+    _k = fixture!(ko_round)
+
+    {:ok, lv, _} = live(conn, ~p"/admin/predictions?view=player")
+
+    group_html = load_grid(lv, player, group_round)
+    refute group_html =~ "first_scorer_player"
+    refute group_html =~ "1st player"
+
+    ko_html = load_grid(lv, player, ko_round)
+    assert ko_html =~ "first_scorer_player"
+    assert ko_html =~ "1st player"
+  end
 end
