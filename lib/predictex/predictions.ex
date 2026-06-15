@@ -15,6 +15,11 @@ defmodule Predictex.Predictions do
 
   def list_predictions, do: Repo.all(Prediction)
 
+  @doc "All of one player's predictions (any round, any fixture state)."
+  def list_player_predictions(player_id) do
+    Repo.all(from p in Prediction, where: p.player_id == ^player_id)
+  end
+
   def change_prediction(%Prediction{} = prediction \\ %Prediction{}, attrs \\ %{}) do
     Prediction.changeset(prediction, attrs)
   end

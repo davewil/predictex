@@ -144,4 +144,33 @@ defmodule Predictex.PredictionsTest do
                away_goals: 0
              })
   end
+
+  test "list_player_predictions returns only that player's predictions", %{
+    round: round,
+    player: player
+  } do
+    other = player_fixture(%{display_name: "Other"})
+    f1 = fixture!(round)
+    f2 = fixture!(round)
+
+    {:ok, _} =
+      Predictions.create_prediction(%{
+        player_id: player.id,
+        fixture_id: f1.id,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, _} =
+      Predictions.create_prediction(%{
+        player_id: other.id,
+        fixture_id: f2.id,
+        home_goals: 2,
+        away_goals: 2
+      })
+
+    preds = Predictions.list_player_predictions(player.id)
+    assert length(preds) == 1
+    assert hd(preds).fixture_id == f1.id
+  end
 end
