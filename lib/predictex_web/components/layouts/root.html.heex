@@ -40,7 +40,13 @@
   </head>
   <body>
     <ul class="menu menu-horizontal w-full relative z-10 flex items-center gap-4 px-4 sm:px-6 lg:px-8 justify-end">
+      <li>
+        <.link href={~p"/"}>Leaderboard</.link>
+      </li>
       <%= if @current_scope do %>
+        <li>
+          <.link href={~p"/predictions"}>My Predictions</.link>
+        </li>
         <li>
           {@current_scope.player.email}
         </li>
