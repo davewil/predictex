@@ -103,6 +103,11 @@ if config_env() == :prod do
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
 
+  config :predictex,
+         :league_invite_code,
+         System.get_env("LEAGUE_INVITE_CODE") ||
+           raise("environment variable LEAGUE_INVITE_CODE is missing.")
+
   # ## Configuring the mailer
   #
   # In production you need to configure the mailer to use a different adapter.

@@ -40,7 +40,11 @@ defmodule PredictexWeb.PlayerLive.RegistrationTest do
       {:ok, lv, _html} = live(conn, ~p"/players/register")
 
       email = unique_player_email()
-      form = form(lv, "#registration_form", player: valid_player_attributes(email: email))
+
+      form =
+        form(lv, "#registration_form",
+          player: valid_player_attributes(email: email) |> Map.put(:invite_code, "test-code")
+        )
 
       render_submit(form)
 
@@ -63,11 +67,43 @@ defmodule PredictexWeb.PlayerLive.RegistrationTest do
       result =
         lv
         |> form("#registration_form",
-          player: %{"email" => player.email}
+          player: %{"email" => player.email, "invite_code" => "test-code"}
         )
         |> render_submit()
 
       assert result =~ "has already been taken"
+    end
+
+    test "rejects registration with an invalid invite code", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/players/register")
+
+      email = unique_player_email()
+
+      result =
+        lv
+        |> form("#registration_form",
+          player: valid_player_attributes(email: email) |> Map.put(:invite_code, "wrong")
+        )
+        |> render_submit()
+
+      assert result =~ "Invalid league invite code."
+      assert Predictex.Accounts.get_player_by_email(email) == nil
+    end
+
+    test "rejects registration when invite code is missing", %{conn: conn} do
+      {:ok, lv, _html} = live(conn, ~p"/players/register")
+
+      email = unique_player_email()
+
+      result =
+        lv
+        |> form("#registration_form",
+          player: valid_player_attributes(email: email)
+        )
+        |> render_submit()
+
+      assert result =~ "Invalid league invite code."
+      assert Predictex.Accounts.get_player_by_email(email) == nil
     end
   end
 

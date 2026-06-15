@@ -56,6 +56,8 @@ defmodule PredictexWeb.PlayerLive.Registration do
             required
           />
 
+          <.input field={@form[:invite_code]} type="text" label="League invite code" required />
+
           <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
             Create an account
           </.button>
@@ -79,15 +81,22 @@ defmodule PredictexWeb.PlayerLive.Registration do
 
   @impl true
   def handle_event("save", %{"player" => player_params}, socket) do
-    case Accounts.register_player(player_params) do
-      {:ok, _player} ->
-        # Player is auto-confirmed and has a password, so hand off to the session
-        # controller to log them in immediately. The DOM form still carries the
-        # plaintext password, which the controller re-verifies before logging in.
-        {:noreply, assign(socket, trigger_submit: true)}
+    if Predictex.Accounts.Invite.valid?(player_params["invite_code"]) do
+      case Accounts.register_player(player_params) do
+        {:ok, _player} ->
+          # Player is auto-confirmed and has a password, so hand off to the session
+          # controller to log them in immediately. The DOM form still carries the
+          # plaintext password, which the controller re-verifies before logging in.
+          {:noreply, assign(socket, trigger_submit: true)}
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+        {:error, %Ecto.Changeset{} = changeset} ->
+          {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+      end
+    else
+      {:noreply,
+       socket
+       |> put_flash(:error, "Invalid league invite code.")
+       |> assign(check_errors: true)}
     end
   end
 
