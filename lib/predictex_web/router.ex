@@ -63,6 +63,17 @@ defmodule PredictexWeb.Router do
       live "/players/settings/confirm-email/:token", PlayerLive.Settings, :confirm_email
     end
 
+    live_session :require_admin,
+      on_mount: [
+        {PredictexWeb.PlayerAuth, :require_authenticated},
+        {PredictexWeb.PlayerAuth, :require_admin}
+      ] do
+      live "/admin", AdminLive, :index
+      live "/admin/predictions", AdminPredictionsLive, :index
+      live "/admin/fixtures", AdminFixturesLive, :index
+      live "/admin/players", AdminPlayersLive, :index
+    end
+
     post "/players/update-password", PlayerSessionController, :update_password
   end
 

@@ -44,6 +44,9 @@ defmodule PredictexWeb.Layouts do
       </div>
       <div class="flex-none">
         <ul class="flex flex-column px-1 space-x-4 items-center">
+          <li :if={@current_scope && @current_scope.player && @current_scope.player.is_admin}>
+            <.link navigate={~p"/admin"} class="btn btn-ghost">Admin</.link>
+          </li>
           <li>
             <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
           </li>
