@@ -273,12 +273,7 @@ defmodule PredictexWeb.PlayerAuth do
   end
 
   @doc "Returns the path to redirect to after log in."
-  # the player was already logged in, redirect to settings
-  def signed_in_path(%Plug.Conn{assigns: %{current_scope: %Scope{player: %Accounts.Player{}}}}) do
-    ~p"/players/settings"
-  end
-
-  def signed_in_path(_), do: ~p"/"
+  def signed_in_path(_), do: ~p"/predictions"
 
   @doc """
   Plug for routes that require the player to be authenticated.

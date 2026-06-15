@@ -18,7 +18,7 @@ defmodule PredictexWeb.PlayerSessionControllerTest do
         })
 
       assert get_session(conn, :player_token)
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/predictions"
 
       # Now do a logged in request and assert on the menu
       conn = get(conn, ~p"/")
@@ -41,7 +41,7 @@ defmodule PredictexWeb.PlayerSessionControllerTest do
         })
 
       assert conn.resp_cookies["_predictex_web_player_remember_me"]
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/predictions"
     end
 
     test "logs the player in with return to", %{conn: conn, player: player} do
@@ -82,7 +82,7 @@ defmodule PredictexWeb.PlayerSessionControllerTest do
         })
 
       assert get_session(conn, :player_token)
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/predictions"
 
       # Now do a logged in request and assert on the menu
       conn = get(conn, ~p"/")
@@ -103,7 +103,7 @@ defmodule PredictexWeb.PlayerSessionControllerTest do
         })
 
       assert get_session(conn, :player_token)
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/predictions"
       assert Phoenix.Flash.get(conn.assigns.flash, :info) =~ "Player confirmed successfully."
 
       assert Accounts.get_player!(player.id).confirmed_at

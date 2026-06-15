@@ -17,7 +17,7 @@ defmodule PredictexWeb.PlayerLive.RegistrationTest do
         conn
         |> log_in_player(player_fixture())
         |> live(~p"/players/register")
-        |> follow_redirect(conn, ~p"/")
+        |> follow_redirect(conn, ~p"/predictions")
 
       assert {:ok, _conn} = result
     end
@@ -53,7 +53,7 @@ defmodule PredictexWeb.PlayerLive.RegistrationTest do
       conn = follow_trigger_action(form, conn)
 
       assert get_session(conn, :player_token)
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/predictions"
 
       assert %Predictex.Accounts.Player{} = player = Predictex.Accounts.get_player_by_email(email)
       assert player.confirmed_at

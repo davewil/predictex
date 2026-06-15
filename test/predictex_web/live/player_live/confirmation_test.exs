@@ -70,7 +70,7 @@ defmodule PredictexWeb.PlayerLive.ConfirmationTest do
       assert Accounts.get_player!(player.id).confirmed_at
       # we are logged in now
       assert get_session(conn, :player_token)
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/predictions"
 
       # log out, new conn
       conn = build_conn()

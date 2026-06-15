@@ -25,7 +25,7 @@ defmodule PredictexWeb.PlayerAuthTest do
       conn = PlayerAuth.log_in_player(conn, player)
       assert token = get_session(conn, :player_token)
       assert get_session(conn, :live_socket_id) == "players_sessions:#{Base.url_encode64(token)}"
-      assert redirected_to(conn) == ~p"/"
+      assert redirected_to(conn) == ~p"/predictions"
       assert Accounts.get_player_by_session_token(token)
     end
 
@@ -76,13 +76,16 @@ defmodule PredictexWeb.PlayerAuthTest do
       assert max_age == @remember_me_cookie_max_age
     end
 
-    test "redirects to settings when player is already logged in", %{conn: conn, player: player} do
+    test "redirects to predictions when player is already logged in", %{
+      conn: conn,
+      player: player
+    } do
       conn =
         conn
         |> assign(:current_scope, Scope.for_player(player))
         |> PlayerAuth.log_in_player(player)
 
-      assert redirected_to(conn) == ~p"/players/settings"
+      assert redirected_to(conn) == ~p"/predictions"
     end
 
     test "writes a cookie if remember_me was set in previous session", %{
