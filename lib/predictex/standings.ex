@@ -54,12 +54,14 @@ defmodule Predictex.Standings do
           not is_nil(fixture) and fixture.status == :completed do
         %{
           ordinal: fixture.round.ordinal,
+          fixture_id: prediction.fixture_id,
           result: Scoring.score(prediction, fixture, fixture.round.stage)
         }
       end
 
     fixtures_total = scored |> Enum.map(& &1.result.fixture_total) |> Enum.sum()
-    round_bonus_total = round_bonus_total(scored, rounds_meta)
+    bonus_by_round = bonus_by_round(scored, rounds_meta)
+    round_bonus_total = bonus_by_round |> Map.values() |> Enum.sum()
 
     %{
       player_id: player.id,
@@ -67,15 +69,17 @@ defmodule Predictex.Standings do
       fixtures_total: fixtures_total,
       round_bonus_total: round_bonus_total,
       total: fixtures_total + round_bonus_total,
+      bonus_by_round: bonus_by_round,
       breakdown: scored
     }
   end
 
-  # Sum the Round Bonus for every round the player fully and correctly predicted.
-  defp round_bonus_total(scored, rounds_meta) do
+  # Round Bonus per round ordinal (one computation feeds both the per-round figure and
+  # the total, so they cannot drift).
+  defp bonus_by_round(scored, rounds_meta) do
     scored
     |> Enum.group_by(& &1.ordinal)
-    |> Enum.map(fn {ordinal, entries} ->
+    |> Map.new(fn {ordinal, entries} ->
       meta = Map.get(rounds_meta, ordinal)
       results = Enum.map(entries, & &1.result)
 
@@ -83,9 +87,8 @@ defmodule Predictex.Standings do
         not is_nil(ordinal) and meta != nil and meta.complete? and
           length(entries) == meta.count
 
-      Scoring.round_total(results, complete?).round_bonus
+      {ordinal, Scoring.round_total(results, complete?).round_bonus}
     end)
-    |> Enum.sum()
   end
 
   # Per-round-ordinal fixture count and whether every fixture is completed.

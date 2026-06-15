@@ -87,4 +87,22 @@ defmodule Predictex.StandingsTest do
     assert dave_standing.fixtures_total == 90
     assert dave_standing.total == 110
   end
+
+  test "breakdown entries carry fixture_id and bonus_by_round sums to round_bonus_total", %{
+    f1: f1,
+    f2: f2
+  } do
+    dave = player_fixture(%{display_name: "Dave"})
+    predict!(dave, f1, 1, 0)
+    predict!(dave, f2, 0, 2)
+
+    standings = Standings.leaderboard()
+    first = hd(standings)
+
+    # every scored entry knows which fixture it came from
+    assert Enum.all?(first.breakdown, fn e -> is_integer(e.fixture_id) end)
+
+    # the per-round bonus map sums back to the headline round_bonus_total
+    assert first.bonus_by_round |> Map.values() |> Enum.sum() == first.round_bonus_total
+  end
 end
