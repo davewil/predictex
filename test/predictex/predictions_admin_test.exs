@@ -43,10 +43,22 @@ defmodule Predictex.PredictionsAdminTest do
   test "admin_upsert_prediction overwrites an existing pick for the same fixture",
        %{round: round, player: player} do
     f = fixture!(round)
-    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 0, away_goals: 0})
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: player.id,
+        fixture_id: f.id,
+        home_goals: 0,
+        away_goals: 0
+      })
 
     assert {:ok, pred} =
-             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 3, away_goals: 2})
+             Predictions.admin_upsert_prediction(%{
+               player_id: player.id,
+               fixture_id: f.id,
+               home_goals: 3,
+               away_goals: 2
+             })
 
     assert pred.home_goals == 3
     assert pred.away_goals == 2
@@ -60,7 +72,12 @@ defmodule Predictex.PredictionsAdminTest do
     f = fixture!(round, %{kickoff_at: past})
 
     assert {:ok, _pred} =
-             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 1, away_goals: 1})
+             Predictions.admin_upsert_prediction(%{
+               player_id: player.id,
+               fixture_id: f.id,
+               home_goals: 1,
+               away_goals: 1
+             })
   end
 
   test "admin_upsert_prediction moving a booster A->B clears the old booster",
@@ -68,10 +85,23 @@ defmodule Predictex.PredictionsAdminTest do
     a = fixture!(round)
     b = fixture!(round)
 
-    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true})
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: player.id,
+        fixture_id: a.id,
+        home_goals: 1,
+        away_goals: 0,
+        booster: true
+      })
 
     assert {:ok, pred_b} =
-             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: b.id, home_goals: 2, away_goals: 0, booster: true})
+             Predictions.admin_upsert_prediction(%{
+               player_id: player.id,
+               fixture_id: b.id,
+               home_goals: 2,
+               away_goals: 0,
+               booster: true
+             })
 
     assert pred_b.booster
     pred_a = Repo.get_by(Predictex.Predictions.Prediction, player_id: player.id, fixture_id: a.id)
@@ -81,7 +111,12 @@ defmodule Predictex.PredictionsAdminTest do
   test "admin_upsert_prediction returns :fixture_not_found for an unknown fixture",
        %{player: player} do
     assert {:error, :fixture_not_found} =
-             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: -1, home_goals: 1, away_goals: 0})
+             Predictions.admin_upsert_prediction(%{
+               player_id: player.id,
+               fixture_id: -1,
+               home_goals: 1,
+               away_goals: 0
+             })
   end
 
   test "admin_save_round_predictions upserts complete rows, skips blank, errors half-filled",
@@ -132,8 +167,21 @@ defmodule Predictex.PredictionsAdminTest do
     other = player_fixture(%{display_name: "Sam"})
     f = fixture!(round)
 
-    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 1, away_goals: 0})
-    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: other.id, fixture_id: f.id, home_goals: 2, away_goals: 2})
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: player.id,
+        fixture_id: f.id,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: other.id,
+        fixture_id: f.id,
+        home_goals: 2,
+        away_goals: 2
+      })
 
     preds = Predictions.list_fixture_predictions(f.id)
 
