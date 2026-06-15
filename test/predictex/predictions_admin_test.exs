@@ -189,17 +189,30 @@ defmodule Predictex.PredictionsAdminTest do
     assert Enum.all?(preds, fn p -> p.player.display_name in ["Dave", "Sam"] end)
   end
 
-  test "admin_save_round_predictions errors when the booster is set on a blank row",
+  test "admin_save_round_predictions rolls back a booster placed on a blank row, preserving a prior booster",
        %{round: round, player: player} do
+    a = fixture!(round)
     blank = fixture!(round)
 
-    {:ok, results} =
+    # Player already has a valid booster on A.
+    {:ok, _} =
       Predictions.admin_save_round_predictions(player.id, round.id, [
-        %{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: true}
+        %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true}
       ])
 
+    # Admin fumbles: moves the booster onto a blank row. This must NOT silently
+    # destroy A's booster — the whole save rolls back.
+    assert {:error, {:booster_on_blank, results}} =
+             Predictions.admin_save_round_predictions(player.id, round.id, [
+               %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: false},
+               %{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: true}
+             ])
+
     assert results[blank.id] == {:error, :booster_on_blank}
-    # nothing persisted, and no stray booster left behind
-    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 0
+
+    # A's booster survived the rollback; nothing was written for the blank row.
+    pred_a = Repo.get_by(Predictex.Predictions.Prediction, player_id: player.id, fixture_id: a.id)
+    assert pred_a.booster
+    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 1
   end
 end

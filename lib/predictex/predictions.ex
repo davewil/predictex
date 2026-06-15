@@ -91,18 +91,30 @@ defmodule Predictex.Predictions do
   both are present and valid; reported as `{:error, changeset}` when invalid (e.g. exactly
   one goal). Returns `{:ok, results}` where `results` maps `fixture_id => :upserted | :skipped | {:error, cs}`.
 
-  `{:ok, results}` is returned even when some rows failed — callers MUST inspect the
-  per-fixture results map; an `{:error, cs}` entry means that row did not persist while
-  the others did.
+  `{:ok, results}` is returned even when ordinary rows failed validation — callers MUST
+  inspect the per-fixture results map; an `{:error, cs}` entry means that row did not
+  persist while the others did.
+
+  The one exception is a booster placed on a row with no scoreline: because the round's
+  boosters are cleared up front, letting that commit would silently destroy the player's
+  existing booster. So the whole save is rolled back and `{:error, {:booster_on_blank,
+  results}}` is returned, leaving prior state untouched.
   """
   def admin_save_round_predictions(player_id, round_id, rows) when is_list(rows) do
     Repo.transaction(fn ->
       from(p in Prediction, where: p.player_id == ^player_id and p.round_id == ^round_id)
       |> Repo.update_all(set: [booster: false])
 
-      Enum.reduce(rows, %{}, fn row, acc ->
-        Map.put(acc, row.fixture_id, save_round_row(player_id, round_id, row))
-      end)
+      results =
+        Enum.reduce(rows, %{}, fn row, acc ->
+          Map.put(acc, row.fixture_id, save_round_row(player_id, round_id, row))
+        end)
+
+      if Enum.any?(results, fn {_id, r} -> r == {:error, :booster_on_blank} end) do
+        Repo.rollback({:booster_on_blank, results})
+      else
+        results
+      end
     end)
   end
 

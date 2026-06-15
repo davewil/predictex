@@ -66,6 +66,14 @@ defmodule PredictexWeb.AdminPredictionsLive do
          |> assign(:existing, existing_for(player_id, fixtures))
          |> put_flash(:info, summarize(results))}
 
+      {:error, {:booster_on_blank, _results}} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
+         )}
+
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Could not save predictions.")}
     end
