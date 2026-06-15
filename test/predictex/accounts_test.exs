@@ -77,13 +77,26 @@ defmodule Predictex.AccountsTest do
       assert "has already been taken" in errors_on(changeset).email
     end
 
-    test "registers players without password" do
+    test "registers players with a password and auto-confirms them" do
       email = unique_player_email()
-      {:ok, player} = Accounts.register_player(valid_player_attributes(email: email))
+      attrs = valid_player_attributes(email: email)
+      {:ok, player} = Accounts.register_player(attrs)
       assert player.email == email
-      assert is_nil(player.hashed_password)
-      assert is_nil(player.confirmed_at)
+      assert player.display_name == attrs.display_name
+      # password is hashed and the virtual field is cleared
+      assert is_binary(player.hashed_password)
       assert is_nil(player.password)
+      # registration auto-confirms the account
+      assert player.confirmed_at
+    end
+
+    test "requires a password and a display name to be set" do
+      {:error, changeset} = Accounts.register_player(%{email: unique_player_email()})
+
+      assert %{
+               password: ["can't be blank"],
+               display_name: ["can't be blank"]
+             } = errors_on(changeset)
     end
   end
 
@@ -139,7 +152,11 @@ defmodule Predictex.AccountsTest do
 
       token =
         extract_player_token(fn url ->
-          Accounts.deliver_player_update_email_instructions(%{player | email: email}, player.email, url)
+          Accounts.deliver_player_update_email_instructions(
+            %{player | email: email},
+            player.email,
+            url
+          )
         end)
 
       %{player: player, token: token, email: email}

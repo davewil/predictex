@@ -1,11 +1,13 @@
 defmodule Predictex.PredictionsTest do
   use Predictex.DataCase, async: true
 
-  alias Predictex.{Accounts, Predictions, Tournament}
+  alias Predictex.{Predictions, Tournament}
+
+  import Predictex.AccountsFixtures
 
   setup do
     {:ok, round} = Tournament.create_round(%{name: "Round 1", stage: :group, ordinal: 1})
-    {:ok, player} = Accounts.create_player(%{display_name: "Dave"})
+    player = player_fixture(%{display_name: "Dave"})
     %{round: round, player: player}
   end
 

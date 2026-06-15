@@ -44,7 +44,9 @@ defmodule Predictex.Accounts.PlayerToken do
   def build_session_token(player) do
     token = :crypto.strong_rand_bytes(@rand_size)
     dt = player.authenticated_at || DateTime.utc_now(:second)
-    {token, %PlayerToken{token: token, context: "session", player_id: player.id, authenticated_at: dt}}
+
+    {token,
+     %PlayerToken{token: token, context: "session", player_id: player.id, authenticated_at: dt}}
   end
 
   @doc """

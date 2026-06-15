@@ -14,29 +14,34 @@ defmodule Predictex.AccountsFixtures do
 
   def valid_player_attributes(attrs \\ %{}) do
     Enum.into(attrs, %{
-      email: unique_player_email()
+      email: unique_player_email(),
+      password: valid_player_password(),
+      display_name: "Player #{System.unique_integer([:positive])}"
     })
   end
 
+  @doc """
+  Builds an unconfirmed player without a password.
+
+  Registration now auto-confirms and requires a password, so `register_player/1`
+  can no longer create an unconfirmed account. We insert directly via a minimal
+  changeset that casts only `email`/`display_name`, leaving `confirmed_at` and
+  `hashed_password` nil — the state the magic-link/confirmation tests rely on.
+  """
   def unconfirmed_player_fixture(attrs \\ %{}) do
+    attrs = valid_player_attributes(attrs)
+
+    %Predictex.Accounts.Player{}
+    |> Ecto.Changeset.cast(attrs, [:email, :display_name])
+    |> Ecto.Changeset.validate_required([:email, :display_name])
+    |> Predictex.Repo.insert!()
+  end
+
+  def player_fixture(attrs \\ %{}) do
     {:ok, player} =
       attrs
       |> valid_player_attributes()
       |> Accounts.register_player()
-
-    player
-  end
-
-  def player_fixture(attrs \\ %{}) do
-    player = unconfirmed_player_fixture(attrs)
-
-    token =
-      extract_player_token(fn url ->
-        Accounts.deliver_login_instructions(player, url)
-      end)
-
-    {:ok, {player, _expired_tokens}} =
-      Accounts.login_player_by_magic_link(token)
 
     player
   end

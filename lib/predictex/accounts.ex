@@ -275,9 +275,14 @@ defmodule Predictex.Accounts do
       {:ok, %{to: ..., body: ...}}
 
   """
-  def deliver_player_update_email_instructions(%Player{} = player, current_email, update_email_url_fun)
+  def deliver_player_update_email_instructions(
+        %Player{} = player,
+        current_email,
+        update_email_url_fun
+      )
       when is_function(update_email_url_fun, 1) do
-    {encoded_token, player_token} = PlayerToken.build_email_token(player, "change:#{current_email}")
+    {encoded_token, player_token} =
+      PlayerToken.build_email_token(player, "change:#{current_email}")
 
     Repo.insert!(player_token)
     PlayerNotifier.deliver_update_email_instructions(player, update_email_url_fun.(encoded_token))
@@ -308,7 +313,9 @@ defmodule Predictex.Accounts do
       with {:ok, player} <- Repo.update(changeset) do
         tokens_to_expire = Repo.all_by(PlayerToken, player_id: player.id)
 
-        Repo.delete_all(from(t in PlayerToken, where: t.id in ^Enum.map(tokens_to_expire, & &1.id)))
+        Repo.delete_all(
+          from(t in PlayerToken, where: t.id in ^Enum.map(tokens_to_expire, & &1.id))
+        )
 
         {:ok, {player, tokens_to_expire}}
       end

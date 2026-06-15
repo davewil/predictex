@@ -36,18 +36,23 @@ defmodule PredictexWeb.PlayerLive.RegistrationTest do
   end
 
   describe "register player" do
-    test "creates account but does not log in", %{conn: conn} do
+    test "creates account and logs the player in", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/players/register")
 
       email = unique_player_email()
       form = form(lv, "#registration_form", player: valid_player_attributes(email: email))
 
-      {:ok, _lv, html} =
-        render_submit(form)
-        |> follow_redirect(conn, ~p"/players/log-in")
+      render_submit(form)
 
-      assert html =~
-               ~r/An email was sent to .*, please access it to confirm your account/
+      # Registration auto-confirms and sets a password, so the LiveView triggers
+      # the form action to the session controller, which logs the player in.
+      conn = follow_trigger_action(form, conn)
+
+      assert get_session(conn, :player_token)
+      assert redirected_to(conn) == ~p"/"
+
+      assert %Predictex.Accounts.Player{} = player = Predictex.Accounts.get_player_by_email(email)
+      assert player.confirmed_at
     end
 
     test "renders errors for duplicated email", %{conn: conn} do

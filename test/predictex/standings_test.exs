@@ -1,7 +1,9 @@
 defmodule Predictex.StandingsTest do
   use Predictex.DataCase, async: true
 
-  alias Predictex.{Accounts, Predictions, Standings, Tournament}
+  alias Predictex.{Predictions, Standings, Tournament}
+
+  import Predictex.AccountsFixtures
 
   # Round 1 (group, ordinal 1) with two completed fixtures: A 1-0 B and C 0-2 D.
   setup do
@@ -41,8 +43,8 @@ defmodule Predictex.StandingsTest do
   end
 
   test "scores DB predictions and ranks players, awarding the round bonus", %{f1: f1, f2: f2} do
-    {:ok, dave} = Accounts.create_player(%{display_name: "Dave"})
-    {:ok, sam} = Accounts.create_player(%{display_name: "Sam"})
+    dave = player_fixture(%{display_name: "Dave"})
+    sam = player_fixture(%{display_name: "Sam"})
 
     # Dave nails both exact scores → 30 + 30, and predicted all of Round 1 correctly → +20.
     predict!(dave, f1, 1, 0)
@@ -66,8 +68,8 @@ defmodule Predictex.StandingsTest do
   end
 
   test "a player with no predictions scores zero and still ranks", %{f1: f1} do
-    {:ok, dave} = Accounts.create_player(%{display_name: "Dave"})
-    {:ok, _lurker} = Accounts.create_player(%{display_name: "Lurker"})
+    dave = player_fixture(%{display_name: "Dave"})
+    _lurker = player_fixture(%{display_name: "Lurker"})
     predict!(dave, f1, 1, 0)
 
     standings = Standings.leaderboard()
@@ -76,7 +78,7 @@ defmodule Predictex.StandingsTest do
   end
 
   test "booster doubles a fixture's points in the standings", %{f1: f1, f2: f2} do
-    {:ok, dave} = Accounts.create_player(%{display_name: "Dave"})
+    dave = player_fixture(%{display_name: "Dave"})
     predict!(dave, f1, 1, 0, booster: true)
     predict!(dave, f2, 0, 2)
 

@@ -3,7 +3,9 @@ defmodule PredictexWeb.LeaderboardLiveTest do
 
   import Phoenix.LiveViewTest
 
-  alias Predictex.{Accounts, Predictions, Tournament}
+  import Predictex.AccountsFixtures
+
+  alias Predictex.{Predictions, Tournament}
 
   test "shows an empty state when there are no players", %{conn: conn} do
     {:ok, _lv, html} = live(conn, ~p"/")
@@ -25,7 +27,7 @@ defmodule PredictexWeb.LeaderboardLiveTest do
         round_id: round.id
       })
 
-    {:ok, dave} = Accounts.create_player(%{display_name: "Dave"})
+    dave = player_fixture(%{display_name: "Dave"})
 
     {:ok, _} =
       Predictions.create_prediction(%{

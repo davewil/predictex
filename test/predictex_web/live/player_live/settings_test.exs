@@ -167,13 +167,22 @@ defmodule PredictexWeb.PlayerLive.SettingsTest do
 
       token =
         extract_player_token(fn url ->
-          Accounts.deliver_player_update_email_instructions(%{player | email: email}, player.email, url)
+          Accounts.deliver_player_update_email_instructions(
+            %{player | email: email},
+            player.email,
+            url
+          )
         end)
 
       %{conn: log_in_player(conn, player), token: token, email: email, player: player}
     end
 
-    test "updates the player email once", %{conn: conn, player: player, token: token, email: email} do
+    test "updates the player email once", %{
+      conn: conn,
+      player: player,
+      token: token,
+      email: email
+    } do
       {:error, redirect} = live(conn, ~p"/players/settings/confirm-email/#{token}")
 
       assert {:live_redirect, %{to: path, flash: flash}} = redirect
