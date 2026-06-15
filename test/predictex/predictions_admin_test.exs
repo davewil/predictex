@@ -39,4 +39,48 @@ defmodule Predictex.PredictionsAdminTest do
     assert pred.home_goals == 2
     assert pred.away_goals == 1
   end
+
+  test "admin_upsert_prediction overwrites an existing pick for the same fixture",
+       %{round: round, player: player} do
+    f = fixture!(round)
+    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 0, away_goals: 0})
+
+    assert {:ok, pred} =
+             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 3, away_goals: 2})
+
+    assert pred.home_goals == 3
+    assert pred.away_goals == 2
+    # overwrite, not a second row
+    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 1
+  end
+
+  test "admin_upsert_prediction succeeds even after kickoff (no lockout)",
+       %{round: round, player: player} do
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+    f = fixture!(round, %{kickoff_at: past})
+
+    assert {:ok, _pred} =
+             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 1, away_goals: 1})
+  end
+
+  test "admin_upsert_prediction moving a booster A->B clears the old booster",
+       %{round: round, player: player} do
+    a = fixture!(round)
+    b = fixture!(round)
+
+    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true})
+
+    assert {:ok, pred_b} =
+             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: b.id, home_goals: 2, away_goals: 0, booster: true})
+
+    assert pred_b.booster
+    pred_a = Repo.get_by(Predictex.Predictions.Prediction, player_id: player.id, fixture_id: a.id)
+    refute pred_a.booster
+  end
+
+  test "admin_upsert_prediction returns :fixture_not_found for an unknown fixture",
+       %{player: player} do
+    assert {:error, :fixture_not_found} =
+             Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: -1, home_goals: 1, away_goals: 0})
+  end
 end
