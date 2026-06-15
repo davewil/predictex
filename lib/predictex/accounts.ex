@@ -63,6 +63,9 @@ defmodule Predictex.Accounts do
   @doc "All players (used by the leaderboard standings)."
   def list_players, do: Repo.all(Player)
 
+  @doc "Count of players (admin landing at-a-glance)."
+  def count_players, do: Repo.aggregate(Player, :count)
+
   @doc "Set a player's `is_admin` to true, by email. Raises if no such player exists."
   def promote_admin(email) do
     case Repo.get_by(Player, email: email) do

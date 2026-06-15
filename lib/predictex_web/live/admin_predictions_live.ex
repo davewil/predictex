@@ -9,7 +9,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <PredictexWeb.AdminLive.admin_nav active={:predictions} />
+      <PredictexWeb.AdminComponents.admin_nav active={:predictions} />
       <p>Prediction entry — coming in Phase 4.</p>
     </Layouts.app>
     """

@@ -63,6 +63,7 @@ defmodule PredictexWeb.Router do
       live "/players/settings/confirm-email/:token", PlayerLive.Settings, :confirm_email
     end
 
+    # Chain :require_authenticated (logged-out -> login) then :require_admin (non-admin -> /).
     live_session :require_admin,
       on_mount: [
         {PredictexWeb.PlayerAuth, :require_authenticated},

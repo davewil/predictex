@@ -9,15 +9,15 @@ defmodule PredictexWeb.AdminLive do
     {:ok,
      socket
      |> assign(:page_title, "Admin")
-     |> assign(:player_count, length(Accounts.list_players()))
-     |> assign(:fixture_count, length(Tournament.list_fixtures()))}
+     |> assign(:player_count, Accounts.count_players())
+     |> assign(:fixture_count, Tournament.count_fixtures())}
   end
 
   @impl true
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <.admin_nav active={:home} />
+      <PredictexWeb.AdminComponents.admin_nav active={:home} />
       <h1 class="text-xl font-semibold mb-4">Admin console</h1>
       <ul class="menu bg-base-200 rounded-box w-full">
         <li>
@@ -29,23 +29,6 @@ defmodule PredictexWeb.AdminLive do
         <li><.link navigate={~p"/admin/players"}>Players</.link></li>
       </ul>
     </Layouts.app>
-    """
-  end
-
-  @doc "Shared section nav bar for all admin LiveViews."
-  attr :active, :atom, required: true
-
-  def admin_nav(assigns) do
-    ~H"""
-    <nav class="tabs tabs-boxed mb-4">
-      <.link navigate={~p"/admin"} class={["tab", @active == :home && "tab-active"]}>Home</.link>
-      <.link
-        navigate={~p"/admin/predictions"}
-        class={["tab", @active == :predictions && "tab-active"]}
-      >Predictions</.link>
-      <.link navigate={~p"/admin/fixtures"} class={["tab", @active == :fixtures && "tab-active"]}>Fixtures</.link>
-      <.link navigate={~p"/admin/players"} class={["tab", @active == :players && "tab-active"]}>Players</.link>
-    </nav>
     """
   end
 end
