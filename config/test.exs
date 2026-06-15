@@ -44,3 +44,9 @@ config :phoenix,
   sort_verified_routes_query_params: true
 
 config :predictex, :league_invite_code, "test-code"
+
+# Stub the admin "Sync from feed" source so tests never hit the network (or the DB
+# from the start_async task). Real ingestion is covered by Predictex.Results.IngestTest.
+config :predictex, :admin_sync_fun, fn ->
+  %{rounds: 0, fixtures_ok: 0, fixtures_error: 0, source: "stub"}
+end
