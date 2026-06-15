@@ -144,3 +144,55 @@ defmodule Predictex.DashboardTest do
     assert Enum.find(view.rounds, & &1.active?).round.ordinal == 2
   end
 end
+
+defmodule Predictex.DashboardDBTest do
+  use Predictex.DataCase, async: true
+
+  import Predictex.AccountsFixtures
+  alias Predictex.{Dashboard, Predictions, Tournament}
+
+  defp fixture!(round, attrs) do
+    base = %{
+      external_ref: "ref-#{System.unique_integer([:positive])}",
+      team1: "Mexico",
+      team2: "Poland",
+      status: :scheduled,
+      round_id: round.id
+    }
+
+    {:ok, f} = Tournament.create_fixture(Map.merge(base, attrs))
+    f
+  end
+
+  test "for_player assembles rounds, picks, points and rank from real data" do
+    {:ok, round} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+    player = player_fixture(%{display_name: "Dave"})
+
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    completed =
+      fixture!(round, %{kickoff_at: past, status: :completed, home_goals: 2, away_goals: 1})
+
+    _open = fixture!(round, %{kickoff_at: future})
+
+    before_kickoff = DateTime.add(past, -1, :second)
+
+    {:ok, _} =
+      Predictions.create_prediction(
+        %{player_id: player.id, fixture_id: completed.id, home_goals: 2, away_goals: 1},
+        before_kickoff
+      )
+
+    view = Dashboard.for_player(player)
+
+    assert view.of >= 1
+    assert is_integer(view.rank)
+    [r1] = view.rounds
+    assert length(r1.fixtures) == 2
+    scored = Enum.find(r1.fixtures, &(&1.fixture.id == completed.id))
+    assert scored.points > 0 and scored.exact?
+    unp = Enum.find(r1.fixtures, &(&1.fixture.id != completed.id))
+    assert unp.prediction == nil
+  end
+end
