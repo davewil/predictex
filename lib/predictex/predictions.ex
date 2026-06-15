@@ -154,6 +154,9 @@ defmodule Predictex.Predictions do
     |> Repo.update_all(set: [booster: false])
   end
 
+  defp save_round_row(_player_id, _round_id, %{home_goals: nil, away_goals: nil, booster: true}),
+    do: {:error, :booster_on_blank}
+
   defp save_round_row(_player_id, _round_id, %{home_goals: nil, away_goals: nil}), do: :skipped
 
   defp save_round_row(player_id, round_id, row) do

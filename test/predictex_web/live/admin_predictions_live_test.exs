@@ -77,6 +77,9 @@ defmodule PredictexWeb.AdminPredictionsLiveTest do
     )
     |> render_submit()
 
+    [pred] = Predictions.list_player_predictions(player.id)
+    assert pred.booster
+
     # Now visit the player's own dashboard as that player.
     player_conn = build_conn() |> log_in_player(player)
     {:ok, _lv2, html} = live(player_conn, ~p"/predictions")

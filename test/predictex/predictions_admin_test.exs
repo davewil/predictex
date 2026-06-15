@@ -188,4 +188,18 @@ defmodule Predictex.PredictionsAdminTest do
     assert length(preds) == 2
     assert Enum.all?(preds, fn p -> p.player.display_name in ["Dave", "Sam"] end)
   end
+
+  test "admin_save_round_predictions errors when the booster is set on a blank row",
+       %{round: round, player: player} do
+    blank = fixture!(round)
+
+    {:ok, results} =
+      Predictions.admin_save_round_predictions(player.id, round.id, [
+        %{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: true}
+      ])
+
+    assert results[blank.id] == {:error, :booster_on_blank}
+    # nothing persisted, and no stray booster left behind
+    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 0
+  end
 end

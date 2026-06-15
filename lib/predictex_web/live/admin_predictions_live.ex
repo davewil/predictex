@@ -1,9 +1,11 @@
 defmodule PredictexWeb.AdminPredictionsLive do
   @moduledoc """
   Admin prediction entry on behalf of players. Two lenses over the same data:
-  `?view=player` (default, primary entry) and `?view=fixture` (audit). The LiveView is the
-  anti-corruption boundary: it parses raw form params into clean typed rows and hands them
-  to `Predictions.admin_save_round_predictions/3` / `admin_upsert_prediction/1`.
+  `?view=player` (primary entry — a per-round grid saved via
+  `Predictions.admin_save_round_predictions/3`) and `?view=fixture` (read-only audit lens
+  that flags players with no pick). The LiveView is the anti-corruption boundary: it parses
+  raw form params into clean typed rows at the edge. Inline editing from the by-fixture lens
+  is a deferred follow-up (it would call `Predictions.admin_upsert_prediction/1`).
   """
   use PredictexWeb, :live_view
 
@@ -20,6 +22,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
      |> assign(:selected_round_id, nil)
      |> assign(:selected_fixture_id, nil)
      |> assign(:fixtures, [])
+     |> assign(:all_fixtures, all_fixtures())
      |> assign(:existing, %{})
      |> assign(:fixture_preds, [])
      |> assign(:missing_players, [])}
@@ -128,9 +131,15 @@ defmodule PredictexWeb.AdminPredictionsLive do
   defp to_int(""), do: nil
   defp to_int(i) when is_integer(i), do: i
   defp to_int(s) when is_binary(s), do: String.to_integer(s)
-  defp to_int_or_nil(""), do: nil
-  defp to_int_or_nil(nil), do: nil
-  defp to_int_or_nil(s), do: String.to_integer(s)
+  defp to_int_or_nil(s) when s in ["", nil], do: nil
+
+  defp to_int_or_nil(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(nil), do: nil
   defp blank_to_nil(s), do: s
@@ -272,7 +281,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
         <form id="by-fixture-select" phx-change="load_fixture" class="mb-4">
           <select name="fixture_id" class="select select-bordered">
             <option value="">Fixture…</option>
-            <option :for={f <- all_fixtures()} value={f.id} selected={f.id == @selected_fixture_id}>
+            <option :for={f <- @all_fixtures} value={f.id} selected={f.id == @selected_fixture_id}>
               {f.team1} v {f.team2}
             </option>
           </select>
