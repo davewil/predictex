@@ -55,14 +55,22 @@ the app scores them against real results and ranks a leaderboard.
 - `scripts/sync-secrets-from-vault.sh` copies the homelab secrets from Vaultwarden (`bw`).
 
 ## Prod ops (run on the host, inside the container)
-Releases ship **no Mix** — use release functions, not mix tasks:
-```bash
-docker compose -f /root/predictex/docker-compose.prod.yml exec app \
-  bin/predictex eval "Predictex.Release.sync_results()"                 # seed/refresh fixtures
-docker compose -f /root/predictex/docker-compose.prod.yml exec app \
-  bin/predictex eval "Predictex.Release.promote_admin(\"you@example.com\")"   # make admin
-```
-(`bin/predictex rpc '<expr>'` works for ad-hoc calls against the running node.)
+Releases ship **no Mix** — use release functions, not mix tasks.
+
+**`rpc` vs `eval` — pick by whether the node is running:**
+- **`rpc <expr>` → ad-hoc calls against the LIVE node** (Repo + full app already started).
+  This is the default for one-off admin/DB ops, e.g. promoting an admin:
+  ```bash
+  docker compose -f /root/predictex/docker-compose.prod.yml exec app \
+    bin/predictex rpc 'Predictex.Accounts.promote_admin("you@example.com")'
+  ```
+- **`eval <expr>` → ONLY for `Release.*` wrapper fns** (migrations/seeding). `eval` boots a
+  fresh BEAM that does **not** start the supervision tree, so the Repo isn't running — a bare
+  `Accounts.*` call would crash. The `Release.*` fns work because they start the repo themselves:
+  ```bash
+  docker compose -f /root/predictex/docker-compose.prod.yml exec app \
+    bin/predictex eval "Predictex.Release.sync_results()"   # seed/refresh fixtures (repo started internally)
+  ```
 
 ## Done (beads issues closed)
 Scoring engine · Ecto schemas · DB ingestion + seeds · DB-backed leaderboard (`0ae`) ·
