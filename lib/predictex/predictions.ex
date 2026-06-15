@@ -90,6 +90,10 @@ defmodule Predictex.Predictions do
   then upserts each row. A row is **skipped** when both goals are nil; **upserted** when
   both are present and valid; reported as `{:error, changeset}` when invalid (e.g. exactly
   one goal). Returns `{:ok, results}` where `results` maps `fixture_id => :upserted | :skipped | {:error, cs}`.
+
+  `{:ok, results}` is returned even when some rows failed — callers MUST inspect the
+  per-fixture results map; an `{:error, cs}` entry means that row did not persist while
+  the others did.
   """
   def admin_save_round_predictions(player_id, round_id, rows) when is_list(rows) do
     Repo.transaction(fn ->
@@ -132,7 +136,12 @@ defmodule Predictex.Predictions do
   end
 
   # Read a key whether the attrs map is atom- or string-keyed.
-  defp take(attrs, key), do: attrs[key] || attrs[Atom.to_string(key)]
+  defp take(attrs, key) do
+    case Map.fetch(attrs, key) do
+      {:ok, val} -> val
+      :error -> Map.get(attrs, Atom.to_string(key))
+    end
+  end
 
   defp booster_set?(attrs), do: take(attrs, :booster) in [true, "true"]
 
