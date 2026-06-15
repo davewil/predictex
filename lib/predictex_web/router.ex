@@ -17,7 +17,7 @@ defmodule PredictexWeb.Router do
   scope "/", PredictexWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", LeaderboardLive, :index
   end
 
   scope "/", PredictexWeb do
