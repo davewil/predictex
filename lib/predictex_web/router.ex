@@ -58,6 +58,7 @@ defmodule PredictexWeb.Router do
 
     live_session :require_authenticated_player,
       on_mount: [{PredictexWeb.PlayerAuth, :require_authenticated}] do
+      live "/predictions", MyPredictionsLive, :index
       live "/players/settings", PlayerLive.Settings, :edit
       live "/players/settings/confirm-email/:token", PlayerLive.Settings, :confirm_email
     end
