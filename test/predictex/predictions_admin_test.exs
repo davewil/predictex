@@ -126,4 +126,18 @@ defmodule Predictex.PredictionsAdminTest do
     assert length(boosted) == 1
     assert hd(boosted).fixture_id == b.id
   end
+
+  test "list_fixture_predictions returns every player's pick for a fixture, player preloaded",
+       %{round: round, player: player} do
+    other = player_fixture(%{display_name: "Sam"})
+    f = fixture!(round)
+
+    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: f.id, home_goals: 1, away_goals: 0})
+    {:ok, _} = Predictions.admin_upsert_prediction(%{player_id: other.id, fixture_id: f.id, home_goals: 2, away_goals: 2})
+
+    preds = Predictions.list_fixture_predictions(f.id)
+
+    assert length(preds) == 2
+    assert Enum.all?(preds, fn p -> p.player.display_name in ["Dave", "Sam"] end)
+  end
 end
