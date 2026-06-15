@@ -74,6 +74,17 @@ defmodule Predictex.Accounts do
     end
   end
 
+  @doc """
+  Set a player's `is_admin` flag by id. Id-based, tuple-returning sibling to
+  `promote_admin/1`, for the admin Players UI. Returns `{:ok, player}` or `{:error, changeset}`.
+  """
+  def set_player_admin(player_id, is_admin) when is_boolean(is_admin) do
+    Player
+    |> Repo.get!(player_id)
+    |> Ecto.Changeset.change(is_admin: is_admin)
+    |> Repo.update()
+  end
+
   ## Player registration
 
   @doc """

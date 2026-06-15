@@ -411,4 +411,17 @@ defmodule Predictex.AccountsTest do
       refute inspect(%Player{password: "123456"}) =~ "password: \"123456\""
     end
   end
+
+  describe "set_player_admin/2" do
+    test "promotes and demotes by id, returning {:ok, player}" do
+      player = player_fixture()
+      refute player.is_admin
+
+      assert {:ok, promoted} = Accounts.set_player_admin(player.id, true)
+      assert promoted.is_admin
+
+      assert {:ok, demoted} = Accounts.set_player_admin(player.id, false)
+      refute demoted.is_admin
+    end
+  end
 end
