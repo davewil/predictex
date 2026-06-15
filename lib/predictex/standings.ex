@@ -34,7 +34,9 @@ defmodule Predictex.Standings do
 
   `fixtures` must have `:round` loaded; `players` must have `:predictions` loaded.
   Returns a list of `%{player_id, name, fixtures_total, round_bonus_total, total,
-  breakdown}` sorted by `:total` descending, ties broken by name.
+  bonus_by_round, breakdown}` sorted by `:total` descending, ties broken by name.
+  `bonus_by_round` maps each round ordinal to its Round Bonus; each `breakdown`
+  entry carries `%{ordinal, fixture_id, result}`.
   """
   def rank(players, fixtures) do
     fixtures_by_id = Map.new(fixtures, &{&1.id, &1})

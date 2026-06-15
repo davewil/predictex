@@ -99,10 +99,11 @@ defmodule Predictex.StandingsTest do
     standings = Standings.leaderboard()
     first = hd(standings)
 
-    # every scored entry knows which fixture it came from
-    assert Enum.all?(first.breakdown, fn e -> is_integer(e.fixture_id) end)
+    # breakdown carries the exact fixture ids Dave predicted in setup
+    actual_ids = first.breakdown |> Enum.map(& &1.fixture_id) |> MapSet.new()
+    assert actual_ids == MapSet.new([f1.id, f2.id])
 
-    # the per-round bonus map sums back to the headline round_bonus_total
-    assert first.bonus_by_round |> Map.values() |> Enum.sum() == first.round_bonus_total
+    # Dave swept the completed round 1 (ordinal 1) → a single +20 round bonus
+    assert first.bonus_by_round == %{1 => 20}
   end
 end
