@@ -7,6 +7,19 @@
 # General application configuration
 import Config
 
+config :predictex, :scopes,
+  player: [
+    default: true,
+    module: Predictex.Accounts.Scope,
+    assign_key: :current_scope,
+    access_path: [:player, :id],
+    schema_key: :player_id,
+    schema_type: :id,
+    schema_table: :players,
+    test_data_fixture: Predictex.AccountsFixtures,
+    test_setup_helper: :register_and_log_in_player
+  ]
+
 config :predictex,
   ecto_repos: [Predictex.Repo],
   generators: [timestamp_type: :utc_datetime]

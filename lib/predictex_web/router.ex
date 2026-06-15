@@ -1,6 +1,8 @@
 defmodule PredictexWeb.Router do
   use PredictexWeb, :router
 
+  import PredictexWeb.PlayerAuth
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,6 +10,7 @@ defmodule PredictexWeb.Router do
     plug :put_root_layout, html: {PredictexWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_scope_for_player
   end
 
   pipeline :api do
@@ -46,5 +49,33 @@ defmodule PredictexWeb.Router do
       live_dashboard "/dashboard", metrics: PredictexWeb.Telemetry
       forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
+  end
+
+  ## Authentication routes
+
+  scope "/", PredictexWeb do
+    pipe_through [:browser, :require_authenticated_player]
+
+    live_session :require_authenticated_player,
+      on_mount: [{PredictexWeb.PlayerAuth, :require_authenticated}] do
+      live "/players/settings", PlayerLive.Settings, :edit
+      live "/players/settings/confirm-email/:token", PlayerLive.Settings, :confirm_email
+    end
+
+    post "/players/update-password", PlayerSessionController, :update_password
+  end
+
+  scope "/", PredictexWeb do
+    pipe_through [:browser]
+
+    live_session :current_player,
+      on_mount: [{PredictexWeb.PlayerAuth, :mount_current_scope}] do
+      live "/players/register", PlayerLive.Registration, :new
+      live "/players/log-in", PlayerLive.Login, :new
+      live "/players/log-in/:token", PlayerLive.Confirmation, :new
+    end
+
+    post "/players/log-in", PlayerSessionController, :create
+    delete "/players/log-out", PlayerSessionController, :delete
   end
 end
