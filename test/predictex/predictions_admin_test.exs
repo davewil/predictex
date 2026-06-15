@@ -83,4 +83,47 @@ defmodule Predictex.PredictionsAdminTest do
     assert {:error, :fixture_not_found} =
              Predictions.admin_upsert_prediction(%{player_id: player.id, fixture_id: -1, home_goals: 1, away_goals: 0})
   end
+
+  test "admin_save_round_predictions upserts complete rows, skips blank, errors half-filled",
+       %{round: round, player: player} do
+    full = fixture!(round)
+    blank = fixture!(round)
+    half = fixture!(round)
+
+    rows = [
+      %{fixture_id: full.id, home_goals: 2, away_goals: 1, booster: false},
+      %{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: false},
+      %{fixture_id: half.id, home_goals: 1, away_goals: nil, booster: false}
+    ]
+
+    {:ok, results} = Predictions.admin_save_round_predictions(player.id, round.id, rows)
+
+    assert results[full.id] == :upserted
+    assert results[blank.id] == :skipped
+    assert match?({:error, _}, results[half.id])
+    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 1
+  end
+
+  test "admin_save_round_predictions sets exactly one booster across the round",
+       %{round: round, player: player} do
+    a = fixture!(round)
+    b = fixture!(round)
+
+    {:ok, _} =
+      Predictions.admin_save_round_predictions(player.id, round.id, [
+        %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true},
+        %{fixture_id: b.id, home_goals: 0, away_goals: 0, booster: false}
+      ])
+
+    # Move the booster to B in a second save.
+    {:ok, _} =
+      Predictions.admin_save_round_predictions(player.id, round.id, [
+        %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: false},
+        %{fixture_id: b.id, home_goals: 0, away_goals: 0, booster: true}
+      ])
+
+    boosted = Repo.all(from p in Predictex.Predictions.Prediction, where: p.booster == true)
+    assert length(boosted) == 1
+    assert hd(boosted).fixture_id == b.id
+  end
 end
