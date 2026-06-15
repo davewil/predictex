@@ -61,6 +61,25 @@ defmodule Predictex.Accounts.Player do
   end
 
   @doc """
+  A player changeset for registering with email, password, and display name.
+
+  Casts email, password and display_name, requires the display name, and reuses
+  the email and password validations (so the password is hashed by default).
+
+  ## Options
+
+  Accepts the same options as `email_changeset/3` and `password_changeset/3`,
+  i.e. `:validate_unique` and `:hash_password`.
+  """
+  def registration_changeset(player, attrs, opts \\ []) do
+    player
+    |> cast(attrs, [:email, :password, :display_name])
+    |> validate_required([:display_name])
+    |> validate_email(opts)
+    |> validate_password(opts)
+  end
+
+  @doc """
   A player changeset for changing the password.
 
   It is important to validate the length of the password, as long passwords may

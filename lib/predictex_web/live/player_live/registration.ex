@@ -22,7 +22,23 @@ defmodule PredictexWeb.PlayerLive.Registration do
           </.header>
         </div>
 
-        <.form for={@form} id="registration_form" phx-submit="save" phx-change="validate">
+        <.form
+          for={@form}
+          id="registration_form"
+          action={~p"/players/log-in"}
+          phx-submit="save"
+          phx-change="validate"
+          phx-trigger-action={@trigger_submit}
+        >
+          <.input
+            field={@form[:display_name]}
+            type="text"
+            label="Display name"
+            autocomplete="nickname"
+            required
+            phx-mounted={JS.focus()}
+          />
+
           <.input
             field={@form[:email]}
             type="email"
@@ -30,7 +46,14 @@ defmodule PredictexWeb.PlayerLive.Registration do
             autocomplete="username"
             spellcheck="false"
             required
-            phx-mounted={JS.focus()}
+          />
+
+          <.input
+            field={@form[:password]}
+            type="password"
+            label="Password"
+            autocomplete="new-password"
+            required
           />
 
           <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
@@ -49,36 +72,27 @@ defmodule PredictexWeb.PlayerLive.Registration do
   end
 
   def mount(_params, _session, socket) do
-    changeset = Accounts.change_player_email(%Player{}, %{}, validate_unique: false)
+    changeset = Accounts.change_player_registration(%Player{})
 
-    {:ok, assign_form(socket, changeset), temporary_assigns: [form: nil]}
+    {:ok, assign_form(socket, changeset) |> assign(trigger_submit: false)}
   end
 
   @impl true
   def handle_event("save", %{"player" => player_params}, socket) do
     case Accounts.register_player(player_params) do
-      {:ok, player} ->
-        {:ok, _} =
-          Accounts.deliver_login_instructions(
-            player,
-            &url(~p"/players/log-in/#{&1}")
-          )
-
-        {:noreply,
-         socket
-         |> put_flash(
-           :info,
-           "An email was sent to #{player.email}, please access it to confirm your account."
-         )
-         |> push_navigate(to: ~p"/players/log-in")}
+      {:ok, _player} ->
+        # Player is auto-confirmed and has a password, so hand off to the session
+        # controller to log them in immediately. The DOM form still carries the
+        # plaintext password, which the controller re-verifies before logging in.
+        {:noreply, assign(socket, trigger_submit: true)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:noreply, assign_form(socket, changeset)}
+        {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
     end
   end
 
   def handle_event("validate", %{"player" => player_params}, socket) do
-    changeset = Accounts.change_player_email(%Player{}, player_params, validate_unique: false)
+    changeset = Accounts.change_player_registration(%Player{}, player_params)
     {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
   end
 

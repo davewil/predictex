@@ -79,8 +79,25 @@ defmodule Predictex.Accounts do
   """
   def register_player(attrs) do
     %Player{}
-    |> Player.email_changeset(attrs)
+    |> Player.registration_changeset(attrs)
+    |> Ecto.Changeset.put_change(:confirmed_at, DateTime.utc_now(:second))
     |> Repo.insert()
+  end
+
+  @doc """
+  Returns an `%Ecto.Changeset{}` for tracking player registration changes.
+
+  Used for live form validation; password hashing and email uniqueness checks
+  are disabled by default so the form can re-render on every keystroke.
+
+  ## Examples
+
+      iex> change_player_registration(player)
+      %Ecto.Changeset{data: %Player{}}
+
+  """
+  def change_player_registration(player, attrs \\ %{}) do
+    Player.registration_changeset(player, attrs, hash_password: false, validate_unique: false)
   end
 
   ## Settings
