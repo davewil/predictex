@@ -45,3 +45,6 @@ npm-debug.log
 .dolt/
 *.db
 .beads-credential-key
+
+# Brainstorming visual companion (transient mockups)
+.superpowers/
