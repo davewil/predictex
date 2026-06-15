@@ -12,15 +12,16 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.3.0`
+- **Latest deployed tag:** `v0.4.0`
 - **League invite code:** `wcpredict2026`
-- **Prod state:** 12 fixtures synced. **My Predictions dashboard (`/predictions`) is live**
-  (read-only). Everyone still shows "no pick imported" until predictions are fed in.
-- **Prediction-entry model (important):** predictions are **never entered in-app**. Members
-  make them on the official FIFA Match Predictor; they reach predictex via **auto-import**
-  (`xox`, not built) or **admin entry on behalf of players** from screenshots (`a02`, not
-  built). `/predictions` only *displays* them. So `a02` is the next thing that makes the
-  game playable.
+- **Prod state:** 12 fixtures synced. **Admin console (`/admin`) and My Predictions
+  (`/predictions`) are both live.** Admins can now enter predictions on behalf of players —
+  the game is playable. Members still show "no pick imported" until an admin transcribes
+  their FIFA screenshots at `/admin/predictions`.
+- **Prediction-entry model (important):** predictions are **never entered in-app by members**.
+  Members make them on the official FIFA Match Predictor; they reach predictex via **admin
+  entry on behalf of players** from screenshots (`a02`, **shipped** — `/admin/predictions`)
+  or, eventually, **auto-import** (`xox`, not built). `/predictions` only *displays* them.
 
 ## Stack & toolchain
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
@@ -68,7 +69,7 @@ Scoring engine · Ecto schemas · DB ingestion + seeds · DB-backed leaderboard 
 Leaderboard LiveView (`8id`) · CI/CD deploy pipeline (`07o`) · Player auth (`5gw`) ·
 **My Predictions read-only dashboard (`79q`)** — spec/plan in `docs/superpowers/{specs,plans}/2026-06-15-my-predictions*`.
 
-## Admin console (`a02`) — IMPLEMENTED LOCALLY, NOT YET PUSHED (as of 2026-06-15)
+## Admin console (`a02`) — SHIPPED in v0.4.0 (2026-06-16)
 Full admin console at `/admin` (gated by chained `:require_authenticated` + `:require_admin`).
 Spec/plan in `docs/superpowers/{specs,plans}/2026-06-15-admin-console*`. **This is the
 playability unlock** — admins can now enter predictions on behalf of players. 237 tests green.
@@ -81,10 +82,12 @@ playability unlock** — admins can now enter predictions on behalf of players. 
   booster-on-blank errors), `list_fixture_predictions/1`; `Accounts.set_player_admin/2`;
   `count_players/0` / `count_fixtures/0`.
 - **Sync is network-free in tests** via injectable `:admin_sync_fun` (config/test.exs stub).
-- **Beads status:** `a02` still claimed/in_progress (left open for you to verify before close).
-- **Caveat:** Phases 1–3 got full two-stage subagent review; Phases 4–7 had one consolidated
-  review (fixes applied in `583a4ce`). A spend-limit interruption mid-run means a `/code-review`
-  pass on the branch before merge is worthwhile.
+- **Reviewed:** Phases 1–3 two-stage subagent review; Phases 4–7 consolidated review
+  (`583a4ce`); plus a full `/code-review` scoped `6e05836..HEAD` which caught and fixed a
+  booster-on-blank data-loss bug (`6f95bc4`). `a02` closed.
+- **Smoke-test gate (still open):** the test suite is all in-process `live/2` — no real
+  browser has hit `/admin` yet. Worth a manual click-through of `/admin/predictions`
+  (two-select grid → Save) before relying on it for real screenshot transcription.
 
 ## Next (beads open — run `bd ready` / `bd list`)
 - `0yn` Admin **by-fixture inline editing** (the by-fixture lens is audit-only today; spec
