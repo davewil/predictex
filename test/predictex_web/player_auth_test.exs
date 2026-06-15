@@ -332,6 +332,45 @@ defmodule PredictexWeb.PlayerAuthTest do
     end
   end
 
+  describe "on_mount :require_admin" do
+    defp make_admin(player),
+      do: Predictex.Repo.update!(Ecto.Changeset.change(player, is_admin: true))
+
+    test "allows an admin player through", %{conn: conn, player: player} do
+      admin = make_admin(player)
+      player_token = Accounts.generate_player_session_token(admin)
+      session = conn |> put_session(:player_token, player_token) |> get_session()
+
+      {:cont, updated_socket} =
+        PlayerAuth.on_mount(:require_admin, %{}, session, %LiveView.Socket{})
+
+      assert updated_socket.assigns.current_scope.player.id == admin.id
+    end
+
+    test "redirects a non-admin authenticated player", %{conn: conn, player: player} do
+      player_token = Accounts.generate_player_session_token(player)
+      session = conn |> put_session(:player_token, player_token) |> get_session()
+
+      socket = %LiveView.Socket{
+        endpoint: PredictexWeb.Endpoint,
+        assigns: %{__changed__: %{}, flash: %{}}
+      }
+
+      {:halt, _updated_socket} = PlayerAuth.on_mount(:require_admin, %{}, session, socket)
+    end
+
+    test "redirects an unauthenticated visitor", %{conn: conn} do
+      session = conn |> get_session()
+
+      socket = %LiveView.Socket{
+        endpoint: PredictexWeb.Endpoint,
+        assigns: %{__changed__: %{}, flash: %{}}
+      }
+
+      {:halt, _updated_socket} = PlayerAuth.on_mount(:require_admin, %{}, session, socket)
+    end
+  end
+
   describe "require_authenticated_player/2" do
     setup %{conn: conn} do
       %{conn: PlayerAuth.fetch_current_scope_for_player(conn, [])}
