@@ -14,6 +14,7 @@ services:
       PORT: "4000"
       POOL_SIZE: "10"
       SECRET_KEY_BASE: "${SECRET_KEY_BASE}"
+      LEAGUE_INVITE_CODE: "${LEAGUE_INVITE_CODE}"
     expose:
       - "4000"
     labels:

@@ -41,6 +41,7 @@ ones are the same values used by slackex.
 | `TAILSCALE_AUTHKEY` | Tailscale OAuth secret |
 | `SECRET_KEY_BASE` | Phoenix secret — generate with `mix phx.gen.secret` |
 | `POSTGRES_PASSWORD` | Password for the prod `postgres` role (avoid `\|` — used as a sed delimiter) |
+| `LEAGUE_INVITE_CODE` | Shared code members enter to register (share it in the WhatsApp group) |
 
 `GITHUB_TOKEN` is provided automatically and is used to push/pull the GHCR image.
 
@@ -61,3 +62,5 @@ The app's own `/root/predictex/.env` (`SECRET_KEY_BASE`, `POSTGRES_PASSWORD`) an
   → `Predictex.Release.migrate()`), so no manual `ecto.create` is needed.
 - Seed fixtures after the first deploy by running the ingest inside the container:
   `docker compose -f docker-compose.prod.yml exec app bin/predictex eval "Predictex.Results.Ingest.sync_from_url()"`.
+- Register yourself (using `LEAGUE_INVITE_CODE`), then make yourself admin:
+  `docker compose -f docker-compose.prod.yml exec app bin/predictex predictex.promote_admin <your-email>`.
