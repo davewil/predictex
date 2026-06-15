@@ -23,6 +23,10 @@ end
 config :predictex, PredictexWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+if fifa_url = System.get_env("FIFA_PREDICTOR_URL") do
+  config :predictex, :fifa_predictor_url, fifa_url
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
