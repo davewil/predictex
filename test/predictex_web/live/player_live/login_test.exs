@@ -10,36 +10,7 @@ defmodule PredictexWeb.PlayerLive.LoginTest do
 
       assert html =~ "Log in"
       assert html =~ "Sign up"
-      assert html =~ "Log in with email"
-    end
-  end
-
-  describe "player login - magic link" do
-    test "sends magic link email when player exists", %{conn: conn} do
-      player = player_fixture()
-
-      {:ok, lv, _html} = live(conn, ~p"/players/log-in")
-
-      {:ok, _lv, html} =
-        form(lv, "#login_form_magic", player: %{email: player.email})
-        |> render_submit()
-        |> follow_redirect(conn, ~p"/players/log-in")
-
-      assert html =~ "If your email is in our system"
-
-      assert Predictex.Repo.get_by!(Predictex.Accounts.PlayerToken, player_id: player.id).context ==
-               "login"
-    end
-
-    test "does not disclose if player is registered", %{conn: conn} do
-      {:ok, lv, _html} = live(conn, ~p"/players/log-in")
-
-      {:ok, _lv, html} =
-        form(lv, "#login_form_magic", player: %{email: "idonotexist@example.com"})
-        |> render_submit()
-        |> follow_redirect(conn, ~p"/players/log-in")
-
-      assert html =~ "If your email is in our system"
+      refute html =~ "Log in with email"
     end
   end
 
@@ -100,10 +71,10 @@ defmodule PredictexWeb.PlayerLive.LoginTest do
 
       assert html =~ "You need to reauthenticate"
       refute html =~ "Register"
-      assert html =~ "Log in with email"
+      refute html =~ "Log in with email"
 
       assert html =~
-               ~s(<input type="email" name="player[email]" id="login_form_magic_email" value="#{player.email}")
+               ~s(<input type="email" name="player[email]" id="login_form_password_email" value="#{player.email}")
     end
   end
 end

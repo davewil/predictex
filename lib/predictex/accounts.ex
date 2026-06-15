@@ -66,7 +66,11 @@ defmodule Predictex.Accounts do
   ## Player registration
 
   @doc """
-  Registers a player.
+  Registers a player (email + password + display_name), auto-confirmed.
+
+  Intentionally NOT invite-gated: the public self-registration path gates on the
+  league invite code in `PredictexWeb.PlayerLive.Registration`; admin-initiated
+  creation (acting on a member's behalf) deliberately bypasses that gate.
 
   ## Examples
 
