@@ -26,7 +26,7 @@ the app scores them against real results and ranks a leaderboard.
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **216 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
+- **237 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
 
 ## Architecture (Gather → Decide → Act; pure cores, effects at edges)
 - `Predictex.Scoring` — **pure** scoring engine (`score/3`, `round_total/2`). All rulings encoded here.
@@ -68,12 +68,27 @@ Scoring engine · Ecto schemas · DB ingestion + seeds · DB-backed leaderboard 
 Leaderboard LiveView (`8id`) · CI/CD deploy pipeline (`07o`) · Player auth (`5gw`) ·
 **My Predictions read-only dashboard (`79q`)** — spec/plan in `docs/superpowers/{specs,plans}/2026-06-15-my-predictions*`.
 
+## Admin console (`a02`) — IMPLEMENTED LOCALLY, NOT YET PUSHED (as of 2026-06-15)
+Full admin console at `/admin` (gated by chained `:require_authenticated` + `:require_admin`).
+Spec/plan in `docs/superpowers/{specs,plans}/2026-06-15-admin-console*`. **This is the
+playability unlock** — admins can now enter predictions on behalf of players. 237 tests green.
+- **Sub-routes:** `AdminLive` (`/admin` landing), `AdminPredictionsLive` (`/admin/predictions`
+  — by-player entry grid + by-fixture audit lens), `AdminFixturesLive` (sync button +
+  result override + cohort %), `AdminPlayersLive` (list + promote). Nav via
+  `PredictexWeb.AdminComponents.admin_nav/1`; an "Admin" link shows in the app nav for admins.
+- **Domain added:** `Predictions.admin_upsert_prediction/1` (single-fixture, no lockout,
+  transactional booster-clear), `admin_save_round_predictions/3` (sparse-grid batch;
+  booster-on-blank errors), `list_fixture_predictions/1`; `Accounts.set_player_admin/2`;
+  `count_players/0` / `count_fixtures/0`.
+- **Sync is network-free in tests** via injectable `:admin_sync_fun` (config/test.exs stub).
+- **Beads status:** `a02` still claimed/in_progress (left open for you to verify before close).
+- **Caveat:** Phases 1–3 got full two-stage subagent review; Phases 4–7 had one consolidated
+  review (fixes applied in `583a4ce`). A spend-limit interruption mid-run means a `/code-review`
+  pass on the branch before merge is worthwhile.
+
 ## Next (beads open — run `bd ready` / `bd list`)
-- **`a02` Admin LiveView — RECOMMENDED NEXT.** Results sync, cohort % entry, player mgmt,
-  recompute, and **admin entry of predictions on behalf of players** (from FIFA screenshots).
-  This is what actually feeds `/predictions` and makes the game playable — gated by
-  `on_mount(:require_admin)` (admin flag + `Accounts.promote_admin/1` already exist).
-  Note: cohort % is admin-entered; if unset, the "risky" bonus is silently skipped — make it visible.
+- `0yn` Admin **by-fixture inline editing** (the by-fixture lens is audit-only today; spec
+  wanted inline save via `admin_upsert_prediction/1`, which currently has no UI caller).
 - `mt6` Automated result-sync schedule (Oban/Task).
 - `xox` FIFA prediction import (bookmarklet + `/api/import`); fragile (endpoint 403s scripted
   requests), so admin entry (`a02`) is the guaranteed path — treat import as a bonus.
