@@ -63,6 +63,14 @@ defmodule Predictex.Accounts do
   @doc "All players (used by the leaderboard standings)."
   def list_players, do: Repo.all(Player)
 
+  @doc "Set a player's `is_admin` to true, by email. Raises if no such player exists."
+  def promote_admin(email) do
+    case Repo.get_by(Player, email: email) do
+      nil -> raise "No player with email #{email}"
+      player -> player |> Ecto.Changeset.change(is_admin: true) |> Repo.update!()
+    end
+  end
+
   ## Player registration
 
   @doc """

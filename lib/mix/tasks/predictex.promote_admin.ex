@@ -1,22 +1,14 @@
 defmodule Mix.Tasks.Predictex.PromoteAdmin do
-  @shortdoc "Promote a player to admin by email"
+  @shortdoc "Promote a player to admin by email (dev/test; use Predictex.Release.promote_admin/1 in prod)"
   @moduledoc "Usage: mix predictex.promote_admin <email>"
   use Mix.Task
 
   @requirements ["app.start"]
-
-  alias Predictex.Repo
-  alias Predictex.Accounts.Player
 
   @impl Mix.Task
   def run([email]), do: promote(email)
   def run(_), do: Mix.raise("Usage: mix predictex.promote_admin <email>")
 
   @doc false
-  def promote(email) do
-    case Repo.get_by(Player, email: email) do
-      nil -> raise "No player with email #{email}"
-      player -> player |> Ecto.Changeset.change(is_admin: true) |> Repo.update!()
-    end
-  end
+  defdelegate promote(email), to: Predictex.Accounts, as: :promote_admin
 end

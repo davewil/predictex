@@ -60,7 +60,9 @@ The app's own `/root/predictex/.env` (`SECRET_KEY_BASE`, `POSTGRES_PASSWORD`) an
 
 - The app container creates `predictex_prod` and runs migrations automatically (boot check
   → `Predictex.Release.migrate()`), so no manual `ecto.create` is needed.
-- Seed fixtures after the first deploy by running the ingest inside the container:
-  `docker compose -f docker-compose.prod.yml exec app bin/predictex eval "Predictex.Results.Ingest.sync_from_url()"`.
+- Seed fixtures after the first deploy:
+  `docker compose -f docker-compose.prod.yml exec app bin/predictex eval "Predictex.Release.sync_results()"`.
 - Register yourself (using `LEAGUE_INVITE_CODE`), then make yourself admin:
-  `docker compose -f docker-compose.prod.yml exec app bin/predictex predictex.promote_admin <your-email>`.
+  `docker compose -f docker-compose.prod.yml exec app bin/predictex eval "Predictex.Release.promote_admin(\"<your-email>\")"`.
+
+These use release functions (`Predictex.Release.*`), not `mix` tasks — releases don't ship Mix. They wrap the work in `Ecto.Migrator.with_repo/2`, so they start the repo themselves and are safe to run via `eval`. (`bin/predictex rpc '<expr>'` also works for ad-hoc calls against the already-running node.)
