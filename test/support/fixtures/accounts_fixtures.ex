@@ -46,6 +46,12 @@ defmodule Predictex.AccountsFixtures do
     player
   end
 
+  @doc "A confirmed player promoted to admin via the production `Accounts.promote_admin/1` path."
+  def admin_player_fixture(attrs \\ %{}) do
+    player = player_fixture(attrs)
+    Accounts.promote_admin(player.email)
+  end
+
   def player_scope_fixture do
     player = player_fixture()
     player_scope_fixture(player)
