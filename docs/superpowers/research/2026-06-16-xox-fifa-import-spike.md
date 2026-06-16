@@ -66,8 +66,8 @@ observation), or **[todo]** (still to verify).
 |------|----------|
 | `rounds.json` | **[confirmed]** `array[8]` of rounds; each `{id, status, stage, startDate, endDate, tournaments: [...]}`. `tournaments[]` are the matches: `{id (== prediction.matchId), homeSquadId, awaySquadId, homeSquadName, awaySquadName, homeSquadAbbr, awaySquadAbbr, homeScore, awayScore, date, venueName, venueCity, fifaId}`. **This is the `matchId` → teams/round/date crosswalk.** |
 | `squads.json` | **[confirmed]** `array[48]` of `{id, name, abbr}` (e.g. `{28, "Mexico", "MEX"}`). Resolves `homeSquadId`/`awaySquadId` and `firstSquadScored` → team/side. |
-| `players.json` | players (`firstPlayerScored` resolution) — **[todo]** |
-| `matchStats.json` | results + (likely) the "Popular Picks" cohort % — **[todo]** |
+| `players.json` | **[confirmed]** `array[1243]` of `{id, firstName, lastName, shortName, squadId, position, status, stats:{goals}}`. Resolves `firstPlayerScored` (player id) → `firstName + lastName`. |
+| `matchStats.json` | **[confirmed]** object keyed by `matchId` (1…72 group matches); each `{homeWin, draw, awayWin (% summing to 100 = our cohort), homePureScore, awayPureScore, firstGoalIsOwn, quickPicks:[{homeScore,awayScore,percentage}]}`. **Carries the risky-bonus cohort data + results.** See "Bonus" below. |
 | `message_banner.json`, `checksums.json`, `poc.json` | app meta |
 
 > Also `https://api.fifa.com/api/geo/esigeo.json` (geo). A console `fetch()` of the `/json/…`
@@ -128,6 +128,32 @@ observation), or **[todo]** (still to verify).
 | `stats` / `matchScore` / `predictionId` | — | ignore [confirmed] |
 
 ---
+
+## Bonus opportunity — FIFA publishes the risky-bonus cohort data [confirmed]
+
+`matchStats.json` is **auth-free** and keyed by the same `matchId` the crosswalk resolves. Its
+`homeWin` / `draw` / `awayWin` percentages (summing to 100) are **exactly** our
+`cohort_home_pct` / `cohort_draw_pct` / `cohort_away_pct` — outcome-level, no aggregation. Today
+those are **admin-entered (`a02`)** and the risky bonus is **silently skipped when unset**.
+
+→ **Opportunity:** auto-populate cohort % (and optionally cross-check results / `firstGoalIsOwn`)
+from FIFA, removing that admin toil and the silent-skip gap. This is **separate from `xox`** (it's
+public stats, not a member's predictions) and is a natural new worker on the `mt6` Oban substrate.
+File as its own issue.
+
+- **Server-fetchable — CONFIRMED [confirmed].** A plain server-side `curl` of
+  `play.fifa.com/json/match_predictor/matchStats.json` (and `rounds.json`) returns **HTTP 200
+  `application/json`** — no browser, no UA spoofing, ~42 KB. The static `/json/…` files are
+  CDN-cached public assets; **only the `/api/…` prediction endpoints are Akamai/cookie gated.**
+- → **Cohort auto-sync = a plain Oban worker** on the `mt6` substrate: `Req.get` `matchStats.json`,
+  map `matchId` → `Fixture` (via `rounds.json` / the same crosswalk), upsert
+  `cohort_home_pct`/`cohort_draw_pct`/`cohort_away_pct`. **No bookmarklet, no member action.**
+  This is the cleanest, highest-value automation found in the spike. **File as its own issue.**
+- Knockout cohort appears in `matchStats.json` once those rounds populate (currently 72 group
+  matches only).
+- Same finding means the `xox` bookmarklet need not bundle reference data either — our server can
+  fetch `rounds.json`/`squads.json`/`players.json` directly for the crosswalk; the bookmarklet
+  only has to carry the member's predictions.
 
 ## The three integration challenges
 
@@ -219,15 +245,15 @@ capture a populated sample.
   bookmarklet can fetch reference data directly.
 - ~~Round numbering / count~~ — **`1..8`, 3 group + 5 knockout [confirmed]** (`rounds.json` is
   `array[8]` with `stage` per round).
-- **[todo]** Read `players.json` shape — confirm `firstPlayerScored` (player id) → name resolution
-  (knockout only).
+- ~~Read `players.json` shape~~ — **DONE [confirmed]:** `array[1243]` `{id, firstName, lastName,
+  shortName, squadId, position, status, stats}`; `firstPlayerScored` → `firstName + lastName`.
+- ~~Does `matchStats.json` carry per-outcome cohort %?~~ — **YES [confirmed]** (`homeWin`/`draw`/
+  `awayWin`), and it's **server-fetchable** → cohort auto-sync as a plain Oban worker. See Bonus.
 - **[todo]** Capture a **populated knockout** `prediction/show/{round}` once those rounds open —
-  verify `firstSquadScored` / `firstPlayerScored` value formats.
-- **[todo]** Does `matchStats.json` carry per-outcome **cohort %** (home/draw/away) we need for
-  the risky bonus, or only per-scoreline "Popular Picks"? If usable, the bookmarklet could also
-  feed cohort data — a bonus that reduces admin entry (relates to `a02` cohort entry).
-- Team-name normalization map (FIFA ↔ openfootball) — now a minor tiebreaker; overlaps with
-  `predictex-c9s`.
+  verify `firstSquadScored` / `firstPlayerScored` value formats. (Only remaining hard unknown;
+  blocked until the tournament's knockout stage.)
+- Team-name normalization map (FIFA ↔ openfootball) — now a minor tiebreaker (date is the primary
+  join key); overlaps with `predictex-c9s`.
 
 ## Risks
 
