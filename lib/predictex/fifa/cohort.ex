@@ -45,7 +45,7 @@ defmodule Predictex.Fifa.Cohort do
       else
         Logger.warning(
           "cohort orientation swap for fixture #{f.id} (#{f.team1} v #{f.team2}); " <>
-            "FIFA home=#{m["homeSquadName"]}"
+            "FIFA match_id=#{m["id"]} home=#{m["homeSquadName"]}"
         )
 
         {stats["awayWin"], stats["homeWin"]}
@@ -61,10 +61,9 @@ defmodule Predictex.Fifa.Cohort do
 
   defp key(datetime, a, b), do: {utc_date(datetime), MapSet.new([norm(a), norm(b)])}
 
-  @doc false
-  def norm(nil), do: ""
+  defp norm(nil), do: ""
 
-  def norm(name) when is_binary(name) do
+  defp norm(name) when is_binary(name) do
     n = name |> String.downcase() |> String.trim() |> String.replace(~r/\s+/, " ")
     Map.get(@aliases, n, n)
   end

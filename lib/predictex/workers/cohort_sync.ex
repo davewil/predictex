@@ -17,7 +17,7 @@ defmodule Predictex.Workers.CohortSync do
 
   @impl Oban.Worker
   def perform(_job) do
-    case source().() do
+    case source_fun().() do
       {:ok, %{rounds: rounds, match_stats: stats}} ->
         fixtures = Tournament.list_fixtures()
         updates = Fifa.Cohort.plan(rounds, stats, fixtures)
@@ -47,7 +47,10 @@ defmodule Predictex.Workers.CohortSync do
         {:ok, body}
 
       {:ok, %Req.Response{status: 200, body: body}} when is_binary(body) ->
-        {:ok, Jason.decode!(body)}
+        case Jason.decode(body) do
+          {:ok, decoded} -> {:ok, decoded}
+          {:error, _} = err -> err
+        end
 
       {:ok, %Req.Response{status: status}} ->
         {:error, {:http, status}}
@@ -69,5 +72,5 @@ defmodule Predictex.Workers.CohortSync do
     end)
   end
 
-  defp source, do: Application.get_env(:predictex, :cohort_source_fun, &fetch/0)
+  defp source_fun, do: Application.get_env(:predictex, :cohort_source_fun, &fetch/0)
 end
