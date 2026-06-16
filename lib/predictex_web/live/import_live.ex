@@ -10,6 +10,8 @@ defmodule PredictexWeb.ImportLive do
   alias Predictex.Fifa.Import
   alias Predictex.{Predictions, Tournament}
 
+  @import_url "https://wc-predict.davewil.dev/import"
+
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -108,12 +110,34 @@ defmodule PredictexWeb.ImportLive do
 
         <p :if={@error} class="alert alert-error mb-4">{@error}</p>
 
-        <div :if={@step == :awaiting}>
-          <p class="mb-4">
-            Paste the JSON your import bookmarklet produced, then preview before saving.
+        <div :if={@step == :awaiting} id="import-root" phx-hook=".FifaFragment">
+          <ol class="list-decimal ml-5 mb-4 space-y-1">
+            <li>Log in to predictex (you already are) and to the FIFA Match Predictor.</li>
+            <li>
+              Drag this button to your bookmarks bar:
+              <a href={bookmarklet()} class="btn btn-sm">Import FIFA picks</a>
+            </li>
+            <li>
+              Open the FIFA Match Predictor, then click the bookmark. It opens this page with your picks ready to preview.
+            </li>
+          </ol>
+          <p class="mb-2 text-sm opacity-70">
+            If the bookmarklet is blocked, run it in the browser console and paste the JSON it prints here:
           </p>
           <.paste_form />
         </div>
+
+        <script :type={Phoenix.LiveView.ColocatedHook} name=".FifaFragment">
+          export default {
+            mounted() {
+              const hash = window.location.hash.slice(1)
+              if (hash) {
+                this.pushEvent("payload", {data: hash})
+                history.replaceState(null, "", window.location.pathname)
+              }
+            }
+          }
+        </script>
 
         <div :if={@step == :preview}>
           <p :if={assigns[:booster_unmatched]} class="alert alert-warning mb-4">
@@ -168,6 +192,31 @@ defmodule PredictexWeb.ImportLive do
       <button type="submit" class="btn btn-primary mt-2">Preview</button>
     </form>
     """
+  end
+
+  defp bookmarklet do
+    js = """
+    (async () => {
+      const base = 'https://play.fifa.com/api/en/match-predictor/prediction/show/';
+      let rows = [];
+      for (let r = 1; r <= 3; r++) {
+        try {
+          const res = await fetch(base + r, {credentials: 'include'});
+          const json = await res.json();
+          const preds = (json && json.success && json.success.predictions) || [];
+          for (const p of preds) {
+            rows.push({round: r, matchId: p.matchId, homeScore: p.homeScore, awayScore: p.awayScore, booster: !!p.booster});
+          }
+        } catch (e) { console.warn('FIFA import: round ' + r + ' failed', e); }
+      }
+      const b64 = btoa(JSON.stringify(rows)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+      window.open('#{@import_url}#' + b64, '_blank');
+    })();
+    """
+
+    # Encode aggressively: a bare '#' or space in a javascript: href would break it, and
+    # URI.encode/1 leaves reserved chars (incl. '#') alone. char_unreserved? escapes them.
+    "javascript:" <> URI.encode(js, &URI.char_unreserved?/1)
   end
 
   defp reason_text(:unknown_match_id), do: "couldn't match this FIFA match"
