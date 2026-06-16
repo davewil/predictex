@@ -12,12 +12,14 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.4.0`
+- **Latest deployed tag:** `v0.5.0`
 - **League invite code:** `wcpredict2026`
-- **Prod state:** 12 fixtures synced. **Admin console (`/admin`) and My Predictions
-  (`/predictions`) are both live.** Admins can now enter predictions on behalf of players —
-  the game is playable. Members still show "no pick imported" until an admin transcribes
-  their FIFA screenshots at `/admin/predictions`.
+- **Prod state:** 12 fixtures synced. **Admin console (`/admin`) + My Predictions
+  (`/predictions`) live; results + cohort now auto-sync (Oban).** Admins can enter predictions
+  on behalf of players (game is playable). **`mt6`** = ResultSync worker (every 15 min, openfootball);
+  **`7ux`** = CohortSync worker (hourly, FIFA `matchStats.json` → `cohort_*_pct`, drives the risky
+  bonus — no more manual cohort entry). Both on Oban (added in v0.5.0; `oban_jobs` migration).
+  Members still show "no pick imported" until an admin transcribes their FIFA screenshots.
 - **Prediction-entry model (important):** predictions are **never entered in-app by members**.
   Members make them on the official FIFA Match Predictor; they reach predictex via **admin
   entry on behalf of players** from screenshots (`a02`, **shipped** — `/admin/predictions`)
