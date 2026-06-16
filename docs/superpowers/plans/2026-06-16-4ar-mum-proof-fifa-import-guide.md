@@ -545,12 +545,12 @@ defmodule PredictexWeb.ImportLive do
 
   @impl true
   def mount(_params, session, socket) do
-    platform = Map.get(session, "platform", :mobile)
+    platform = Map.get(session, "platform", "mobile")
 
     {:ok,
      assign(socket,
        platform: platform,
-       step: if(platform == :mobile, do: :paste, else: :awaiting),
+       step: if(platform == "mobile", do: :paste, else: :awaiting),
        current_round: 1,
        imported_total: 0,
        matched: [],
@@ -678,7 +678,7 @@ defmodule PredictexWeb.ImportLive do
         <p :if={@error} class="alert alert-error mb-4">{@error}</p>
 
         <%!-- DESKTOP: one-tap button --%>
-        <div :if={@platform == :desktop and @step == :awaiting} id="import-root" phx-hook=".FifaFragment">
+        <div :if={@platform == "desktop" and @step == :awaiting} id="import-root" phx-hook=".FifaFragment">
           <ol class="list-decimal ml-5 mb-4 space-y-1">
             <li>
               Drag this button up to your bookmarks bar:
@@ -705,7 +705,7 @@ defmodule PredictexWeb.ImportLive do
         </script>
 
         <%!-- MOBILE: per-round copy-paste --%>
-        <div :if={@platform == :mobile and @step == :paste}>
+        <div :if={@platform == "mobile" and @step == :paste}>
           <p class="mb-2">
             Step {@current_round} of 3 — let's get your <strong>Round {@current_round}</strong> picks.
           </p>
@@ -738,7 +738,7 @@ defmodule PredictexWeb.ImportLive do
           </p>
 
           <p class="mb-2 font-semibold">
-            <%= if @platform == :mobile, do: "Round #{@current_round}: ", else: "" %>This will save these {length(@matched)} picks:
+            <%= if @platform == "mobile", do: "Round #{@current_round}: ", else: "" %>This will save these {length(@matched)} picks:
           </p>
           <ul class="mb-4">
             <li :for={m <- @matched}>
@@ -754,14 +754,14 @@ defmodule PredictexWeb.ImportLive do
           </div>
 
           <button
-            :if={@platform == :mobile and @matched != []}
+            :if={@platform == "mobile" and @matched != []}
             class="btn btn-primary"
             phx-click="confirm_round"
           >
             Save Round {@current_round}
           </button>
           <button
-            :if={@platform == :mobile and @matched == []}
+            :if={@platform == "mobile" and @matched == []}
             class="btn"
             phx-click="skip_round"
           >
@@ -769,7 +769,7 @@ defmodule PredictexWeb.ImportLive do
           </button>
 
           <button
-            :if={@platform == :desktop}
+            :if={@platform == "desktop"}
             class="btn btn-primary"
             phx-click="confirm"
             disabled={@matched == []}
