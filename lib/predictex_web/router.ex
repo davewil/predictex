@@ -11,6 +11,7 @@ defmodule PredictexWeb.Router do
     plug :protect_from_forgery
     plug :put_secure_browser_headers
     plug :fetch_current_scope_for_player
+    # Classify UA (mobile/desktop); read by LiveViews via the session
     plug PredictexWeb.PlatformPlug
   end
 

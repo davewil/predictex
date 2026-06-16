@@ -9,23 +9,28 @@ defmodule PredictexWeb.PlatformPlugTest do
     PlatformPlug.call(conn, PlatformPlug.init([]))
   end
 
-  test "classifies an iPhone UA as :mobile" do
+  test "classifies an iPhone UA as \"mobile\"" do
     conn = run("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari")
-    assert Plug.Conn.get_session(conn, :platform) == :mobile
+    assert Plug.Conn.get_session(conn, :platform) == "mobile"
   end
 
-  test "classifies an Android UA as :mobile" do
+  test "classifies an Android UA as \"mobile\"" do
     conn = run("Mozilla/5.0 (Linux; Android 14; Pixel 7) Chrome Mobile")
-    assert Plug.Conn.get_session(conn, :platform) == :mobile
+    assert Plug.Conn.get_session(conn, :platform) == "mobile"
   end
 
-  test "classifies a desktop UA as :desktop" do
+  test "classifies a desktop UA as \"desktop\"" do
     conn = run("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120 Safari")
-    assert Plug.Conn.get_session(conn, :platform) == :desktop
+    assert Plug.Conn.get_session(conn, :platform) == "desktop"
   end
 
-  test "defaults to :mobile when the User-Agent is absent" do
+  test "defaults to \"mobile\" when the User-Agent is absent" do
     conn = run(nil)
-    assert Plug.Conn.get_session(conn, :platform) == :mobile
+    assert Plug.Conn.get_session(conn, :platform) == "mobile"
+  end
+
+  test "classifies an empty User-Agent as \"desktop\"" do
+    conn = run("")
+    assert Plug.Conn.get_session(conn, :platform) == "desktop"
   end
 end
