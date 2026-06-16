@@ -51,23 +51,27 @@ For each FIFA match `m` (a `tournaments[]` entry from `rounds.json`, joined to i
    norm(m.awaySquadName)])}`. Find the fixture whose key equals it
    (`{utc_date(fixture.kickoff_at), MapSet.new([norm(fixture.team1), norm(fixture.team2)])}`).
    The **unordered team set** identifies the match; the **UTC date** disambiguates and guards.
-2. **Orient by identity (load-bearing — neutral-venue matches let the two sources disagree on
-   home/away):**
-   - if `norm(m.homeSquadName) == norm(fixture.team1)` →
-     `cohort_home_pct = stats.homeWin`, `cohort_away_pct = stats.awayWin`
-   - else (FIFA's home is our `team2`) → **swap**:
-     `cohort_home_pct = stats.awayWin`, `cohort_away_pct = stats.homeWin`
-   - `cohort_draw_pct = stats.draw` (orientation-independent)
+2. **Orient home/away.** Convention: **the first-listed team is home** — our `team1` is home,
+   `team2` away, and FIFA's `homeSquadName` is its home. So the **expected** case is positional
+   alignment:
+   - `norm(m.homeSquadName) == norm(fixture.team1)` →
+     `cohort_home_pct = stats.homeWin`, `cohort_away_pct = stats.awayWin`.
+   - `cohort_draw_pct = stats.draw` (orientation-independent).
+   - **Guard:** if instead `norm(m.homeSquadName) == norm(fixture.team2)` (a source ordered the
+     pair oppositely / broke the convention) → **swap** (`cohort_home_pct = stats.awayWin`,
+     `cohort_away_pct = stats.homeWin`) so the win-shares still land on the correct team, and
+     **log it as an anomaly** (unexpected and worth knowing). Same two teams, so the swap is safe.
 3. Emit `%{fixture_id: fixture.id, cohort_home_pct:, cohort_draw_pct:, cohort_away_pct:}`.
 
 Unmatched FIFA matches (no fixture, or no `matchStats` entry) are **omitted**; the caller counts
 them. Fixtures with no FIFA match are left untouched.
 
-> **Why orientation matters:** `cohort_home_pct`/`cohort_away_pct` are home/away-specific scoring
-> inputs. If FIFA lists `home=Iran, away=Spain` but our fixture is `team1=Spain, team2=Iran`, a
-> set-only match would write Iran's win-share into Spain's slot — a contrarian predicting Spain
-> would be scored against Iran's cohort. The orient step fixes this; the swap test must assert
-> **values land on the correct team**.
+> **Why the guard matters even with the convention:** `cohort_home_pct`/`cohort_away_pct` are
+> home/away-specific scoring inputs. Under the first-listed-is-home convention the sources should
+> agree, so no swap fires — but if one ever orders a pair oppositely, a positional-only write would
+> put the wrong team's win-share in the home slot (a contrarian scored against the other team's
+> cohort). The guard makes the function correct-by-construction rather than convention-dependent;
+> the swap test asserts **values land on the correct team**.
 
 ### `norm(team_name) :: String.t()` (pure)
 
