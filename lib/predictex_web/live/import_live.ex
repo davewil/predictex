@@ -73,10 +73,9 @@ defmodule PredictexWeb.ImportLive do
       %{errors: 0, imported: imported} ->
         advance(socket, socket.assigns.imported_total + imported)
 
-      %{imported: imported} ->
+      _ ->
         {:noreply,
          assign(socket,
-           imported_total: socket.assigns.imported_total + imported,
            error:
              "Some of your Round #{socket.assigns.current_round} picks didn't save — please try again."
          )}
@@ -278,6 +277,8 @@ defmodule PredictexWeb.ImportLive do
           >
             Confirm import
           </button>
+
+          <.escape_hatch />
         </div>
 
         <%!-- SHARED: done --%>
