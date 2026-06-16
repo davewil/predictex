@@ -10,8 +10,6 @@ defmodule PredictexWeb.ImportLive do
   alias Predictex.Fifa.Import
   alias Predictex.{Predictions, Tournament}
 
-  @import_url "https://wc-predict.davewil.dev/import"
-
   @impl true
   def mount(_params, _session, socket) do
     {:ok,
@@ -210,7 +208,7 @@ defmodule PredictexWeb.ImportLive do
         } catch (e) { console.warn('FIFA import: round ' + r + ' failed', e); }
       }
       const b64 = btoa(JSON.stringify(rows)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
-      window.open('#{@import_url}#' + b64, '_blank');
+      window.open('#{PredictexWeb.Endpoint.url()}/import#' + b64, '_blank');
     })();
     """
 
