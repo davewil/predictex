@@ -14,18 +14,7 @@ defmodule Predictex.Fifa.Cohort do
   """
   require Logger
 
-  # FIFA -> openfootball normalized-name divergences, derived by diffing the live
-  # squads.json vs worldcup.json feeds (the predictex-c9s shared artifact).
-  @aliases %{
-    "bosnia and herzegovina" => "bosnia & herzegovina",
-    "cabo verde" => "cape verde",
-    "congo dr" => "dr congo",
-    "czechia" => "czech republic",
-    "côte d'ivoire" => "ivory coast",
-    "ir iran" => "iran",
-    "korea republic" => "south korea",
-    "türkiye" => "turkey"
-  }
+  alias Predictex.Fifa.Crosswalk
 
   @doc """
   Pure. Returns `[%{fixture_id, cohort_home_pct, cohort_draw_pct, cohort_away_pct}]` for
@@ -34,13 +23,15 @@ defmodule Predictex.Fifa.Cohort do
   """
   def plan(rounds, match_stats, fixtures)
       when is_list(rounds) and is_map(match_stats) and is_list(fixtures) do
-    index = Map.new(fixtures, fn f -> {key(f.kickoff_at, f.team1, f.team2), f} end)
+    index = Crosswalk.index_fixtures(fixtures)
 
     rounds
     |> Enum.flat_map(fn r -> r["tournaments"] || [] end)
     |> Enum.flat_map(fn m ->
       stats = match_stats[to_string(m["id"])]
-      fixture = Map.get(index, key(m["date"], m["homeSquadName"], m["awaySquadName"]))
+
+      fixture =
+        Map.get(index, Crosswalk.match_key(m["date"], m["homeSquadName"], m["awaySquadName"]))
 
       if is_map(stats) and not is_nil(fixture) and complete?(stats),
         do: [orient(m, stats, fixture)],
@@ -54,7 +45,7 @@ defmodule Predictex.Fifa.Cohort do
 
   defp orient(m, stats, f) do
     {home, away} =
-      if norm(m["homeSquadName"]) == norm(f.team1) do
+      if Crosswalk.home_first?(m["homeSquadName"], f.team1) do
         {stats["homeWin"], stats["awayWin"]}
       else
         Logger.warning(
@@ -72,26 +63,4 @@ defmodule Predictex.Fifa.Cohort do
       cohort_away_pct: away
     }
   end
-
-  defp key(datetime, a, b), do: {utc_date(datetime), MapSet.new([norm(a), norm(b)])}
-
-  defp norm(nil), do: ""
-
-  defp norm(name) when is_binary(name) do
-    n = name |> String.downcase() |> String.trim() |> String.replace(~r/\s+/, " ")
-    Map.get(@aliases, n, n)
-  end
-
-  # FIFA `date` is offset-bearing ISO8601 ("...+01:00"); from_iso8601 returns a UTC
-  # DateTime. Fixture kickoff_at is already UTC. Both reduce to a UTC Date for the key.
-  defp utc_date(%DateTime{} = dt), do: DateTime.to_date(dt)
-
-  defp utc_date(iso) when is_binary(iso) do
-    case DateTime.from_iso8601(iso) do
-      {:ok, dt, _offset} -> DateTime.to_date(dt)
-      _ -> nil
-    end
-  end
-
-  defp utc_date(_), do: nil
 end
