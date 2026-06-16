@@ -1,20 +1,35 @@
 defmodule PredictexWeb.ImportLive do
   @moduledoc """
-  Member self-import of FIFA group-stage picks. A thin bookmarklet (added later) hands a base64
-  payload via the URL fragment; this LiveView also accepts a pasted JSON array as a fallback.
-  Both feed the pure `Fifa.Import.plan/3`. Dumb view: the pure core validates; the view renders
-  and, on confirm, writes via `Predictions.admin_save_round_predictions/3` for the current member.
+  Member self-import of FIFA group-stage picks, platform-aware.
+
+  Desktop: a relabelled bookmarklet hands a base64 payload (all rounds) via the URL fragment;
+  one preview, one confirm, all rounds written together.
+
+  Mobile: no install. The member opens FIFA's prediction page per round, copies what they see,
+  and pastes it here. Each round is previewed and **written on its own** so progress survives a
+  mobile tab discard (the flow navigates away to FIFA and back per round). FIFA's raw response
+  carries no round number, so `Fifa.Import.rows_from_envelope/2` injects the round we are on.
+
+  Dumb view: the pure core (`Fifa.Import.plan/3`) validates and orients; the view renders and,
+  on confirm, writes via `Predictions.admin_save_round_predictions/3` for the current member.
   """
   use PredictexWeb, :live_view
 
   alias Predictex.Fifa.Import
   alias Predictex.{Predictions, Tournament}
 
+  @last_group_round 3
+
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
+    platform = Map.get(session, "platform", "mobile")
+
     {:ok,
      assign(socket,
-       step: :awaiting,
+       platform: platform,
+       step: if(platform == "mobile", do: :paste, else: :awaiting),
+       current_round: 1,
+       imported_total: 0,
        matched: [],
        unmatched: [],
        error: nil,
@@ -23,19 +38,23 @@ defmodule PredictexWeb.ImportLive do
      )}
   end
 
+  # ---- Mobile: per-round paste of FIFA's raw envelope ------------------------------------
+
   @impl true
   def handle_event("paste", %{"paste" => %{"json" => raw}}, socket) do
-    case Jason.decode(raw) do
-      {:ok, rows} when is_list(rows) ->
-        preview(socket, rows)
+    round = socket.assigns.current_round
 
+    with {:ok, decoded} <- Jason.decode(raw),
+         {:ok, rows} <- Import.rows_from_envelope(decoded, round) do
+      preview(socket, rows)
+    else
       _ ->
         {:noreply,
-         assign(socket,
-           error: "We could not read that — paste the JSON the bookmarklet produced."
-         )}
+         assign(socket, error: "We couldn't read that — paste exactly what FIFA showed you.")}
     end
   end
+
+  # ---- Desktop: base64 payload from the bookmarklet fragment ------------------------------
 
   def handle_event("payload", %{"data" => b64}, socket) do
     case Import.decode_payload(b64) do
@@ -43,30 +62,29 @@ defmodule PredictexWeb.ImportLive do
         preview(socket, rows)
 
       {:error, _} ->
-        {:noreply,
-         assign(socket, error: "We could not read the import payload. Try the paste box below.")}
+        {:noreply, assign(socket, error: "We couldn't read your picks. Please try again.")}
     end
   end
 
-  def handle_event("confirm", _params, socket) do
-    player_id = socket.assigns.current_scope.player.id
+  # ---- Mobile confirm: write THIS round now, then advance ---------------------------------
 
-    summary =
-      socket.assigns.matched
-      |> Import.to_write_rows()
-      |> Enum.reduce(%{imported: 0, errors: 0}, fn {round_id, rows}, acc ->
-        case Predictions.admin_save_round_predictions(player_id, round_id, rows) do
-          {:ok, results} ->
-            imported = Enum.count(results, fn {_id, r} -> r == :upserted end)
-            %{acc | imported: acc.imported + imported}
-
-          {:error, _} ->
-            %{acc | errors: acc.errors + 1}
-        end
-      end)
-
-    {:noreply, assign(socket, step: :done, summary: summary)}
+  def handle_event("confirm_round", _params, socket) do
+    imported = write_matched(socket)
+    advance(socket, socket.assigns.imported_total + imported)
   end
+
+  def handle_event("skip_round", _params, socket) do
+    advance(socket, socket.assigns.imported_total)
+  end
+
+  # ---- Desktop confirm: write all matched rounds together --------------------------------
+
+  def handle_event("confirm", _params, socket) do
+    imported = write_matched(socket)
+    {:noreply, assign(socket, step: :done, summary: %{imported: imported, errors: 0})}
+  end
+
+  # ---- internals -------------------------------------------------------------------------
 
   defp preview(socket, rows) do
     case reference_fun().() do
@@ -85,9 +103,38 @@ defmodule PredictexWeb.ImportLive do
 
       {:error, _} ->
         {:noreply,
-         assign(socket,
-           error: "Couldn't reach FIFA reference data. Try again, or use the paste box."
-         )}
+         assign(socket, error: "We couldn't reach FIFA just now. Please try again in a moment.")}
+    end
+  end
+
+  defp write_matched(socket) do
+    player_id = socket.assigns.current_scope.player.id
+
+    socket.assigns.matched
+    |> Import.to_write_rows()
+    |> Enum.reduce(0, fn {round_id, rows}, acc ->
+      case Predictions.admin_save_round_predictions(player_id, round_id, rows) do
+        {:ok, results} -> acc + Enum.count(results, fn {_id, r} -> r == :upserted end)
+        {:error, _} -> acc
+      end
+    end)
+  end
+
+  defp advance(socket, total) do
+    if socket.assigns.current_round >= @last_group_round do
+      {:noreply,
+       assign(socket, step: :done, imported_total: total, summary: %{imported: total, errors: 0})}
+    else
+      {:noreply,
+       assign(socket,
+         step: :paste,
+         current_round: socket.assigns.current_round + 1,
+         matched: [],
+         unmatched: [],
+         error: nil,
+         booster_unmatched: false,
+         imported_total: total
+       )}
     end
   end
 
@@ -108,21 +155,23 @@ defmodule PredictexWeb.ImportLive do
 
         <p :if={@error} class="alert alert-error mb-4">{@error}</p>
 
-        <div :if={@step == :awaiting} id="import-root" phx-hook=".FifaFragment">
+        <%!-- DESKTOP: one-tap button --%>
+        <div
+          :if={@platform == "desktop" and @step == :awaiting}
+          id="import-root"
+          phx-hook=".FifaFragment"
+        >
           <ol class="list-decimal ml-5 mb-4 space-y-1">
-            <li>Log in to predictex (you already are) and to the FIFA Match Predictor.</li>
             <li>
-              Drag this button to your bookmarks bar:
-              <a href={bookmarklet()} class="btn btn-sm">Import FIFA picks</a>
+              Drag this button up to your bookmarks bar:
+              <a href={bookmarklet()} class="btn btn-sm">Import my picks</a>
             </li>
+            <li>Open the FIFA Match Predictor and sign in.</li>
             <li>
-              Open the FIFA Match Predictor, then click the bookmark. It opens this page with your picks ready to preview.
+              Click <strong>Import my picks</strong>. It brings your picks back here so you can check them.
             </li>
           </ol>
-          <p class="mb-2 text-sm opacity-70">
-            If the bookmarklet is blocked, run it in the browser console and paste the JSON it prints here:
-          </p>
-          <.paste_form />
+          <.escape_hatch />
         </div>
 
         <script :type={Phoenix.LiveView.ColocatedHook} name=".FifaFragment">
@@ -137,14 +186,43 @@ defmodule PredictexWeb.ImportLive do
           }
         </script>
 
+        <%!-- MOBILE: per-round copy-paste --%>
+        <div :if={@platform == "mobile" and @step == :paste}>
+          <p class="mb-2">
+            Step {@current_round} of 3 — let's get your <strong>Round {@current_round}</strong> picks.
+          </p>
+          <ol class="list-decimal ml-5 mb-4 space-y-2">
+            <li>
+              <a
+                href={"https://play.fifa.com/api/en/match-predictor/prediction/show/#{@current_round}"}
+                target="_blank"
+                rel="noopener"
+                class="link link-primary font-semibold"
+              >
+                Tap here to open your Round {@current_round} picks
+              </a>
+            </li>
+            <li>
+              Press and hold the text, choose <strong>Select all</strong>, then <strong>Copy</strong>.
+              <%!-- [screenshot: android long-press -> Select all -> Copy] --%>
+            </li>
+            <li>Come back here and paste it into the box below.</li>
+          </ol>
+          <.paste_form round={@current_round} />
+          <.escape_hatch />
+        </div>
+
+        <%!-- SHARED: preview --%>
         <div :if={@step == :preview}>
-          <p :if={assigns[:booster_unmatched]} class="alert alert-warning mb-4">
-            Your booster is on a match we couldn't import — saving this round will leave you
-            without a booster. Fix the unmatched row on FIFA, or proceed knowingly.
+          <p :if={@booster_unmatched} class="alert alert-warning mb-4">
+            Your booster is on a match we couldn't find — saving this will leave you without a
+            booster here. Fix it on FIFA, or carry on knowing that.
           </p>
 
           <p class="mb-2 font-semibold">
-            This will overwrite your existing picks for these {length(@matched)} matches:
+            {if @platform == "mobile", do: "Round #{@current_round}: ", else: ""}This will save these {length(
+              @matched
+            )} picks:
           </p>
           <ul class="mb-4">
             <li :for={m <- @matched}>
@@ -153,23 +231,42 @@ defmodule PredictexWeb.ImportLive do
           </ul>
 
           <div :if={@unmatched != []} class="mb-4">
-            <p class="font-semibold">We couldn't match these rows:</p>
+            <p class="font-semibold">We couldn't match these:</p>
             <ul>
-              <li :for={u <- @unmatched}>
-                round {u.round}, match {u.matchId} — {reason_text(u.reason)}
-              </li>
+              <li :for={u <- @unmatched}>{reason_text(u.reason)}</li>
             </ul>
           </div>
 
-          <button class="btn btn-primary" phx-click="confirm" disabled={@matched == []}>
+          <button
+            :if={@platform == "mobile" and @matched != []}
+            class="btn btn-primary"
+            phx-click="confirm_round"
+          >
+            Save Round {@current_round}
+          </button>
+          <button
+            :if={@platform == "mobile" and @matched == []}
+            class="btn"
+            phx-click="skip_round"
+          >
+            Nothing to save here — continue
+          </button>
+
+          <button
+            :if={@platform == "desktop"}
+            class="btn btn-primary"
+            phx-click="confirm"
+            disabled={@matched == []}
+          >
             Confirm import
           </button>
         </div>
 
+        <%!-- SHARED: done --%>
         <div :if={@step == :done}>
           <p class="alert alert-success">
-            Imported {@summary.imported} picks{if @summary.errors > 0,
-              do: " (#{@summary.errors} errors)"}.
+            Your picks are in ✅ {@summary.imported} saved{if @summary.errors > 0,
+              do: " (#{@summary.errors} we couldn't save)"}.
           </p>
           <.link navigate={~p"/predictions"} class="btn">See my predictions</.link>
         </div>
@@ -185,10 +282,19 @@ defmodule PredictexWeb.ImportLive do
         name="paste[json]"
         rows="6"
         class="textarea textarea-bordered w-full"
-        placeholder="[{&quot;round&quot;:1,&quot;matchId&quot;:1,&quot;homeScore&quot;:2,&quot;awayScore&quot;:0,&quot;booster&quot;:true}]"
+        placeholder="Paste your Round {@round} picks here"
       ></textarea>
-      <button type="submit" class="btn btn-primary mt-2">Preview</button>
+      <button type="submit" class="btn btn-primary mt-2">Check my picks</button>
     </form>
+    """
+  end
+
+  defp escape_hatch(assigns) do
+    ~H"""
+    <p class="mt-6 text-sm opacity-70">
+      Stuck? Take a screenshot of your FIFA picks and send it to the group admin — they'll add
+      them for you.
+    </p>
     """
   end
 
@@ -205,20 +311,18 @@ defmodule PredictexWeb.ImportLive do
           for (const p of preds) {
             rows.push({round: r, matchId: p.matchId, homeScore: p.homeScore, awayScore: p.awayScore, booster: !!p.booster});
           }
-        } catch (e) { console.warn('FIFA import: round ' + r + ' failed', e); }
+        } catch (e) {}
       }
       const b64 = btoa(JSON.stringify(rows)).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
       window.open('#{PredictexWeb.Endpoint.url()}/import#' + b64, '_blank');
     })();
     """
 
-    # Encode aggressively: a bare '#' or space in a javascript: href would break it, and
-    # URI.encode/1 leaves reserved chars (incl. '#') alone. char_unreserved? escapes them.
     "javascript:" <> URI.encode(js, &URI.char_unreserved?/1)
   end
 
-  defp reason_text(:unknown_match_id), do: "couldn't match this FIFA match"
-  defp reason_text(:no_fixture), do: "couldn't match the teams/date to a fixture"
-  defp reason_text(:out_of_scope), do: "knockout rounds aren't imported yet"
-  defp reason_text(:invalid), do: "the scoreline was incomplete"
+  defp reason_text(:unknown_match_id), do: "one match we couldn't recognise"
+  defp reason_text(:no_fixture), do: "a match we couldn't line up with our fixtures"
+  defp reason_text(:out_of_scope), do: "knockout rounds (not imported yet)"
+  defp reason_text(:invalid), do: "a pick with a missing score"
 end

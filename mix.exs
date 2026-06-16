@@ -69,7 +69,8 @@ defmodule Predictex.MixProject do
       {:oban, "~> 2.19"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:stream_data, "~> 1.0", only: [:dev, :test]}
+      {:stream_data, "~> 1.0", only: [:dev, :test]},
+      {:floki, ">= 0.30.0", only: :test}
     ]
   end
 

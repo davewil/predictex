@@ -4,6 +4,9 @@ defmodule PredictexWeb.ImportLiveTest do
   import Phoenix.LiveViewTest
   alias Predictex.{Predictions, Tournament}
 
+  @iphone "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari"
+  @desktop "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120 Safari"
+
   defp group_round(ordinal) do
     {:ok, r} =
       Tournament.create_round(%{name: "Matchday #{ordinal}", stage: :group, ordinal: ordinal})
@@ -36,127 +39,184 @@ defmodule PredictexWeb.ImportLiveTest do
     on_exit(fn -> Application.put_env(:predictex, :fifa_reference_fun, prev) end)
   end
 
-  defp paste_json(rows), do: Jason.encode!(rows)
-
-  test "redirects to login when logged out", %{conn: conn} do
-    assert {:error, {:redirect, %{to: "/players/log-in"}}} = live(conn, ~p"/import")
+  # The raw FIFA envelope as it appears at /prediction/show/{round} (no round field).
+  defp fifa_envelope(preds) do
+    Jason.encode!(%{
+      "success" => %{
+        "predictions" =>
+          Enum.map(preds, fn {match_id, hs, as, booster} ->
+            %{"matchId" => match_id, "homeScore" => hs, "awayScore" => as, "booster" => booster}
+          end)
+      },
+      "errors" => []
+    })
   end
 
-  describe "authenticated import" do
+  # Base64url payload as the desktop bookmarklet emits it (round-tagged rows for all rounds).
+  defp bookmarklet_payload(rows) do
+    rows |> Jason.encode!() |> Base.url_encode64(padding: false)
+  end
+
+  defp ua(conn, agent), do: Plug.Conn.put_req_header(conn, "user-agent", agent)
+
+  # Visible text only — Floki.text drops attribute values (so the bookmarklet's javascript:
+  # href, which legitimately contains "json"/"JSON.stringify", is excluded) and <script> content.
+  # The jargon ban is about user-facing copy, not the opaque bookmarklet code.
+  defp visible_text(html),
+    do: html |> Floki.parse_document!() |> Floki.text() |> String.downcase()
+
+  test "redirects to login when logged out", %{conn: conn} do
+    assert {:error, {:redirect, %{to: "/players/log-in"}}} = live(ua(conn, @iphone), ~p"/import")
+  end
+
+  describe "mobile per-round import" do
     setup :register_and_log_in_player
 
-    test "paste -> preview shows matched picks, then confirm writes them for the member", ctx do
+    test "paste round 1 -> preview -> confirm writes round 1 and reveals round 2", ctx do
       %{conn: conn, player: player} = ctx
-      round = group_round(1)
-      fx = fixture!(round, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
+      r1 = group_round(1)
+      fx = fixture!(r1, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
+      group_round(2)
 
       stub_rounds([
-        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")])
+        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")]),
+        fifa_round(2, [])
       ])
 
-      {:ok, view, _html} = live(conn, ~p"/import")
-
-      rows = [
-        %{"round" => 1, "matchId" => 1, "homeScore" => 2, "awayScore" => 0, "booster" => true}
-      ]
+      {:ok, view, html} = live(ua(conn, @iphone), ~p"/import")
+      assert html =~ "Round 1"
+      refute html =~ "Round 2"
 
       html =
         view
-        |> form("#paste-form", paste: %{json: paste_json(rows)})
+        |> form("#paste-form", paste: %{json: fifa_envelope([{1, 2, 0, true}])})
         |> render_submit()
 
       assert html =~ "Mexico"
       assert html =~ "South Africa"
 
-      render_click(view, "confirm", %{})
+      html = render_click(view, "confirm_round", %{})
 
+      # Round 1 is written to the DB now (not held in assigns).
       [pred] = Predictions.list_player_predictions(player.id)
       assert pred.fixture_id == fx.id
-      assert pred.home_goals == 2
-      assert pred.away_goals == 0
-      assert pred.booster == true
+      assert pred.home_goals == 2 and pred.away_goals == 0 and pred.booster == true
+
+      # And the flow has advanced to round 2.
+      assert html =~ "Round 2"
     end
 
-    test "import overwrites an existing pick for the same fixture", ctx do
+    test "tab-discard regression: a confirmed round survives a fresh mount", ctx do
       %{conn: conn, player: player} = ctx
-      round = group_round(1)
-      fx = fixture!(round, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
-
-      {:ok, _} =
-        Predictions.admin_upsert_prediction(%{
-          player_id: player.id,
-          fixture_id: fx.id,
-          home_goals: 0,
-          away_goals: 0,
-          booster: false
-        })
+      r1 = group_round(1)
+      fixture!(r1, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
+      group_round(2)
 
       stub_rounds([
-        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")])
+        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")]),
+        fifa_round(2, [])
       ])
 
-      {:ok, view, _} = live(conn, ~p"/import")
+      {:ok, view, _} = live(ua(conn, @iphone), ~p"/import")
 
-      rows = [
-        %{"round" => 1, "matchId" => 1, "homeScore" => 3, "awayScore" => 1, "booster" => false}
-      ]
+      view
+      |> form("#paste-form", paste: %{json: fifa_envelope([{1, 3, 1, false}])})
+      |> render_submit()
 
-      view |> form("#paste-form", paste: %{json: paste_json(rows)}) |> render_submit()
-      render_click(view, "confirm", %{})
+      render_click(view, "confirm_round", %{})
 
+      # Simulate the discarded tab reloading: a brand-new LiveView mount.
+      {:ok, _view2, _html2} = live(ua(conn, @iphone), ~p"/import")
+
+      # Round 1 is still saved — progress was durable, not in volatile assigns.
       [pred] = Predictions.list_player_predictions(player.id)
-      assert pred.home_goals == 3
-      assert pred.away_goals == 1
+      assert pred.home_goals == 3 and pred.away_goals == 1
     end
 
-    test "unmatched rows render with a reason and do not block matched", ctx do
+    test "a round with nothing matchable can be skipped without writing", ctx do
+      %{conn: conn, player: player} = ctx
+      group_round(1)
+      group_round(2)
+      stub_rounds([fifa_round(1, []), fifa_round(2, [])])
+
+      {:ok, view, _} = live(ua(conn, @iphone), ~p"/import")
+
+      html =
+        view
+        |> form("#paste-form", paste: %{json: fifa_envelope([{99, 2, 0, false}])})
+        |> render_submit()
+
+      assert html =~ "continue" or html =~ "Continue"
+      html = render_click(view, "skip_round", %{})
+
+      assert Predictions.list_player_predictions(player.id) == []
+      assert html =~ "Round 2"
+    end
+
+    test "malformed paste keeps the round with a friendly error", ctx do
       %{conn: conn} = ctx
-      round = group_round(1)
-      _fx = fixture!(round, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
+      group_round(1)
+      stub_rounds([fifa_round(1, [])])
+      {:ok, view, _} = live(ua(conn, @iphone), ~p"/import")
 
-      stub_rounds([
-        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")])
-      ])
-
-      {:ok, view, _} = live(conn, ~p"/import")
-
-      rows = [
-        %{"round" => 1, "matchId" => 1, "homeScore" => 2, "awayScore" => 0, "booster" => false},
-        %{"round" => 1, "matchId" => 999, "homeScore" => 1, "awayScore" => 1, "booster" => false}
-      ]
-
-      html = view |> form("#paste-form", paste: %{json: paste_json(rows)}) |> render_submit()
-      assert html =~ "Mexico"
-      # matches the unmatched-reason copy (apostrophe may be HTML-escaped)
+      html = view |> form("#paste-form", paste: %{json: "not json"}) |> render_submit()
       assert html =~ "couldn"
     end
 
-    test "booster on an unmatched row shows the warning", ctx do
+    test "no developer jargon appears on the mobile flow", ctx do
       %{conn: conn} = ctx
-      round = group_round(1)
-      _fx = fixture!(round, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
+      group_round(1)
+      stub_rounds([fifa_round(1, [])])
+      {:ok, _view, html} = live(ua(conn, @iphone), ~p"/import")
+      text = visible_text(html)
+      refute text =~ "bookmarklet"
+      refute text =~ "json"
+      refute text =~ "console"
+    end
+  end
+
+  describe "desktop bookmarklet import" do
+    setup :register_and_log_in_player
+
+    test "bookmarklet payload -> preview all -> confirm writes every round", ctx do
+      %{conn: conn, player: player} = ctx
+      r1 = group_round(1)
+      r2 = group_round(2)
+      fx1 = fixture!(r1, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
+      fx2 = fixture!(r2, "Brazil", "Serbia", ~U[2026-06-18 19:00:00Z])
 
       stub_rounds([
-        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")])
+        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")]),
+        fifa_round(2, [fifa_match(1, "Brazil", "Serbia", "2026-06-18T20:00:00+01:00")])
       ])
 
-      {:ok, view, _} = live(conn, ~p"/import")
+      {:ok, view, html} = live(ua(conn, @desktop), ~p"/import")
+      assert html =~ "Import my picks"
 
       rows = [
-        %{"round" => 1, "matchId" => 999, "homeScore" => 2, "awayScore" => 0, "booster" => true}
+        %{"round" => 1, "matchId" => 1, "homeScore" => 2, "awayScore" => 0, "booster" => true},
+        %{"round" => 2, "matchId" => 1, "homeScore" => 1, "awayScore" => 1, "booster" => false}
       ]
 
-      html = view |> form("#paste-form", paste: %{json: paste_json(rows)}) |> render_submit()
-      assert html =~ "booster"
+      html = render_hook(view, "payload", %{"data" => bookmarklet_payload(rows)})
+      assert html =~ "Mexico"
+      assert html =~ "Brazil"
+
+      render_click(view, "confirm", %{})
+
+      preds = Map.new(Predictions.list_player_predictions(player.id), &{&1.fixture_id, &1})
+      assert preds[fx1.id].home_goals == 2
+      assert preds[fx2.id].home_goals == 1
     end
 
-    test "malformed paste keeps the awaiting state with an error", ctx do
+    test "no developer jargon and no console-fallback copy on desktop", ctx do
       %{conn: conn} = ctx
       stub_rounds([])
-      {:ok, view, _} = live(conn, ~p"/import")
-
-      html = view |> form("#paste-form", paste: %{json: "not json"}) |> render_submit()
-      assert html =~ "could not read"
+      {:ok, _view, html} = live(ua(conn, @desktop), ~p"/import")
+      text = visible_text(html)
+      refute text =~ "bookmarklet"
+      refute text =~ "json"
+      refute text =~ "console"
     end
   end
 end
