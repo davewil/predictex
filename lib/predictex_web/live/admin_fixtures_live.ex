@@ -9,6 +9,7 @@ defmodule PredictexWeb.AdminFixturesLive do
 
   alias Predictex.Results.Ingest
   alias Predictex.Tournament
+  alias PredictexWeb.Flags
 
   @impl true
   def mount(_params, _session, socket) do
@@ -74,40 +75,56 @@ defmodule PredictexWeb.AdminFixturesLive do
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <PredictexWeb.AdminComponents.admin_nav active={:fixtures} />
 
-      <button phx-click="sync" class="btn btn-secondary mb-4" disabled={@syncing}>
-        {if @syncing, do: "Syncing…", else: "Sync from feed"}
-      </button>
+      <div class="mb-4 flex items-center justify-between gap-3">
+        <PredictexWeb.AdminComponents.admin_stat label="fixtures" value={length(@fixtures)} />
+        <button phx-click="sync" class="btn btn-info btn-soft btn-sm gap-2" disabled={@syncing}>
+          {if @syncing, do: "Syncing…", else: "⟳ Sync from feed"}
+        </button>
+      </div>
 
-      <div :for={f <- @fixtures} class="card bg-base-200 p-4 mb-3">
-        <div class="font-medium mb-2">{f.team1} v {f.team2}</div>
+      <div
+        :for={f <- @fixtures}
+        class="mb-3 rounded-box border border-base-300 bg-base-100 p-4"
+      >
+        <div class="mb-3 flex items-center justify-between gap-2">
+          <div class="font-bold">
+            {Flags.flag(f.team1)} {f.team1} <span class="text-base-content/40">v</span> {f.team2} {Flags.flag(f.team2)}
+          </div>
+          <span class={[
+            "rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+            (f.status == :completed && "bg-success/15 text-success") || "bg-base-200 text-base-content/55"
+          ]}>
+            {f.status}
+          </span>
+        </div>
 
         <form
           id={"fixture-#{f.id}-result"}
           phx-submit="save_result"
-          class="flex flex-wrap gap-2 items-end mb-2"
+          class="mb-3 flex flex-wrap items-end gap-2"
         >
           <input type="hidden" name="fixture_id" value={f.id} />
-          <label class="text-xs">
+          <label class="text-xs text-base-content/60">
             H<input
               type="number"
               min="0"
               name="fixture[home_goals]"
               value={f.home_goals}
-              class="input input-bordered input-sm w-16"
+              class="input input-bordered input-sm font-score ml-1 w-16"
             />
           </label>
-          <label class="text-xs">
+          <label class="text-xs text-base-content/60">
             A<input
               type="number"
               min="0"
               name="fixture[away_goals]"
               value={f.away_goals}
-              class="input input-bordered input-sm w-16"
+              class="input input-bordered input-sm font-score ml-1 w-16"
             />
           </label>
-          <label class="text-xs">
+          <label class="text-xs text-base-content/60">
             Status
-            <select name="fixture[status]" class="select select-bordered select-sm">
+            <select name="fixture[status]" class="select select-bordered select-sm ml-1">
               <option value="scheduled" selected={f.status == :scheduled}>scheduled</option>
               <option value="completed" selected={f.status == :completed}>completed</option>
             </select>
@@ -118,41 +135,46 @@ defmodule PredictexWeb.AdminFixturesLive do
         <form
           id={"fixture-#{f.id}-cohort"}
           phx-submit="save_cohort"
-          class="flex flex-wrap gap-2 items-end"
+          class="flex flex-wrap items-end gap-2 border-t border-base-200 pt-3"
         >
           <input type="hidden" name="fixture_id" value={f.id} />
-          <label class="text-xs">
+          <label class="text-xs text-base-content/60">
             Home%<input
               type="number"
               min="0"
               max="100"
               name="fixture[cohort_home_pct]"
               value={f.cohort_home_pct}
-              class="input input-bordered input-sm w-16"
+              class="input input-bordered input-sm font-score ml-1 w-16"
             />
           </label>
-          <label class="text-xs">
+          <label class="text-xs text-base-content/60">
             Draw%<input
               type="number"
               min="0"
               max="100"
               name="fixture[cohort_draw_pct]"
               value={f.cohort_draw_pct}
-              class="input input-bordered input-sm w-16"
+              class="input input-bordered input-sm font-score ml-1 w-16"
             />
           </label>
-          <label class="text-xs">
+          <label class="text-xs text-base-content/60">
             Away%<input
               type="number"
               min="0"
               max="100"
               name="fixture[cohort_away_pct]"
               value={f.cohort_away_pct}
-              class="input input-bordered input-sm w-16"
+              class="input input-bordered input-sm font-score ml-1 w-16"
             />
           </label>
-          <button type="submit" class="btn btn-sm">Save cohort</button>
-          <span :if={!cohort_set?(f)} class="badge badge-warning">cohort not set — risky bonus off</span>
+          <button type="submit" class="btn btn-sm btn-soft">Save cohort</button>
+          <span
+            :if={!cohort_set?(f)}
+            class="rounded-md bg-warning/15 px-2 py-1 text-[11px] font-semibold text-warning"
+          >
+            cohort not set — risky bonus off
+          </span>
         </form>
       </div>
     </Layouts.app>

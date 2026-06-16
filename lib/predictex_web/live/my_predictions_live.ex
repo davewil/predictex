@@ -7,7 +7,6 @@ defmodule PredictexWeb.MyPredictionsLive do
   use PredictexWeb, :live_view
 
   alias Predictex.Dashboard
-  alias PredictexWeb.Flags
 
   @impl true
   def mount(_params, _session, socket) do
@@ -39,102 +38,58 @@ defmodule PredictexWeb.MyPredictionsLive do
       </div>
 
       <div :if={@dash.rounds != []} class="space-y-4">
-        <div
-          class="rounded-2xl p-4 text-white shadow-lg"
-          style="background:linear-gradient(135deg,#0a7d3c,#0f9d4f)"
-        >
+        <%!-- rank hero — always pitch green, light ink, regardless of theme --%>
+        <div class="relative overflow-hidden rounded-box bg-gradient-to-br from-primary to-secondary p-4 text-white shadow-lg">
           <div class="flex items-center justify-between">
             <div>
-              <div class="text-xs uppercase tracking-wide opacity-80">Your rank</div>
+              <div class="text-[10px] font-bold uppercase tracking-wider opacity-80">Your rank</div>
               <div class="text-3xl font-black leading-none">
                 {ordinal(@dash.rank)} <span class="text-sm opacity-80">of {@dash.of}</span>
               </div>
             </div>
             <div class="text-right">
-              <div class="text-xs uppercase tracking-wide opacity-80">Total points</div>
-              <div class="text-3xl font-black">{@dash.total}</div>
+              <div class="text-[10px] font-bold uppercase tracking-wider opacity-80">Total points</div>
+              <div class="font-score text-3xl font-bold">{@dash.total}</div>
               <div class="text-xs opacity-80">
                 {@dash.fixtures_total} fixtures · {@dash.round_bonus_total} bonus
               </div>
             </div>
           </div>
-
-          <div class="mt-3 flex flex-wrap gap-2">
-            <button
-              :for={r <- @dash.rounds}
-              phx-click="select_round"
-              phx-value-ordinal={r.round.ordinal}
-              class={[
-                "rounded-full px-3 py-1 text-xs font-bold",
-                (r.round.ordinal == @active_ordinal && "bg-white text-[#0a7d3c]") ||
-                  "bg-white/20 text-white"
-              ]}
-            >
-              {r.round.name}
-            </button>
-          </div>
         </div>
 
-        <div :if={@active} class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div
-            :for={fx <- @active.fixtures}
+        <%!-- round selector chips --%>
+        <div class="flex flex-wrap gap-2">
+          <button
+            :for={r <- @dash.rounds}
+            phx-click="select_round"
+            phx-value-ordinal={r.round.ordinal}
             class={[
-              "flex flex-col justify-between rounded-xl bg-base-100 p-3 shadow",
-              fx.prediction == nil && "border border-dashed border-error/40"
+              "rounded-full px-3 py-1 text-xs font-bold transition-colors",
+              (r.round.ordinal == @active_ordinal && "bg-primary text-primary-content") ||
+                "bg-base-200 text-base-content/70 hover:bg-base-300"
             ]}
           >
-            <div class="flex items-center justify-between text-[11px] uppercase tracking-wide opacity-60">
-              <span>{kickoff(fx.fixture.kickoff_at)}</span>
-              <span>{status_label(fx)}</span>
-            </div>
+            {r.round.name}
+          </button>
+        </div>
 
-            <div class="mt-2 space-y-1">
-              <div class="flex items-center gap-2">
-                <span class="text-lg leading-none">{Flags.flag(fx.fixture.team1)}</span>
-                <span class="flex-1 truncate font-semibold" title={fx.fixture.team1}>{fx.fixture.team1}</span>
-                <span class="w-5 text-right text-lg font-black tabular-nums">{home_score(
-                  fx.prediction
-                )}</span>
-              </div>
-              <div class="flex items-center gap-2">
-                <span class="text-lg leading-none">{Flags.flag(fx.fixture.team2)}</span>
-                <span class="flex-1 truncate font-semibold" title={fx.fixture.team2}>{fx.fixture.team2}</span>
-                <span class="w-5 text-right text-lg font-black tabular-nums">{away_score(
-                  fx.prediction
-                )}</span>
-              </div>
-            </div>
+        <div :if={@active} class="flex items-center gap-2">
+          <span class="text-sm font-extrabold">{@active.round.name}</span>
+          <span
+            :if={@active.round.stage == :knockout}
+            class="rounded-md bg-info/15 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-info"
+          >
+            Knockout
+          </span>
+        </div>
 
-            <div
-              :if={@active.round.stage == :knockout and fx.prediction}
-              class="mt-1 text-center text-xs opacity-70"
-            >
-              First team: {side_label(fx.prediction.first_scorer_side, fx.fixture)} ·
-              First scorer: {fx.prediction.first_scorer_player || "—"}
-            </div>
-
-            <div class="mt-2 text-center text-xs">
-              <span :if={fx.prediction == nil} class="font-semibold text-error">⚠ No pick imported yet</span>
-              <span :if={fx.prediction && fx.status == :completed}>
-                Actual <strong>{fx.fixture.home_goals}–{fx.fixture.away_goals}</strong>
-                <span :if={fx.exact?} class="font-bold text-success">· exact ✓✓</span>
-                <span class="ml-1 rounded-full bg-warning px-2 py-0.5 font-bold text-warning-content">+{fx.points}</span>
-                <span :if={fx.booster?} class="ml-1 font-bold text-amber-600">⚡ boosted</span>
-              </span>
-              <span
-                :if={fx.prediction && fx.status != :completed && fx.locked?}
-                class="italic opacity-60"
-              >
-                Locked — awaiting result {if fx.booster?, do: "· ⚡ boosted", else: ""}
-              </span>
-              <span
-                :if={fx.prediction && fx.status != :completed && not fx.locked?}
-                class="opacity-60"
-              >
-                Open {if fx.booster?, do: "· ⚡ boosted", else: ""}
-              </span>
-            </div>
-          </div>
+        <div :if={@active} class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <.fixture_card
+            :for={fx <- @active.fixtures}
+            fx={fx}
+            stage={@active.round.stage}
+            fifa_url={@fifa_url}
+          />
         </div>
 
         <div :if={@fifa_url} class="text-center">
@@ -154,22 +109,6 @@ defmodule PredictexWeb.MyPredictionsLive do
 
   defp active_round(dash, ordinal),
     do: Enum.find(dash.rounds, &(&1.round.ordinal == ordinal))
-
-  defp home_score(nil), do: "–"
-  defp home_score(p), do: p.home_goals
-  defp away_score(nil), do: "–"
-  defp away_score(p), do: p.away_goals
-
-  defp status_label(%{status: :completed}), do: "Full time"
-  defp status_label(%{locked?: true}), do: "🔒 Locked"
-  defp status_label(_), do: "Open"
-
-  defp side_label(:home, fixture), do: fixture.team1
-  defp side_label(:away, fixture), do: fixture.team2
-  defp side_label(_, _), do: "—"
-
-  defp kickoff(nil), do: "TBC"
-  defp kickoff(%DateTime{} = dt), do: Calendar.strftime(dt, "%a %d %b · %H:%M")
 
   defp ordinal(nil), do: "—"
   defp ordinal(n) when n in [11, 12, 13], do: "#{n}th"

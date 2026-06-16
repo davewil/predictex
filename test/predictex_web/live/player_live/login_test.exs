@@ -9,7 +9,7 @@ defmodule PredictexWeb.PlayerLive.LoginTest do
       {:ok, _lv, html} = live(conn, ~p"/players/log-in")
 
       assert html =~ "Log in"
-      assert html =~ "Sign up"
+      assert html =~ "Create an account"
       refute html =~ "Log in with email"
     end
   end
@@ -52,11 +52,11 @@ defmodule PredictexWeb.PlayerLive.LoginTest do
 
       {:ok, _login_live, login_html} =
         lv
-        |> element("main a", "Sign up")
+        |> element("main a", "Create an account")
         |> render_click()
         |> follow_redirect(conn, ~p"/players/register")
 
-      assert login_html =~ "Register"
+      assert login_html =~ "Join the league"
     end
   end
 
@@ -69,7 +69,7 @@ defmodule PredictexWeb.PlayerLive.LoginTest do
     test "shows login page with email filled in", %{conn: conn, player: player} do
       {:ok, _lv, html} = live(conn, ~p"/players/log-in")
 
-      assert html =~ "You need to reauthenticate"
+      assert html =~ "Reauthenticate to perform sensitive actions"
       refute html =~ "Register"
       refute html =~ "Log in with email"
 

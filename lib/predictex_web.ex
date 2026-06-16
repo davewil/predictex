@@ -86,6 +86,8 @@ defmodule PredictexWeb do
       import Phoenix.HTML
       # Core UI components
       import PredictexWeb.CoreComponents
+      # Predictex domain UI atoms (FixtureCard, LeaderboardRow, scoring legend)
+      import PredictexWeb.PredictexComponents
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

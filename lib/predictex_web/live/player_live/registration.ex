@@ -8,20 +8,7 @@ defmodule PredictexWeb.PlayerLive.Registration do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-sm">
-        <div class="text-center">
-          <.header>
-            Register for an account
-            <:subtitle>
-              Already registered?
-              <.link navigate={~p"/players/log-in"} class="font-semibold text-brand hover:underline">
-                Log in
-              </.link>
-              to your account now.
-            </:subtitle>
-          </.header>
-        </div>
-
+      <.auth_card heading="Join the league" sub="Pick a name worth seeing at the top of the table.">
         <.form
           for={@form}
           id="registration_form"
@@ -56,13 +43,27 @@ defmodule PredictexWeb.PlayerLive.Registration do
             required
           />
 
-          <.input field={@form[:invite_code]} type="text" label="League invite code" required />
+          <.input
+            field={@form[:invite_code]}
+            type="text"
+            label="League invite code"
+            class="font-score tracking-wide text-accent"
+            required
+          />
+          <p class="mb-2 text-[11px] text-base-content/55">🔑 Ask the group admin for the code.</p>
 
           <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
             Create an account
           </.button>
         </.form>
-      </div>
+
+        <p class="mt-5 text-center text-sm text-base-content/60">
+          Already playing?
+          <.link navigate={~p"/players/log-in"} class="font-bold text-primary hover:underline">
+            Log in
+          </.link>
+        </p>
+      </.auth_card>
     </Layouts.app>
     """
   end

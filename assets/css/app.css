@@ -20,76 +20,119 @@
   themes: false;
 }
 
-/* daisyUI theme plugin. You can update this file by fetching the latest version with:
-  curl -sLO https://github.com/saadeghi/daisyui/releases/latest/download/daisyui-theme.js
-  We ship with two themes, a light one inspired on Phoenix colors and a dark one inspired
-  on Elixir colors. Build your own at: https://daisyui.com/theme-generator/ */
+/* ──────────────────────────────────────────────────────────────────────────
+   Predictex — FIFA World Cup 2026 prediction league
+   Stadium-at-night dark + a light variant. Theme names kept as "dark"/"light"
+   so the existing data-theme toggle and the `dark` custom-variant keep working.
+
+   System rules baked into the tokens:
+   • primary  = pitch green  → identity, actions, "you"
+   • accent   = champagne gold → winners, boosters, bonus moments ONLY
+   • warning  = points amber  → per-fixture points chips
+   • error    = no-pick red    → missing / unimported picks
+   • info     = pitch blue     → knockout first-team / first-scorer
+   • success  = bright green    → correct picks
+   To make dark the app's default, swap the `default:` flags on the two blocks.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* DARK — group-chat-at-night */
 @plugin "../vendor/daisyui-theme" {
   name: "dark";
-  default: false;
+  default: true;
   prefersdark: true;
   color-scheme: "dark";
-  --color-base-100: oklch(30.33% 0.016 252.42);
-  --color-base-200: oklch(25.26% 0.014 253.1);
-  --color-base-300: oklch(20.15% 0.012 254.09);
-  --color-base-content: oklch(97.807% 0.029 256.847);
-  --color-primary: oklch(58% 0.233 277.117);
-  --color-primary-content: oklch(96% 0.018 272.314);
-  --color-secondary: oklch(58% 0.233 277.117);
-  --color-secondary-content: oklch(96% 0.018 272.314);
-  --color-accent: oklch(60% 0.25 292.717);
-  --color-accent-content: oklch(96% 0.016 293.756);
-  --color-neutral: oklch(37% 0.044 257.287);
-  --color-neutral-content: oklch(98% 0.003 247.858);
-  --color-info: oklch(58% 0.158 241.966);
-  --color-info-content: oklch(97% 0.013 236.62);
-  --color-success: oklch(60% 0.118 184.704);
-  --color-success-content: oklch(98% 0.014 180.72);
-  --color-warning: oklch(66% 0.179 58.318);
-  --color-warning-content: oklch(98% 0.022 95.277);
-  --color-error: oklch(58% 0.253 17.585);
-  --color-error-content: oklch(96% 0.015 12.422);
-  --radius-selector: 0.25rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --size-selector: 0.21875rem;
-  --size-field: 0.21875rem;
-  --border: 1.5px;
+
+  /* Green-tinted night surfaces (base-100 = cards, base-300 = page) */
+  --color-base-100: oklch(24% 0.009 162);        /* ~#161d18  card / panel   */
+  --color-base-200: oklch(20% 0.010 162);        /* ~#10150f  sunken / rails  */
+  --color-base-300: oklch(16% 0.008 162);        /* ~#0a0d0c  page background */
+  --color-base-content: oklch(96% 0.006 160);    /* ~#f0f4f1  primary ink     */
+
+  /* Pitch green — identity & actions */
+  --color-primary: oklch(64% 0.18 152);          /* ~#16b35e */
+  --color-primary-content: oklch(22% 0.04 158);  /* ~#04130a  dark ink on green */
+
+  /* Deep pitch — secondary */
+  --color-secondary: oklch(50% 0.13 152);        /* ~#0a7d3c */
+  --color-secondary-content: oklch(95% 0.02 158);
+
+  /* Champagne gold — winners, boosters, bonuses (rationed!) */
+  --color-accent: oklch(82% 0.125 88);           /* ~#e8c468 */
+  --color-accent-content: oklch(26% 0.05 82);    /* ~#2a1c00  dark ink on gold */
+
+  /* Neutral chrome */
+  --color-neutral: oklch(27% 0.010 162);
+  --color-neutral-content: oklch(90% 0.006 160);
+
+  /* Info — knockout first-team / first-scorer */
+  --color-info: oklch(70% 0.13 245);             /* ~#3b9eff */
+  --color-info-content: oklch(20% 0.05 250);
+
+  /* Success — correct picks */
+  --color-success: oklch(72% 0.17 153);          /* ~#1ec46d */
+  --color-success-content: oklch(22% 0.05 158);
+
+  /* Warning — points amber */
+  --color-warning: oklch(78% 0.16 67);           /* ~#f5a524 */
+  --color-warning-content: oklch(26% 0.06 60);
+
+  /* Error — no pick imported */
+  --color-error: oklch(64% 0.19 14);             /* ~#f0506a */
+  --color-error-content: oklch(98% 0.01 12);
+
+  --radius-selector: 2rem;     /* pills, badges, toggles */
+  --radius-field: 0.75rem;     /* buttons, inputs        */
+  --radius-box: 1rem;          /* cards, modals          */
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
   --depth: 1;
   --noise: 0;
 }
 
+/* LIGHT — day match, same palette on crisp surfaces */
 @plugin "../vendor/daisyui-theme" {
   name: "light";
-  default: true;
+  default: false;
   prefersdark: false;
   color-scheme: "light";
-  --color-base-100: oklch(98% 0 0);
-  --color-base-200: oklch(96% 0.001 286.375);
-  --color-base-300: oklch(92% 0.004 286.32);
-  --color-base-content: oklch(21% 0.006 285.885);
-  --color-primary: oklch(70% 0.213 47.604);
-  --color-primary-content: oklch(98% 0.016 73.684);
-  --color-secondary: oklch(55% 0.027 264.364);
-  --color-secondary-content: oklch(98% 0.002 247.839);
-  --color-accent: oklch(0% 0 0);
-  --color-accent-content: oklch(100% 0 0);
-  --color-neutral: oklch(44% 0.017 285.786);
-  --color-neutral-content: oklch(98% 0 0);
-  --color-info: oklch(62% 0.214 259.815);
-  --color-info-content: oklch(97% 0.014 254.604);
-  --color-success: oklch(70% 0.14 182.503);
-  --color-success-content: oklch(98% 0.014 180.72);
-  --color-warning: oklch(66% 0.179 58.318);
-  --color-warning-content: oklch(98% 0.022 95.277);
-  --color-error: oklch(58% 0.253 17.585);
-  --color-error-content: oklch(96% 0.015 12.422);
-  --radius-selector: 0.25rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.5rem;
-  --size-selector: 0.21875rem;
-  --size-field: 0.21875rem;
-  --border: 1.5px;
+
+  --color-base-100: oklch(100% 0 0);             /* white cards            */
+  --color-base-200: oklch(97% 0.006 160);        /* faint green page wash  */
+  --color-base-300: oklch(93% 0.010 160);        /* borders / sunken       */
+  --color-base-content: oklch(25% 0.02 160);     /* green-ink text         */
+
+  /* Pitch green pulled a touch deeper for contrast on white */
+  --color-primary: oklch(58% 0.15 152);          /* ~#0f9d4f */
+  --color-primary-content: oklch(99% 0.01 150);
+
+  --color-secondary: oklch(48% 0.12 152);        /* ~#0a7d3c */
+  --color-secondary-content: oklch(99% 0.01 150);
+
+  --color-accent: oklch(80% 0.12 86);            /* gold, dark ink on top  */
+  --color-accent-content: oklch(28% 0.06 80);
+
+  --color-neutral: oklch(30% 0.02 160);
+  --color-neutral-content: oklch(97% 0.006 160);
+
+  --color-info: oklch(60% 0.14 245);
+  --color-info-content: oklch(98% 0.02 240);
+
+  --color-success: oklch(60% 0.15 153);
+  --color-success-content: oklch(99% 0.01 150);
+
+  --color-warning: oklch(76% 0.16 67);
+  --color-warning-content: oklch(28% 0.06 60);
+
+  --color-error: oklch(60% 0.20 16);
+  --color-error-content: oklch(98% 0.01 12);
+
+  --radius-selector: 2rem;
+  --radius-field: 0.75rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
   --depth: 1;
   --noise: 0;
 }
@@ -104,5 +147,38 @@
 
 /* Make LiveView wrapper divs transparent for layout */
 [data-phx-session], [data-phx-teleported-src] { display: contents }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Predictex — brand type + celebratory micro-moment keyframes
+   Load the fonts in root.html.heex <head>:
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+   ────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --font-display: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Spline Sans Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+body { font-family: var(--font-display); }
+
+/* Big legible numbers: scorelines, points, ranks. Use class="font-score". */
+.font-score { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+/* Celebratory flourishes — fire on a daisyUI toast/alert at the match-day moment.
+   e.g. <div class="toast"><div class="alert alert-success animate-pdx-rise">…</div></div>
+   These are CSS-only, so they translate straight into HEEx with no JS. */
+@keyframes pdx-rise   { 0% { opacity: 0; transform: translateY(18px) scale(.94); } 100% { opacity: 1; transform: none; } }
+@keyframes pdx-pop    { 0% { opacity: 0; transform: scale(.5); } 62% { opacity: 1; transform: scale(1.1); } 100% { transform: scale(1); } }
+@keyframes pdx-glow   { 0%, 100% { box-shadow: 0 16px 32px -12px color-mix(in oklab, var(--color-accent) 60%, transparent); }
+                        50%      { box-shadow: 0 0 0 6px color-mix(in oklab, var(--color-accent) 25%, transparent), 0 16px 32px -12px color-mix(in oklab, var(--color-accent) 85%, transparent); } }
+
+.animate-pdx-rise   { animation: pdx-rise .55s cubic-bezier(.2,.8,.2,1) both; }
+.animate-pdx-pop    { animation: pdx-pop .5s cubic-bezier(.2,.9,.3,1.25) both; }
+.animate-pdx-glow   { animation: pdx-glow 1.6s .3s ease-in-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pdx-rise, .animate-pdx-pop, .animate-pdx-glow { animation: none; }
+}
 
 /* This file is for your main application CSS */

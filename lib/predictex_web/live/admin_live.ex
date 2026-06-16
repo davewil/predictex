@@ -18,16 +18,35 @@ defmodule PredictexWeb.AdminLive do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <PredictexWeb.AdminComponents.admin_nav active={:home} />
-      <h1 class="text-xl font-semibold mb-4">Admin console</h1>
-      <ul class="menu bg-base-200 rounded-box w-full">
-        <li>
-          <.link navigate={~p"/admin/predictions"}>Enter predictions ({@player_count} players)</.link>
-        </li>
-        <li>
-          <.link navigate={~p"/admin/fixtures"}>Fixtures &amp; results ({@fixture_count} fixtures)</.link>
-        </li>
-        <li><.link navigate={~p"/admin/players"}>Players</.link></li>
-      </ul>
+
+      <div class="mb-5 flex flex-wrap gap-x-5 gap-y-1">
+        <PredictexWeb.AdminComponents.admin_stat label="players" value={@player_count} />
+        <PredictexWeb.AdminComponents.admin_stat label="fixtures" value={@fixture_count} />
+      </div>
+
+      <div class="grid gap-3 sm:grid-cols-3">
+        <.link
+          navigate={~p"/admin/predictions"}
+          class="rounded-box border border-base-300 bg-base-100 p-4 transition-colors hover:border-primary/40 hover:bg-base-200"
+        >
+          <div class="font-bold">Enter predictions</div>
+          <div class="text-xs text-base-content/60">By player or by fixture, from screenshots</div>
+        </.link>
+        <.link
+          navigate={~p"/admin/fixtures"}
+          class="rounded-box border border-base-300 bg-base-100 p-4 transition-colors hover:border-primary/40 hover:bg-base-200"
+        >
+          <div class="font-bold">Fixtures &amp; results</div>
+          <div class="text-xs text-base-content/60">Sync results, set cohort %</div>
+        </.link>
+        <.link
+          navigate={~p"/admin/players"}
+          class="rounded-box border border-base-300 bg-base-100 p-4 transition-colors hover:border-primary/40 hover:bg-base-200"
+        >
+          <div class="font-bold">Players</div>
+          <div class="text-xs text-base-content/60">Roles &amp; admin promotion</div>
+        </.link>
+      </div>
     </Layouts.app>
     """
   end

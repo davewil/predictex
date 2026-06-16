@@ -5,24 +5,14 @@ defmodule PredictexWeb.PlayerLive.Login do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-sm space-y-4">
-        <div class="text-center">
-          <.header>
-            <p>Log in</p>
-            <:subtitle>
-              <%= if @current_scope do %>
-                You need to reauthenticate to perform sensitive actions on your account.
-              <% else %>
-                Don't have an account? <.link
-                  navigate={~p"/players/register"}
-                  class="font-semibold text-brand hover:underline"
-                  phx-no-format
-                >Sign up</.link> for an account now.
-              <% end %>
-            </:subtitle>
-          </.header>
-        </div>
-
+      <.auth_card
+        heading="Welcome back"
+        sub={
+          if @current_scope,
+            do: "Reauthenticate to perform sensitive actions on your account.",
+            else: "The group's been busy. Let's see where you stand."
+        }
+      >
         <.form
           :let={f}
           for={@form}
@@ -55,7 +45,14 @@ defmodule PredictexWeb.PlayerLive.Login do
             Log in only this time
           </.button>
         </.form>
-      </div>
+
+        <p :if={!@current_scope} class="mt-5 text-center text-sm text-base-content/60">
+          New here?
+          <.link navigate={~p"/players/register"} class="font-bold text-primary hover:underline">
+            Create an account
+          </.link>
+        </p>
+      </.auth_card>
     </Layouts.app>
     """
   end

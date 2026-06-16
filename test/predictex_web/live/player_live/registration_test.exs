@@ -8,7 +8,7 @@ defmodule PredictexWeb.PlayerLive.RegistrationTest do
     test "renders registration page", %{conn: conn} do
       {:ok, _lv, html} = live(conn, ~p"/players/register")
 
-      assert html =~ "Register"
+      assert html =~ "Join the league"
       assert html =~ "Log in"
     end
 
@@ -30,7 +30,7 @@ defmodule PredictexWeb.PlayerLive.RegistrationTest do
         |> element("#registration_form")
         |> render_change(player: %{"email" => "with spaces"})
 
-      assert result =~ "Register"
+      assert result =~ "Join the league"
       assert result =~ "must have the @ sign and no spaces"
     end
   end

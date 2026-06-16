@@ -10,6 +10,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
   use PredictexWeb, :live_view
 
   alias Predictex.{Accounts, Predictions, Tournament}
+  alias PredictexWeb.Flags
 
   @impl true
   def mount(_params, _session, socket) do
@@ -179,14 +180,22 @@ defmodule PredictexWeb.AdminPredictionsLive do
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <PredictexWeb.AdminComponents.admin_nav active={:predictions} />
 
-      <div class="tabs tabs-boxed mb-4">
+      <div class="mb-4 inline-flex gap-1 rounded-xl border border-base-300 bg-base-200/60 p-1">
         <.link
           patch={~p"/admin/predictions?view=player"}
-          class={["tab", @view == :player && "tab-active"]}
-        >By player</.link>
+          class={[
+            "rounded-lg px-3.5 py-1.5 text-sm font-bold transition-colors",
+            (@view == :player && "bg-primary text-primary-content shadow") ||
+              "text-base-content/70 hover:bg-base-300"
+          ]}
+        >Enter by player</.link>
         <.link
           patch={~p"/admin/predictions?view=fixture"}
-          class={["tab", @view == :fixture && "tab-active"]}
+          class={[
+            "rounded-lg px-3.5 py-1.5 text-sm font-bold transition-colors",
+            (@view == :fixture && "bg-primary text-primary-content shadow") ||
+              "text-base-content/70 hover:bg-base-300"
+          ]}
         >By fixture</.link>
       </div>
 
@@ -236,12 +245,12 @@ defmodule PredictexWeb.AdminPredictionsLive do
             </thead>
             <tbody>
               <tr :for={f <- @fixtures}>
-                <td>{f.team1} v {f.team2}</td>
+                <td class="font-medium">{Flags.flag(f.team1)} {f.team1} v {f.team2} {Flags.flag(f.team2)}</td>
                 <td>
                   <input
                     type="number"
                     min="0"
-                    class="input input-bordered w-16"
+                    class="input input-bordered font-score w-16"
                     name={"rows[#{f.id}][home_goals]"}
                     value={existing_val(@existing, f.id, :home_goals)}
                   />
@@ -250,7 +259,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
                   <input
                     type="number"
                     min="0"
-                    class="input input-bordered w-16"
+                    class="input input-bordered font-score w-16"
                     name={"rows[#{f.id}][away_goals]"}
                     value={existing_val(@existing, f.id, :away_goals)}
                   />
@@ -301,7 +310,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
           <select name="fixture_id" class="select select-bordered">
             <option value="">Fixture…</option>
             <option :for={f <- @all_fixtures} value={f.id} selected={f.id == @selected_fixture_id}>
-              {f.team1} v {f.team2}
+              {Flags.flag(f.team1)} {f.team1} v {f.team2} {Flags.flag(f.team2)}
             </option>
           </select>
         </form>
@@ -316,13 +325,19 @@ defmodule PredictexWeb.AdminPredictionsLive do
           </thead>
           <tbody>
             <tr :for={p <- @fixture_preds}>
-              <td>{p.player.display_name}</td>
-              <td>{p.home_goals}–{p.away_goals}</td>
-              <td>{if p.booster, do: "⚡"}</td>
+              <td class="font-medium">{p.player.display_name}</td>
+              <td class="font-score">{p.home_goals}–{p.away_goals}</td>
+              <td>
+                <span :if={p.booster} class="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-content">
+                  ⚡ 2×
+                </span>
+              </td>
             </tr>
             <tr :for={pl <- @missing_players} class="opacity-60">
               <td>{pl.display_name}</td>
-              <td colspan="2"><span class="badge badge-warning">no pick</span></td>
+              <td colspan="2">
+                <span class="rounded-md bg-error/15 px-2 py-1 text-[11px] font-semibold text-error">no pick</span>
+              </td>
             </tr>
           </tbody>
         </table>
