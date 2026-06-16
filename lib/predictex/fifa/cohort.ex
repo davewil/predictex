@@ -14,9 +14,17 @@ defmodule Predictex.Fifa.Cohort do
   """
   require Logger
 
-  # FIFA -> normalized openfootball name divergences (shared artifact with predictex-c9s).
+  # FIFA -> openfootball normalized-name divergences, derived by diffing the live
+  # squads.json vs worldcup.json feeds (the predictex-c9s shared artifact).
   @aliases %{
-    "ir iran" => "iran"
+    "bosnia and herzegovina" => "bosnia & herzegovina",
+    "cabo verde" => "cape verde",
+    "congo dr" => "dr congo",
+    "czechia" => "czech republic",
+    "côte d'ivoire" => "ivory coast",
+    "ir iran" => "iran",
+    "korea republic" => "south korea",
+    "türkiye" => "turkey"
   }
 
   @doc """
@@ -34,9 +42,15 @@ defmodule Predictex.Fifa.Cohort do
       stats = match_stats[to_string(m["id"])]
       fixture = Map.get(index, key(m["date"], m["homeSquadName"], m["awaySquadName"]))
 
-      if is_map(stats) and fixture, do: [orient(m, stats, fixture)], else: []
+      if is_map(stats) and not is_nil(fixture) and complete?(stats),
+        do: [orient(m, stats, fixture)],
+        else: []
     end)
   end
+
+  defp complete?(stats),
+    do:
+      not is_nil(stats["homeWin"]) and not is_nil(stats["draw"]) and not is_nil(stats["awayWin"])
 
   defp orient(m, stats, f) do
     {home, away} =

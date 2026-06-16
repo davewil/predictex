@@ -59,4 +59,21 @@ defmodule Predictex.Fifa.CohortTest do
     rounds = rounds([fifa_match(2, "Brazil", "Serbia", "2026-06-12T20:00:00+01:00")])
     assert [] = Cohort.plan(rounds, %{}, [fx])
   end
+
+  test "resolves a newly-verified alias (Czechia -> Czech Republic)" do
+    fx = fixture(11, "Czech Republic", "Spain", ~U[2026-06-22 19:00:00Z])
+    rounds = rounds([fifa_match(7, "Czechia", "Spain", "2026-06-22T20:00:00+01:00")])
+    stats = %{"7" => %{"homeWin" => 45, "draw" => 25, "awayWin" => 30}}
+
+    assert [u] = Cohort.plan(rounds, stats, [fx])
+    assert u.fixture_id == 11
+    assert u.cohort_home_pct == 45
+  end
+
+  test "omits a match whose matchStats entry has nil percentages" do
+    fx = fixture(1, "Brazil", "Serbia", ~U[2026-06-12 19:00:00Z])
+    rounds = rounds([fifa_match(2, "Brazil", "Serbia", "2026-06-12T20:00:00+01:00")])
+    stats = %{"2" => %{"homeWin" => nil, "draw" => nil, "awayWin" => nil}}
+    assert [] = Cohort.plan(rounds, stats, [fx])
+  end
 end
