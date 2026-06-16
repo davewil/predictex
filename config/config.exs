@@ -89,7 +89,8 @@ config :predictex, Oban,
   repo: Predictex.Repo,
   queues: [default: 10],
   plugins: [
-    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7}
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7},
+    {Oban.Plugins.Cron, crontab: [{"*/15 * * * *", Predictex.Workers.ResultSync}]}
   ]
 
 # Import environment specific config. This must remain at the bottom
