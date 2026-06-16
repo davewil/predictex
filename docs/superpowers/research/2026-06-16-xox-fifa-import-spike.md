@@ -62,10 +62,10 @@ observation), or **[todo]** (still to verify).
 **Auth-free static reference JSON** (200 while logged out), under
 `https://play.fifa.com/json/match_predictor/`:
 
-| File | Likely contents |
-|------|-----------------|
-| `rounds.json` | round + match structure (fixtures, `matchId` ↔ teams/date) — **[todo] not yet read** |
-| `squads.json` | teams / squads (`firstSquadScored` resolution) — **[todo]** |
+| File | Contents |
+|------|----------|
+| `rounds.json` | **[confirmed]** `array[8]` of rounds; each `{id, status, stage, startDate, endDate, tournaments: [...]}`. `tournaments[]` are the matches: `{id (== prediction.matchId), homeSquadId, awaySquadId, homeSquadName, awaySquadName, homeSquadAbbr, awaySquadAbbr, homeScore, awayScore, date, venueName, venueCity, fifaId}`. **This is the `matchId` → teams/round/date crosswalk.** |
+| `squads.json` | **[confirmed]** `array[48]` of `{id, name, abbr}` (e.g. `{28, "Mexico", "MEX"}`). Resolves `homeSquadId`/`awaySquadId` and `firstSquadScored` → team/side. |
 | `players.json` | players (`firstPlayerScored` resolution) — **[todo]** |
 | `matchStats.json` | results + (likely) the "Popular Picks" cohort % — **[todo]** |
 | `message_banner.json`, `checksums.json`, `poc.json` | app meta |
@@ -131,22 +131,30 @@ observation), or **[todo]** (still to verify).
 
 ## The three integration challenges
 
-### A. `matchId` → `Fixture` crosswalk (the core problem)
+### A. `matchId` → `Fixture` crosswalk — **SOLVED [confirmed]**
 
-FIFA's `matchId` (1, 2, 3 …) is opaque and **not present in openfootball** (our fixture source,
-keyed by `external_ref` like `"2026-06-11 Mexico v South Africa"`). Options:
+FIFA's `prediction.matchId` resolves directly via `rounds.json`: `matchId` === a `tournaments[].id`,
+whose record carries `homeSquadName`/`awaySquadName`, `homeSquadAbbr`/`awaySquadAbbr`, the round
+`id`/`stage`, and the kickoff `date`. Verified: prediction `matchId:1` (a 2-0 booster pick) →
+round 1 tournament `id:1` = **Mexico v South Africa**, kickoff `2026-06-11T20:00:00+01:00`.
 
-1. **Resolve in the bookmarklet, match by teams+round on our side (recommended [inferred]).**
-   The bookmarklet has FIFA's reference data in-session, so it maps `matchId` →
-   `(round, homeTeam, awayTeam)` and sends *those*; `/api/import` matches to a `Fixture` by
-   round + team names. Keeps FIFA's opaque ids out of our domain; ties into `predictex-c9s`
-   (team-name normalization).
-2. **Store FIFA `matchId` on `Fixture`.** Add a column, populate via a one-off mapping. Tighter
-   match, but our fixtures come from openfootball which has no FIFA id — needs its own crosswalk
-   to populate, so it just moves the problem.
+**Design (recommended):** the bookmarklet resolves `matchId` → `(round, homeSquadName,
+awaySquadName, date)` in-session and sends those; `/api/import` matches to a `Fixture` by
+**kickoff date** (the strongest, spelling-proof key — every match has a unique kickoff), with
+normalized team names as a tiebreaker. Both `prediction/show/{round}` and `rounds.json` are
+round-scoped, so the lookup is unambiguous even if `tournaments[].id` resets per round.
 
-→ **Decision for design:** likely (1). Requires confirming `rounds.json`'s `matchId` ↔ team
-mapping **[todo]** and a team-name normalization step (FIFA names vs openfootball names).
+- **Knockout `firstSquadScored`** (a squad id) → compare to the match's `homeSquadId` /
+  `awaySquadId` → `:home`/`:away`. Also solved via the same record.
+- **Name normalization** is now a *minor tiebreaker*, not a blocker: FIFA uses standard official
+  names; only a few differ from openfootball (e.g. "Korea Republic", "IR Iran", "Congo DR",
+  "Czechia", "Côte d'Ivoire"). Matching on `date` sidesteps most of it. Ties to `predictex-c9s`.
+- **Alternative (rejected):** storing FIFA `matchId` on `Fixture` — our fixtures come from
+  openfootball (no FIFA id), so it just moves the crosswalk. The date join is simpler.
+
+> Bonus observed: `rounds.json` tournaments also carry the **actual results** (`homeScore`/
+> `awayScore`/`status`) and a global `fifaId` — a potential cross-check against openfootball,
+> not needed now.
 
 ### B. Cross-origin transport (fifa.com → our app)
 
@@ -203,18 +211,23 @@ capture a populated sample.
 
 ## Open questions / TODO before/at design
 
-- **[todo]** Read `rounds.json` / `squads.json` / `players.json` shapes — confirm `matchId` ↔
-  teams/round and squad/player id resolution. (Capture in a follow-up console probe.)
+- ~~Read `rounds.json` / `squads.json` shapes & confirm the `matchId` crosswalk~~ —
+  **DONE [confirmed]** (see Challenge A). The crosswalk is solved via `rounds.json`.
+- ~~Is an in-session console `fetch()` of the static `/json/…` files Akamai-challenged?~~ —
+  **No [confirmed]:** fetching `rounds.json`/`squads.json` via console on the FIFA origin
+  returned clean JSON. (The earlier HTML response was on the Google origin mid-OAuth.) So the
+  bookmarklet can fetch reference data directly.
+- ~~Round numbering / count~~ — **`1..8`, 3 group + 5 knockout [confirmed]** (`rounds.json` is
+  `array[8]` with `stage` per round).
+- **[todo]** Read `players.json` shape — confirm `firstPlayerScored` (player id) → name resolution
+  (knockout only).
 - **[todo]** Capture a **populated knockout** `prediction/show/{round}` once those rounds open —
   verify `firstSquadScored` / `firstPlayerScored` value formats.
 - **[todo]** Does `matchStats.json` carry per-outcome **cohort %** (home/draw/away) we need for
   the risky bonus, or only per-scoreline "Popular Picks"? If usable, the bookmarklet could also
   feed cohort data — a bonus that reduces admin entry (relates to `a02` cohort entry).
-- **[todo]** Is an in-session console/bookmarklet `fetch()` of the static `/json/…` reference
-  files Akamai-challenged? If so, read what the app already loaded instead of re-fetching.
-- **[todo]** Round numbering / count: assumed `1..8` (3 group + 5 knockout) from the UI tabs +
-  `rules.md`; `show/1` (group) confirmed, `show/4` (Round of 32) inferred.
-- Team-name normalization map (FIFA ↔ openfootball) — overlaps with `predictex-c9s`.
+- Team-name normalization map (FIFA ↔ openfootball) — now a minor tiebreaker; overlaps with
+  `predictex-c9s`.
 
 ## Risks
 
