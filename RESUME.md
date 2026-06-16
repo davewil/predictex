@@ -29,19 +29,26 @@ the app scores them against real results and ranks a leaderboard.
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **237 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
+- **251 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
+- **Oban 2.23** (Postgres-backed jobs) added in v0.5.0 — supervised in `application.ex`, cron in `config.exs`, `testing: :manual` in tests. The substrate for `xox` next.
 
 ## Architecture (Gather → Decide → Act; pure cores, effects at edges)
 - `Predictex.Scoring` — **pure** scoring engine (`score/3`, `round_total/2`). All rulings encoded here.
 - `Predictex.Results.Openfootball` — **pure** feed parser (anti-corruption boundary; handles string/stoppage minutes, own-goal beneficiary array, FT-excludes-ET, kickoff parsing).
-- `Predictex.Fifa` — **pure** openfootball → FIFA 8-game-round mapping.
+- `Predictex.Fifa` — **pure** openfootball → FIFA 8-game-round mapping. `Predictex.Fifa.Cohort` —
+  **pure** join of FIFA `matchStats.json` cohort → fixtures (`plan/3`; `{utc_date, team-set}` key +
+  home/away orientation; **data-verified FIFA↔openfootball alias table** — 8 divergences, the core of `c9s`).
 - `Predictex.Leaderboard` — **pure** DB-free aggregator (drives `mix predictex.leaderboard`).
 - `Predictex.Standings` — DB-backed leaderboard (`leaderboard/0`), reuses `Scoring`. Entries
   now also carry `bonus_by_round` + per-fixture `fixture_id` so the dashboard reconciles totals.
 - `Predictex.Dashboard` — read model for `/predictions`: pure `build/4` + `for_player/2` edge;
   consumes `Standings` as the **single scoring authority** (does no scoring of its own).
 - `PredictexWeb.Flags` — team name → flag emoji, keyed on real openfootball strings (⚽ fallback).
-- `Predictex.Results.Ingest` — DB ingestion (`plan/1` pure, `commit/1` act; upserts, preserves admin cohort %).
+- `Predictex.Results.Ingest` — DB ingestion (`plan/1` pure, `commit/1` act; upserts; `@replace_on_conflict` excludes `cohort_*_pct`, so result sync never fights cohort sync).
+- **Background jobs (Oban):** `Predictex.Workers.ResultSync` (every 15 min) runs `Ingest.sync_from_url/0`;
+  `Predictex.Workers.CohortSync` (hourly) fetches FIFA reference+cohort JSON and applies `Fifa.Cohort.plan/3`,
+  **overwriting** `cohort_*_pct` (FIFA is the cohort source; admin `a02` cohort entry is now a vestigial
+  stop-gap). Both sync sources injectable for tests (`:result_sync_fun`, `:cohort_source_fun`).
 - Contexts: `Tournament` (rounds/fixtures, `round_open?`), `Accounts` (players/auth, `promote_admin/1`), `Predictions` (lockout-aware `create_prediction`).
 - Schemas: `Round`, `Fixture`, `Player`, `Prediction` (partial unique index = one booster per player per round).
 - Web: `LeaderboardLive` (`/`, public), `MyPredictionsLive` (`/predictions`, auth — read-only:
@@ -95,18 +102,28 @@ playability unlock** — admins can now enter predictions on behalf of players. 
 - **Reviewed:** Phases 1–3 two-stage subagent review; Phases 4–7 consolidated review
   (`583a4ce`); plus a full `/code-review` scoped `6e05836..HEAD` which caught and fixed a
   booster-on-blank data-loss bug (`6f95bc4`). `a02` closed.
-- **Smoke-test gate (still open):** the test suite is all in-process `live/2` — no real
-  browser has hit `/admin` yet. Worth a manual click-through of `/admin/predictions`
-  (two-select grid → Save) before relying on it for real screenshot transcription.
+- **Smoke-tested ✓** (real browser, confirmed working). `v0.4.1` followed with a fix: first-scorer
+  (team/player) inputs now show **only for knockout rounds** (group = scoreline only, per rules.md §2;
+  scoring already gated it).
 
 ## Next (beads open — run `bd ready` / `bd list`)
-- `0yn` Admin **by-fixture inline editing** (the by-fixture lens is audit-only today; spec
-  wanted inline save via `admin_upsert_prediction/1`, which currently has no UI caller).
-- `mt6` Automated result-sync schedule (Oban/Task).
-- `xox` FIFA prediction import (bookmarklet + `/api/import`); fragile (endpoint 403s scripted
-  requests), so admin entry (`a02`) is the guaranteed path — treat import as a bonus.
+- **`xox` FIFA prediction import — RECOMMENDED NEXT, fully spiked & de-risked.** Member-facing
+  bookmarklet reads the player's own picks from `GET /api/en/match-predictor/prediction/show/{round}`
+  (cookie+Akamai gated → must run in the member's browser), hands them to our origin to import.
+  Crosswalk solved (`matchId` → fixture via `rounds.json`, by kickoff date/teams). Read the spike:
+  `docs/superpowers/research/2026-06-16-xox-fifa-import-spike.md`. Scope first cut to group-stage
+  scoreline+booster; defer knockout name-matching.
+- `0yn` Admin **by-fixture inline editing** (the by-fixture lens is audit-only today; spec wanted
+  inline save via `admin_upsert_prediction/1`, which has no UI caller yet).
 - `a4j` Cache/scope `Standings.leaderboard/0` (recomputed per dashboard load; fine at current scale).
-- `c9s` Flags: commit openfootball team-name snapshot + regression test.
+- `c9s` Flags/team-names: the FIFA↔openfootball **alias map is now done** (in `Fifa.Cohort`); only the
+  openfootball name-snapshot + regression test remain.
+- `08p` Harden `Predictions.save_round_row/3` vs direct-API misuse (P4; not UI-reachable today).
+
+## Done (shipped, this session)
+- **`a02` admin console** (v0.4.0/v0.4.1) · **`mt6` automated result-sync** + **`7ux` FIFA cohort
+  auto-sync** (v0.5.0, Oban). Specs/plans in `docs/superpowers/{specs,plans}/2026-06-15-admin-console*`,
+  `2026-06-16-result-sync-automation*`, `2026-06-16-cohort-sync*`.
 
 ## Conventions & gotchas (learned the hard way)
 - **Tracking is beads (`bd`)**, not TodoWrite/markdown TODOs. `bd ready`, `bd show <id>`, `bd update <id> --claim`, `bd close <id>`.
@@ -120,6 +137,10 @@ playability unlock** — admins can now enter predictions on behalf of players. 
 - `docs/rules.md` — game rules + §9 scoring/data contract (source of truth).
 - `docs/plan.md` — original (Ultraplan) implementation plan.
 - `docs/runbooks/deployment.md` — deploy, secrets, prod ops.
-- `docs/superpowers/specs/2026-06-15-auth-design.md` — auth design spec.
-- `docs/superpowers/plans/2026-06-15-auth.md` — auth implementation plan.
+- `docs/superpowers/specs/2026-06-15-auth-design.md` + `plans/2026-06-15-auth.md` — auth.
+- `docs/superpowers/{specs,plans}/2026-06-15-admin-console*` — admin console (`a02`).
+- `docs/superpowers/{specs,plans}/2026-06-16-result-sync-automation*` — `mt6`.
+- `docs/superpowers/{specs,plans}/2026-06-16-cohort-sync*` — `7ux`.
+- `docs/superpowers/research/2026-06-16-xox-fifa-import-spike.md` — **`xox` spike** (FIFA endpoints,
+  data model, crosswalk, three integration forks). Read before starting `xox`.
 - `priv/examples/league.sample.json` — sample league file for the DB-free `mix predictex.leaderboard`.
