@@ -2,7 +2,8 @@ defmodule PredictexWeb.AdminFixturesLive do
   @moduledoc """
   Admin fixtures: trigger a results sync, override a result by hand, and enter per-fixture
   FIFA cohort percentages (which drive the risky bonus). Unset cohort is shown explicitly.
-  The sync source is injectable (`:admin_sync_fun`) so tests can avoid the network.
+  The sync source is injectable (`:result_sync_fun`, shared with the ResultSync cron worker)
+  so tests can avoid the network.
   """
   use PredictexWeb, :live_view
 
@@ -24,7 +25,7 @@ defmodule PredictexWeb.AdminFixturesLive do
 
   @impl true
   def handle_event("sync", _params, socket) do
-    sync_fun = Application.get_env(:predictex, :admin_sync_fun, &Ingest.sync_from_url/0)
+    sync_fun = Application.get_env(:predictex, :result_sync_fun, &Ingest.sync_from_url/0)
 
     {:noreply,
      socket

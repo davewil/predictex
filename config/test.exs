@@ -51,6 +51,6 @@ config :predictex, Oban, testing: :manual
 
 # Stub the admin "Sync from feed" source so tests never hit the network (or the DB
 # from the start_async task). Real ingestion is covered by Predictex.Results.IngestTest.
-config :predictex, :admin_sync_fun, fn ->
+config :predictex, :result_sync_fun, fn ->
   %{rounds: 0, fixtures_ok: 0, fixtures_error: 0, source: "stub"}
 end
