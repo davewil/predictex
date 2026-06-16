@@ -75,7 +75,9 @@ easy. Changes are copy-only:
 The mobile branch leads with this (the bookmarklet is *not* shown as the primary path on
 mobile; an optional "advanced" disclosure may mention it):
 
-One round visible at a time. For Round N:
+One round visible at a time, and **each round confirms and writes to the DB on its own**
+(see "Persistence" below — this is not just UX, it is what makes the flow survive mobile tab
+discards). For Round N:
 
 1. **"Tap to open your Round N picks"** — a link to
    `https://play.fifa.com/api/en/match-predictor/prediction/show/N`, `target="_blank"`. FIFA
@@ -83,11 +85,34 @@ One round visible at a time. For Round N:
 2. Plain instruction with a `[screenshot: …]` slot: **"Press and hold the text → Select all →
    Copy."**
 3. **"Come back here and paste below."** A single textarea, labelled "Round N".
-4. On paste + submit, the round is validated and previewed inline; **only then** is Round N+1
-   revealed. After Round 3, the combined preview + confirm appears.
+4. On paste + submit, **this round only** is validated and previewed inline. The user confirms,
+   we **write Round N immediately** (`admin_save_round_predictions(player_id, round_id, rows)`),
+   show **"Round N saved ✓"**, and only then reveal Round N+1. After Round 3 is saved, show the
+   final success state.
 
 Rationale for progressive reveal (chosen over three-boxes-at-once): one instruction on screen
 at a time is gentler for a non-technical user and makes "where am I?" unambiguous.
+
+#### Persistence — the flow must survive a tab discard
+
+The mobile flow *mandates* leaving predictex (to FIFA) and returning, once per round. Mobile
+browsers aggressively discard backgrounded tabs; when that happens the LiveView socket closes,
+the process dies, and on return `mount/3` runs fresh with empty assigns. **Therefore round
+progress must not live in socket assigns.** Each round is an independent
+paste → preview → confirm → **DB write** cycle, so a confirmed round is durable in the database,
+not in volatile process state. If the tab is discarded after Round 1 is confirmed, the user
+returns, re-mounts, and Round 1 is already saved (writes are idempotent upserts via the existing
+path). This is the specific reason the design does **not** accumulate three rounds for one final
+confirm.
+
+On re-mount we may optionally read the player's already-saved rounds to resume at the right step
+("Rounds 1–2 already done — paste Round 3"); if that adds complexity, the safe fallback is to
+restart at Round 1, and re-confirming a saved round is harmless (idempotent). Decide during
+planning; correctness does not depend on it.
+
+> Desktop is unaffected: the bookmarklet delivers all three rounds in a single URL fragment
+> (one `mount`, no round-trips), so it keeps the single preview → single confirm that writes all
+> rounds. Only the mobile multi-trip flow needs per-round writes.
 
 #### Escape hatch — screenshot → admin (any platform, the literal mum)
 
@@ -109,12 +134,15 @@ New, at the edge (`ImportLive` + a small pure helper):
   `%{"round" => round, "matchId" => …, "homeScore" => …, "awayScore" => …, "booster" => …}` —
   exactly the shape `plan/3` already consumes. It tolerates both `{"success":{"predictions":[…]}}`
   and a top-level `[…]` array.
-- `handle_event("paste", …)` is parameterised by the **current round** (from socket assigns /
-  the box that produced it), decodes, calls `rows_from_envelope/2`, and **accumulates** rows
-  across rounds in socket state. `plan/3` is re-run over the full accumulated set each time
-  (pure, cheap) so the preview always reflects everything pasted so far.
+- `handle_event("paste", …)` is parameterised by the **current round** (socket assign tracking
+  which round is in progress), decodes, calls `rows_from_envelope/2`, and runs `plan/3` over
+  **just that round's** rows to build the inline preview. On confirm, that round is written to
+  the DB; nothing is held across rounds (see Persistence). The "current round" assign is the
+  only volatile state, and it is reconstructable from what is already saved (or simply restarts
+  at Round 1).
 - The base64 fragment/bookmarklet path (`handle_event("payload", …)`) is unchanged — the
-  bookmarklet already emits `round`-tagged rows.
+  bookmarklet already emits `round`-tagged rows for all rounds at once, and keeps the single
+  preview → single confirm (which writes every round via `to_write_rows/1`'s `round_id` grouping).
 
 ### Jargon purge (issue hard rule)
 
@@ -151,13 +179,20 @@ the count and a button to **See my predictions**. Keep the `errors > 0` note but
   bare-array input; empty `predictions`; missing/garbage keys → `{:error, :bad_envelope}`;
   knockout-shaped fields ignored for group rounds.
 - **`ImportLive` (LiveView, full flow):**
-  - mobile UA → renders the copy-paste flow, Round 1 only; pasting valid Round 1 reveals Round
-    2; after Round 3, preview shows all matched; confirm writes via the real
-    `Predictions.admin_save_round_predictions/3` and lands on the success state.
-  - desktop UA → renders the relabelled bookmarklet steps; no console-fallback copy present.
+  - mobile UA → renders the copy-paste flow, Round 1 only; pasting valid Round 1 → inline
+    preview → confirm **writes Round 1** via the real `Predictions.admin_save_round_predictions/3`
+    and reveals Round 2; repeat to Round 3 → final success state.
+  - **tab-discard / remount persistence (the regression this design exists to prevent):** after
+    confirming Round 1, simulate a fresh `mount` (new `live/2` session = the discarded-tab
+    reload). Assert Round 1's predictions are still in the DB (durable, not in assigns) — i.e.
+    progress is not lost. This is the test that the naive accumulate-then-confirm design would
+    fail.
+  - desktop UA → renders the relabelled bookmarklet steps; no console-fallback copy present;
+    single confirm writes all pasted rounds.
   - jargon assertion: rendered HTML for both UAs contains none of "bookmarklet"/"JSON"/
     "console" (case-insensitive).
-  - bad paste → inline error, flow recoverable.
+  - bad paste → inline error, the current round is recoverable (re-paste), already-saved rounds
+    untouched.
 - Tests use production write paths (no hand-set fixtures), per project rules.
 
 ## Scope boundaries (YAGNI)
@@ -173,6 +208,16 @@ jargon purge, escape-hatch copy, confirmation state, group stage (rounds 1–3).
 - Knockout import (`i9k`).
 - Real illustrative screenshots/gifs: the spec leaves `[screenshot: …]` slots; the operator
   captures them from a live FIFA session (cannot be done from code).
+
+## Pre-build validation (cheap, do first)
+
+The spike confirmed the JSON *loads* on Android; it did **not** confirm a non-technical user can
+*extract* it. Before building, do the gesture live on the Android phone: open
+`…/prediction/show/1`, long-press the page → **Select All → Copy** → paste into any text field.
+Confirm (a) Chrome offers "Select All" on a raw-text page and (b) the whole 24-prediction blob
+copies cleanly. If that gesture is awkward even for a developer, the copy-paste path's mum-test
+verdict is effectively already "no", the escape hatch carries more load than assumed, and we
+should reconsider weighting before investing in the illustrated mobile flow.
 
 ## Risks
 
