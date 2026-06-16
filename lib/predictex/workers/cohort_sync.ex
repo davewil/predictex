@@ -39,26 +39,7 @@ defmodule Predictex.Workers.CohortSync do
     end
   end
 
-  defp get_json(url) do
-    {:ok, _} = Application.ensure_all_started(:req)
-
-    case Req.get(url, receive_timeout: 15_000) do
-      {:ok, %Req.Response{status: 200, body: body}} when is_map(body) or is_list(body) ->
-        {:ok, body}
-
-      {:ok, %Req.Response{status: 200, body: body}} when is_binary(body) ->
-        case Jason.decode(body) do
-          {:ok, decoded} -> {:ok, decoded}
-          {:error, _} = err -> err
-        end
-
-      {:ok, %Req.Response{status: status}} ->
-        {:error, {:http, status}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
+  defp get_json(url), do: Predictex.Fifa.Reference.get_json(url)
 
   defp commit(updates, by_id) do
     Enum.reduce(updates, {0, 0}, fn u, {ok, err} ->

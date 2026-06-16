@@ -57,3 +57,4 @@ end
 
 # Cohort sync source stubbed in tests (no network); worker tests override per-test.
 config :predictex, :cohort_source_fun, fn -> {:ok, %{rounds: [], match_stats: %{}}} end
+config :predictex, :fifa_reference_fun, fn -> {:ok, []} end
