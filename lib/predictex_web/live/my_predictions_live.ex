@@ -32,7 +32,7 @@ defmodule PredictexWeb.MyPredictionsLive do
     assigns = assign(assigns, :active, active_round(assigns.dash, assigns.active_ordinal))
 
     ~H"""
-    <Layouts.app flash={@flash} current_scope={@current_scope}>
+    <Layouts.app flash={@flash} current_scope={@current_scope} max_width="max-w-6xl">
       <div :if={@dash.rounds == []} class="rounded-box bg-base-200 p-6 text-center">
         <p class="font-medium">No schedule yet</p>
         <p class="text-sm opacity-70">Fixtures appear once the tournament is seeded.</p>
@@ -75,11 +75,11 @@ defmodule PredictexWeb.MyPredictionsLive do
           </div>
         </div>
 
-        <div :if={@active} class="space-y-3">
+        <div :if={@active} class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div
             :for={fx <- @active.fixtures}
             class={[
-              "rounded-xl bg-base-100 p-3 shadow",
+              "flex flex-col justify-between rounded-xl bg-base-100 p-3 shadow",
               fx.prediction == nil && "border border-dashed border-error/40"
             ]}
           >
@@ -88,12 +88,21 @@ defmodule PredictexWeb.MyPredictionsLive do
               <span>{status_label(fx)}</span>
             </div>
 
-            <div class="mt-1 flex items-center justify-center gap-2 font-semibold">
-              <span>{Flags.flag(fx.fixture.team1)} {fx.fixture.team1}</span>
-              <span class="rounded-lg bg-base-200 px-3 py-1 text-lg font-black">{scoreline(
-                fx.prediction
-              )}</span>
-              <span>{fx.fixture.team2} {Flags.flag(fx.fixture.team2)}</span>
+            <div class="mt-2 space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="text-lg leading-none">{Flags.flag(fx.fixture.team1)}</span>
+                <span class="flex-1 truncate font-semibold" title={fx.fixture.team1}>{fx.fixture.team1}</span>
+                <span class="w-5 text-right text-lg font-black tabular-nums">{home_score(
+                  fx.prediction
+                )}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-lg leading-none">{Flags.flag(fx.fixture.team2)}</span>
+                <span class="flex-1 truncate font-semibold" title={fx.fixture.team2}>{fx.fixture.team2}</span>
+                <span class="w-5 text-right text-lg font-black tabular-nums">{away_score(
+                  fx.prediction
+                )}</span>
+              </div>
             </div>
 
             <div
@@ -146,8 +155,10 @@ defmodule PredictexWeb.MyPredictionsLive do
   defp active_round(dash, ordinal),
     do: Enum.find(dash.rounds, &(&1.round.ordinal == ordinal))
 
-  defp scoreline(nil), do: "– – –"
-  defp scoreline(p), do: "#{p.home_goals} – #{p.away_goals}"
+  defp home_score(nil), do: "–"
+  defp home_score(p), do: p.home_goals
+  defp away_score(nil), do: "–"
+  defp away_score(p), do: p.away_goals
 
   defp status_label(%{status: :completed}), do: "Full time"
   defp status_label(%{locked?: true}), do: "🔒 Locked"
