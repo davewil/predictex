@@ -23,7 +23,8 @@ the app scores them against real results and ranks a leaderboard.
 - **Prediction-entry model (important):** predictions are **never entered in-app by members**.
   Members make them on the official FIFA Match Predictor; they reach predictex via **admin
   entry on behalf of players** from screenshots (`a02`, **shipped** — `/admin/predictions`)
-  or, eventually, **auto-import** (`xox`, not built). `/predictions` only *displays* them.
+  or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
+  `/import`). `/predictions` only *displays* them.
 
 ## Stack & toolchain
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
@@ -107,12 +108,20 @@ playability unlock** — admins can now enter predictions on behalf of players. 
   scoring already gated it).
 
 ## Next (beads open — run `bd ready` / `bd list`)
-- **`xox` FIFA prediction import — RECOMMENDED NEXT, fully spiked & de-risked.** Member-facing
-  bookmarklet reads the player's own picks from `GET /api/en/match-predictor/prediction/show/{round}`
-  (cookie+Akamai gated → must run in the member's browser), hands them to our origin to import.
-  Crosswalk solved (`matchId` → fixture via `rounds.json`, by kickoff date/teams). Read the spike:
-  `docs/superpowers/research/2026-06-16-xox-fifa-import-spike.md`. Scope first cut to group-stage
-  scoreline+booster; defer knockout name-matching.
+- **`xox` member self-import — CODE COMPLETE & REVIEWED; one gate left: manual real-session
+  validation.** Group-stage scoreline+booster self-import shipped as code (5 tasks, subagent-driven,
+  two-stage review each + final integration review = Ready; 275 tests green; commits `1098f4a..097a09b`,
+  local/unpushed). Thin bookmarklet (rounds 1..3 → `{round,matchId,homeScore,awayScore,booster}`) →
+  `/import` (`ImportLive`): colocated `FifaFragment` hook reads the URL-fragment payload → server
+  fetches `rounds.json` (`Fifa.Reference`) → pure `Fifa.Import.plan/3` (composite `{round,matchId}`
+  crosswalk via shared `Fifa.Crosswalk`) → preview/confirm → `admin_save_round_predictions/3` for the
+  logged-in member. Paste-JSON fallback included. **REMAINING:** run the bookmarklet end-to-end in a
+  real authed FIFA session into a `/import` preview (popup-blocker, fragment size, await-all-fetches)
+  — the spec's acceptance criterion; CI cannot cover it. Spec/plan:
+  `docs/superpowers/{specs/2026-06-16-xox-fifa-import-design.md,plans/2026-06-16-xox-fifa-import.md}`;
+  spike: `docs/superpowers/research/2026-06-16-xox-fifa-import-spike.md`.
+- `i9k` **xox knockout import** + first-scorer matching (deferred until knockout rounds populate).
+- `tvs` xox: derive bookmarklet import URL from endpoint config (today `@import_url` is hardcoded; P4).
 - `0yn` Admin **by-fixture inline editing** (the by-fixture lens is audit-only today; spec wanted
   inline save via `admin_upsert_prediction/1`, which has no UI caller yet).
 - `a4j` Cache/scope `Standings.leaderboard/0` (recomputed per dashboard load; fine at current scale).
@@ -142,5 +151,7 @@ playability unlock** — admins can now enter predictions on behalf of players. 
 - `docs/superpowers/{specs,plans}/2026-06-16-result-sync-automation*` — `mt6`.
 - `docs/superpowers/{specs,plans}/2026-06-16-cohort-sync*` — `7ux`.
 - `docs/superpowers/research/2026-06-16-xox-fifa-import-spike.md` — **`xox` spike** (FIFA endpoints,
-  data model, crosswalk, three integration forks). Read before starting `xox`.
+  data model, crosswalk, three integration forks).
+- `docs/superpowers/{specs,plans}/2026-06-16-xox-fifa-import*` — **`xox` design + implementation plan**
+  (member self-import; group-stage; server-side composite-key crosswalk; manual-validation gate).
 - `priv/examples/league.sample.json` — sample league file for the DB-free `mix predictex.leaderboard`.
