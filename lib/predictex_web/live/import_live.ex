@@ -69,8 +69,18 @@ defmodule PredictexWeb.ImportLive do
   # ---- Mobile confirm: write THIS round now, then advance ---------------------------------
 
   def handle_event("confirm_round", _params, socket) do
-    imported = write_matched(socket)
-    advance(socket, socket.assigns.imported_total + imported)
+    case write_matched(socket) do
+      %{errors: 0, imported: imported} ->
+        advance(socket, socket.assigns.imported_total + imported)
+
+      %{imported: imported} ->
+        {:noreply,
+         assign(socket,
+           imported_total: socket.assigns.imported_total + imported,
+           error:
+             "Some of your Round #{socket.assigns.current_round} picks didn't save — please try again."
+         )}
+    end
   end
 
   def handle_event("skip_round", _params, socket) do
@@ -80,8 +90,7 @@ defmodule PredictexWeb.ImportLive do
   # ---- Desktop confirm: write all matched rounds together --------------------------------
 
   def handle_event("confirm", _params, socket) do
-    imported = write_matched(socket)
-    {:noreply, assign(socket, step: :done, summary: %{imported: imported, errors: 0})}
+    {:noreply, assign(socket, step: :done, summary: write_matched(socket))}
   end
 
   # ---- internals -------------------------------------------------------------------------
@@ -112,10 +121,19 @@ defmodule PredictexWeb.ImportLive do
 
     socket.assigns.matched
     |> Import.to_write_rows()
-    |> Enum.reduce(0, fn {round_id, rows}, acc ->
+    |> Enum.reduce(%{imported: 0, errors: 0}, fn {round_id, rows}, acc ->
       case Predictions.admin_save_round_predictions(player_id, round_id, rows) do
-        {:ok, results} -> acc + Enum.count(results, fn {_id, r} -> r == :upserted end)
-        {:error, _} -> acc
+        {:ok, results} ->
+          imported = Enum.count(results, fn {_id, r} -> r == :upserted end)
+
+          %{
+            acc
+            | imported: acc.imported + imported,
+              errors: acc.errors + (Enum.count(results) - imported)
+          }
+
+        {:error, _} ->
+          %{acc | errors: acc.errors + length(rows)}
       end
     end)
   end

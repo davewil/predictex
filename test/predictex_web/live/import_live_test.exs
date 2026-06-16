@@ -106,7 +106,8 @@ defmodule PredictexWeb.ImportLiveTest do
       assert html =~ "Round 2"
     end
 
-    test "tab-discard regression: a confirmed round survives a fresh mount", ctx do
+    test "a round is written to the DB the moment it is confirmed (not held until the end)",
+         ctx do
       %{conn: conn, player: player} = ctx
       r1 = group_round(1)
       fixture!(r1, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
@@ -125,12 +126,41 @@ defmodule PredictexWeb.ImportLiveTest do
 
       render_click(view, "confirm_round", %{})
 
-      # Simulate the discarded tab reloading: a brand-new LiveView mount.
-      {:ok, _view2, _html2} = live(ua(conn, @iphone), ~p"/import")
-
-      # Round 1 is still saved — progress was durable, not in volatile assigns.
+      # Persisted immediately — BEFORE rounds 2/3 are confirmed. A tab discard here (dropping all
+      # LiveView assigns) cannot lose it. Regression guard against accumulate-then-confirm.
       [pred] = Predictions.list_player_predictions(player.id)
       assert pred.home_goals == 3 and pred.away_goals == 1
+    end
+
+    test "confirming round 2 does not clobber round 1's saved picks", ctx do
+      %{conn: conn, player: player} = ctx
+      r1 = group_round(1)
+      r2 = group_round(2)
+      fx1 = fixture!(r1, "Mexico", "South Africa", ~U[2026-06-11 19:00:00Z])
+      fx2 = fixture!(r2, "Brazil", "Serbia", ~U[2026-06-18 19:00:00Z])
+
+      stub_rounds([
+        fifa_round(1, [fifa_match(1, "Mexico", "South Africa", "2026-06-11T20:00:00+01:00")]),
+        fifa_round(2, [fifa_match(1, "Brazil", "Serbia", "2026-06-18T20:00:00+01:00")])
+      ])
+
+      {:ok, view, _} = live(ua(conn, @iphone), ~p"/import")
+
+      view
+      |> form("#paste-form", paste: %{json: fifa_envelope([{1, 2, 0, true}])})
+      |> render_submit()
+
+      render_click(view, "confirm_round", %{})
+
+      view
+      |> form("#paste-form", paste: %{json: fifa_envelope([{1, 1, 1, false}])})
+      |> render_submit()
+
+      render_click(view, "confirm_round", %{})
+
+      preds = Map.new(Predictions.list_player_predictions(player.id), &{&1.fixture_id, &1})
+      assert preds[fx1.id].home_goals == 2 and preds[fx1.id].booster == true
+      assert preds[fx2.id].home_goals == 1
     end
 
     test "a round with nothing matchable can be skipped without writing", ctx do
