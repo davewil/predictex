@@ -34,6 +34,37 @@ defmodule Predictex.Fifa.Import do
   end
 
   @doc """
+  Build `plan/3`-ready rows from a decoded FIFA prediction envelope (or a bare predictions list),
+  injecting the known `round` (FIFA's response does not carry it — it is implied by which
+  `/prediction/show/{round}` produced the data). Tolerates `%{"success" => %{"predictions" => [...]}}`
+  and a top-level `[...]`. Entries without a `matchId` are skipped. `{:ok, rows} | {:error, :bad_envelope}`.
+  """
+  def rows_from_envelope(decoded, round) when is_integer(round) do
+    case predictions(decoded) do
+      nil ->
+        {:error, :bad_envelope}
+
+      list ->
+        rows =
+          for %{"matchId" => match_id} = p <- list do
+            %{
+              "round" => round,
+              "matchId" => match_id,
+              "homeScore" => p["homeScore"],
+              "awayScore" => p["awayScore"],
+              "booster" => p["booster"] == true
+            }
+          end
+
+        {:ok, rows}
+    end
+  end
+
+  defp predictions(%{"success" => %{"predictions" => p}}) when is_list(p), do: p
+  defp predictions(p) when is_list(p), do: p
+  defp predictions(_), do: nil
+
+  @doc """
   Partition payload rows into `%{matched: [...], unmatched: [...]}`.
 
   A matched entry: `%{fixture_id, team1, team2, home_goals, away_goals, booster, round_id}`

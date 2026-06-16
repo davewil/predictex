@@ -123,6 +123,75 @@ defmodule Predictex.Fifa.ImportTest do
     end
   end
 
+  describe "rows_from_envelope/2" do
+    test "maps a FIFA envelope to plan rows, injecting the round" do
+      envelope = %{
+        "success" => %{
+          "predictions" => [
+            %{"matchId" => 1, "homeScore" => 2, "awayScore" => 0, "booster" => true},
+            %{"matchId" => 2, "homeScore" => 1, "awayScore" => 1, "booster" => false}
+          ]
+        },
+        "errors" => []
+      }
+
+      assert {:ok, rows} = Import.rows_from_envelope(envelope, 1)
+
+      assert rows == [
+               %{
+                 "round" => 1,
+                 "matchId" => 1,
+                 "homeScore" => 2,
+                 "awayScore" => 0,
+                 "booster" => true
+               },
+               %{
+                 "round" => 1,
+                 "matchId" => 2,
+                 "homeScore" => 1,
+                 "awayScore" => 1,
+                 "booster" => false
+               }
+             ]
+    end
+
+    test "accepts a bare predictions list too" do
+      list = [%{"matchId" => 5, "homeScore" => 0, "awayScore" => 3, "booster" => false}]
+      assert {:ok, [row]} = Import.rows_from_envelope(list, 2)
+
+      assert row == %{
+               "round" => 2,
+               "matchId" => 5,
+               "homeScore" => 0,
+               "awayScore" => 3,
+               "booster" => false
+             }
+    end
+
+    test "coerces a missing/non-true booster to false" do
+      envelope = %{
+        "success" => %{"predictions" => [%{"matchId" => 1, "homeScore" => 1, "awayScore" => 0}]}
+      }
+
+      assert {:ok, [row]} = Import.rows_from_envelope(envelope, 1)
+      assert row["booster"] == false
+    end
+
+    test "empty predictions yields an empty row list (not an error)" do
+      assert {:ok, []} = Import.rows_from_envelope(%{"success" => %{"predictions" => []}}, 1)
+    end
+
+    test "rejects a shape that is neither an envelope nor a list" do
+      assert {:error, :bad_envelope} = Import.rows_from_envelope(%{"oops" => true}, 1)
+      assert {:error, :bad_envelope} = Import.rows_from_envelope("nope", 1)
+    end
+
+    test "ignores entries with no matchId rather than crashing" do
+      envelope = %{"success" => %{"predictions" => [%{"homeScore" => 1, "awayScore" => 0}]}}
+      assert {:ok, []} = Import.rows_from_envelope(envelope, 1)
+    end
+  end
+
   describe "to_write_rows/1" do
     test "groups matched entries by round_id, stripped to the write contract" do
       matched = [
