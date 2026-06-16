@@ -88,11 +88,13 @@ defmodule PredictexWeb.AdminFixturesLive do
       >
         <div class="mb-3 flex items-center justify-between gap-2">
           <div class="font-bold">
-            {Flags.flag(f.team1)} {f.team1} <span class="text-base-content/40">v</span> {f.team2} {Flags.flag(f.team2)}
+            {Flags.flag(f.team1)} {f.team1}
+            <span class="text-base-content/40">v</span> {f.team2} {Flags.flag(f.team2)}
           </div>
           <span class={[
             "rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-            (f.status == :completed && "bg-success/15 text-success") || "bg-base-200 text-base-content/55"
+            (f.status == :completed && "bg-success/15 text-success") ||
+              "bg-base-200 text-base-content/55"
           ]}>
             {f.status}
           </span>

@@ -60,7 +60,10 @@ defmodule PredictexWeb.LeaderboardLive do
               <div class="text-[10px] font-extrabold uppercase tracking-wider text-accent">
                 👑 League leader
               </div>
-              <div class="truncate text-2xl font-black tracking-tight sm:text-3xl" title={@champion.name}>
+              <div
+                class="truncate text-2xl font-black tracking-tight sm:text-3xl"
+                title={@champion.name}
+              >
                 {@champion.name}
               </div>
               <div class="text-xs text-accent/80">

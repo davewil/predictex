@@ -245,7 +245,9 @@ defmodule PredictexWeb.AdminPredictionsLive do
             </thead>
             <tbody>
               <tr :for={f <- @fixtures}>
-                <td class="font-medium">{Flags.flag(f.team1)} {f.team1} v {f.team2} {Flags.flag(f.team2)}</td>
+                <td class="font-medium">
+                  {Flags.flag(f.team1)} {f.team1} v {f.team2} {Flags.flag(f.team2)}
+                </td>
                 <td>
                   <input
                     type="number"
@@ -328,7 +330,10 @@ defmodule PredictexWeb.AdminPredictionsLive do
               <td class="font-medium">{p.player.display_name}</td>
               <td class="font-score">{p.home_goals}–{p.away_goals}</td>
               <td>
-                <span :if={p.booster} class="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-content">
+                <span
+                  :if={p.booster}
+                  class="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-content"
+                >
                   ⚡ 2×
                 </span>
               </td>

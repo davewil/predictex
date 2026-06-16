@@ -48,7 +48,9 @@ defmodule PredictexWeb.MyPredictionsLive do
               </div>
             </div>
             <div class="text-right">
-              <div class="text-[10px] font-bold uppercase tracking-wider opacity-80">Total points</div>
+              <div class="text-[10px] font-bold uppercase tracking-wider opacity-80">
+                Total points
+              </div>
               <div class="font-score text-3xl font-bold">{@dash.total}</div>
               <div class="text-xs opacity-80">
                 {@dash.fixtures_total} fixtures · {@dash.round_bonus_total} bonus
