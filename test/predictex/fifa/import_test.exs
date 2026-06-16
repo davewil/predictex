@@ -190,6 +190,22 @@ defmodule Predictex.Fifa.ImportTest do
       envelope = %{"success" => %{"predictions" => [%{"homeScore" => 1, "awayScore" => 0}]}}
       assert {:ok, []} = Import.rows_from_envelope(envelope, 1)
     end
+
+    test "keeps valid entries and drops only the matchId-less ones, preserving order" do
+      envelope = %{
+        "success" => %{
+          "predictions" => [
+            %{"matchId" => 1, "homeScore" => 2, "awayScore" => 0, "booster" => false},
+            %{"homeScore" => 9, "awayScore" => 9},
+            %{"matchId" => 3, "homeScore" => 1, "awayScore" => 1, "booster" => true}
+          ]
+        }
+      }
+
+      assert {:ok, rows} = Import.rows_from_envelope(envelope, 1)
+      assert Enum.map(rows, & &1["matchId"]) == [1, 3]
+      assert List.last(rows)["booster"] == true
+    end
   end
 
   describe "to_write_rows/1" do
