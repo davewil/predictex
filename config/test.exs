@@ -54,3 +54,6 @@ config :predictex, Oban, testing: :manual
 config :predictex, :result_sync_fun, fn ->
   %{rounds: 0, fixtures_ok: 0, fixtures_error: 0, source: "stub"}
 end
+
+# Cohort sync source stubbed in tests (no network); worker tests override per-test.
+config :predictex, :cohort_source_fun, fn -> {:ok, %{rounds: [], match_stats: %{}}} end
