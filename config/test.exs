@@ -45,6 +45,10 @@ config :phoenix,
 
 config :predictex, :league_invite_code, "test-code"
 
+# Oban runs in manual mode in tests — no queues, cron, or plugins fire automatically;
+# workers are driven explicitly via Oban.Testing.perform_job/2.
+config :predictex, Oban, testing: :manual
+
 # Stub the admin "Sync from feed" source so tests never hit the network (or the DB
 # from the start_async task). Real ingestion is covered by Predictex.Results.IngestTest.
 config :predictex, :admin_sync_fun, fn ->

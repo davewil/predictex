@@ -10,6 +10,7 @@ defmodule Predictex.Application do
     children = [
       PredictexWeb.Telemetry,
       Predictex.Repo,
+      {Oban, Application.fetch_env!(:predictex, Oban)},
       {DNSCluster, query: Application.get_env(:predictex, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Predictex.PubSub},
       # Start a worker by calling: Predictex.Worker.start_link(arg)

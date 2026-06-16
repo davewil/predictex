@@ -83,6 +83,15 @@ config :phoenix, :json_library, Jason
 # Overridable at runtime via FIFA_PREDICTOR_URL.
 config :predictex, :fifa_predictor_url, "https://play.fifa.com/match-predictor/match"
 
+# Oban — background jobs (result sync now; xox import later). Cron entries are added
+# alongside their worker modules so Oban's Cron plugin can validate them at boot.
+config :predictex, Oban,
+  repo: Predictex.Repo,
+  queues: [default: 10],
+  plugins: [
+    {Oban.Plugins.Pruner, max_age: 60 * 60 * 24 * 7}
+  ]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
