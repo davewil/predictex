@@ -5,16 +5,18 @@ defmodule PredictexWeb.FixtureLive do
   - Flag off (`live_buzz` disabled): redirects to home immediately.
   - Pre-kickoff: shows fixture info; picks are hidden (anti-copy).
   - Post-kickoff (locked): reveals everyone's picks.
-  - Live fixture: shows Buzz scenarios ("if it ends …") and viewer narratives.
+  - Live fixture: shows the "what-if" projected standings (with rank movement)
+    and shareable buzz headlines.
 
   Efficiency: on PubSub `{:live_update, id}` ticks, the full projection (~7 DB
-  queries: scenarios + narratives + picks) is recomputed only when something
+  queries: scenarios + headlines + picks) is recomputed only when something
   material changes — score change, live-state transition, or kickoff lock flip.
   Minute-only updates refresh only the fixture assign (clock advances).
   """
   use PredictexWeb, :live_view
 
   alias Predictex.{Tournament, Predictions, Buzz}
+  alias PredictexWeb.Flags
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -58,12 +60,16 @@ defmodule PredictexWeb.FixtureLive do
 
     socket
     |> assign(:fixture, fixture)
+    |> assign(:viewer_id, viewer_id)
     |> assign(:picks_visible?, locked?)
     |> assign(:picks, if(locked?, do: Predictions.list_fixture_predictions(fixture.id), else: []))
-    |> assign(:scenarios, if(fixture.is_live, do: Buzz.scenarios(fixture.id, h, a), else: []))
     |> assign(
-      :narratives,
-      if(fixture.is_live, do: Buzz.narratives(fixture.id, h, a, viewer_id), else: [])
+      :scenarios,
+      if(fixture.is_live, do: Buzz.scenarios_with_deltas(fixture.id, h, a), else: [])
+    )
+    |> assign(
+      :headlines,
+      if(fixture.is_live, do: Buzz.headlines(fixture.id, h, a, viewer_id), else: [])
     )
   end
 
@@ -75,41 +81,146 @@ defmodule PredictexWeb.FixtureLive do
   def render(assigns) do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
-      <div class="mx-auto max-w-2xl p-4 space-y-4">
-        <h1 class="text-xl font-bold">{@fixture.team1} v {@fixture.team2}</h1>
+      <div class="mx-auto max-w-2xl space-y-5 p-4">
+        <.link
+          navigate={~p"/"}
+          class="inline-flex items-center gap-1 text-xs font-semibold text-base-content/60 hover:text-base-content"
+        >
+          ← Leaderboard
+        </.link>
 
-        <p :if={@fixture.is_live} class="text-error font-bold">
-          LIVE {@fixture.live_minute} · {@fixture.live_home_goals}-{@fixture.live_away_goals}
-        </p>
+        <%!-- Match header: teams, flags, big live score, LIVE pulse --%>
+        <div class="space-y-3 rounded-box bg-base-100 p-5 text-center shadow">
+          <div class="flex items-center justify-center gap-3 text-base font-bold sm:text-lg">
+            <span class="flex-1 truncate text-right" title={@fixture.team1}>
+              {@fixture.team1} <span class="text-xl">{Flags.flag(@fixture.team1)}</span>
+            </span>
 
-        <section :if={@scenarios != []} class="space-y-2">
-          <h2 class="font-semibold">Scenarios</h2>
-          <ul class="space-y-1">
-            <li :for={s <- @scenarios} class="text-sm">{s.label}</li>
-          </ul>
-        </section>
+            <span
+              :if={@fixture.is_live}
+              class="font-score text-4xl font-extrabold tabular-nums sm:text-5xl"
+            >
+              {@fixture.live_home_goals}<span class="px-1 text-base-content/30">–</span>{@fixture.live_away_goals}
+            </span>
+            <span :if={not @fixture.is_live} class="px-2 text-base-content/40">v</span>
 
-        <section :if={@narratives != []} class="space-y-2">
-          <h2 class="font-semibold">Your buzz</h2>
-          <ul class="space-y-1">
-            <li :for={line <- @narratives} class="text-sm">{line}</li>
-          </ul>
-        </section>
+            <span class="flex-1 truncate text-left" title={@fixture.team2}>
+              <span class="text-xl">{Flags.flag(@fixture.team2)}</span> {@fixture.team2}
+            </span>
+          </div>
 
-        <section :if={@picks_visible?} class="space-y-2">
-          <h2 class="font-semibold">Everyone's picks</h2>
-          <ul class="space-y-1">
-            <li :for={p <- @picks} class="text-sm">
-              {p.player.display_name}: {p.home_goals}-{p.away_goals}
+          <span
+            :if={@fixture.is_live}
+            class="inline-flex items-center gap-1.5 rounded-selector bg-error/15 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-error animate-pdx-glow"
+          >
+            <span class="size-1.5 rounded-full bg-error"></span>
+            LIVE{if @fixture.live_minute, do: " #{@fixture.live_minute}"}
+          </span>
+          <p
+            :if={not @fixture.is_live}
+            class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
+          >
+            {kickoff(@fixture.kickoff_at)}
+          </p>
+        </div>
+
+        <%!-- The buzz: shareable movement headlines --%>
+        <section :if={@headlines != []} class="space-y-2">
+          <h2 class="px-1 text-sm font-extrabold uppercase tracking-wider text-accent">⚡ The buzz</h2>
+          <ul class="space-y-2">
+            <li
+              :for={line <- @headlines}
+              class="rounded-box border border-accent/30 bg-accent/10 px-4 py-2.5 text-sm font-semibold animate-pdx-rise"
+            >
+              {line}
             </li>
           </ul>
         </section>
 
-        <p :if={not @picks_visible?} class="text-base-content/60 text-sm">
-          Picks reveal at kickoff.
-        </p>
+        <%!-- What-if projected standings, with rank movement vs current --%>
+        <section :if={@scenarios != []} class="space-y-3">
+          <h2 class="px-1 text-sm font-extrabold uppercase tracking-wider text-base-content/60">
+            What if…
+          </h2>
+          <div :for={s <- @scenarios} class="space-y-2 rounded-box bg-base-100 p-4 shadow">
+            <h3 class="text-sm font-bold capitalize text-base-content/90">{s.label}</h3>
+            <ul class="space-y-1">
+              <li
+                :for={row <- Enum.take(s.rows, 8)}
+                class={[
+                  "flex items-center gap-2.5 rounded-field px-2.5 py-1.5",
+                  row.player_id == @viewer_id && "bg-primary/10"
+                ]}
+              >
+                <span class="w-5 shrink-0 text-center font-score text-xs text-base-content/50">
+                  {row.rank}
+                </span>
+                <span class="w-8 shrink-0 text-center text-xs font-bold">{movement(row.delta)}</span>
+                <span class={[
+                  "min-w-0 flex-1 truncate text-sm",
+                  (row.player_id == @viewer_id && "font-bold text-primary") || "text-base-content/90"
+                ]}>
+                  {row.name}<span :if={row.player_id == @viewer_id} class="text-primary/70"> (you)</span>
+                </span>
+                <span class="shrink-0 font-score text-sm font-bold tabular-nums">{row.total}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <%!-- Everyone's picks — only after kickoff (anti-copy) --%>
+        <section :if={@picks_visible?} class="space-y-2">
+          <h2 class="px-1 text-sm font-extrabold uppercase tracking-wider text-base-content/60">
+            Everyone's picks
+          </h2>
+          <div
+            :if={@picks == []}
+            class="rounded-box bg-base-100 p-4 text-sm text-base-content/50 shadow"
+          >
+            No predictions on this fixture.
+          </div>
+          <div :if={@picks != []} class="divide-y divide-base-200 rounded-box bg-base-100 px-3 shadow">
+            <div
+              :for={p <- @picks}
+              class={[
+                "flex items-center justify-between py-2.5",
+                p.player_id == @viewer_id && "font-bold text-primary"
+              ]}
+            >
+              <span class="truncate text-sm">{p.player.display_name}</span>
+              <span class="flex items-center gap-1.5 font-score text-sm font-bold tabular-nums">
+                {p.home_goals}–{p.away_goals}
+                <span
+                  :if={p.booster}
+                  class="rounded bg-accent px-1 py-0.5 text-[9px] text-accent-content"
+                >
+                  ⚡2×
+                </span>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <div
+          :if={not @picks_visible?}
+          class="rounded-box border border-dashed border-base-300 bg-base-100/50 p-4 text-center text-sm text-base-content/60"
+        >
+          🔒 Everyone's picks reveal at kickoff.
+        </div>
       </div>
     </Layouts.app>
     """
   end
+
+  # Rank-movement indicator vs the current standings.
+  defp movement(delta) when is_integer(delta) and delta > 0,
+    do: Phoenix.HTML.raw(~s(<span class="text-success">▲#{delta}</span>))
+
+  defp movement(delta) when is_integer(delta) and delta < 0,
+    do: Phoenix.HTML.raw(~s(<span class="text-error">▼#{abs(delta)}</span>))
+
+  defp movement(_), do: Phoenix.HTML.raw(~s(<span class="text-base-content/25">–</span>))
+
+  defp kickoff(nil), do: "TBC"
+  defp kickoff(%DateTime{} = dt), do: Calendar.strftime(dt, "%a %d %b · %H:%M UTC")
 end
