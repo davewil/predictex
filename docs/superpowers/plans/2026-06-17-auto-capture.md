@@ -28,6 +28,10 @@
   (unchanged — gating lives in the LiveViews, not here).
 - Keep the existing table name `fifa_captures` (no migration).
 - "Live" detection = FIFA `MatchStatus` **not in `[0, 1]`** (confirmed `3` = in-play).
+- **Capture scope (intended):** the producer fetches/persists ONLY the `/detail` endpoint and ONLY
+  successful (`200`) frames — that is all replay and the buzz need. The spike's extra `/now` endpoint
+  and error-row capture were analysis-only and are intentionally dropped; `Capture.summary`'s `nows`/
+  `errors` sections will therefore be empty for matches recorded under this worker. Accepted.
 - Injectable fetch via `Application.get_env(:predictex, :live_score_fetch_fun, &fetch/1)`
   (existing pattern); Oban tests via `Oban.Testing` + `perform_job/2`; `use Predictex.DataCase`.
 - Gate before deploy: `mix format --check-formatted && mix compile --warnings-as-errors && mix test`.
@@ -213,14 +217,19 @@ git commit -m "refactor(live): extract shared LiveScore decoder (predictex-rfm)"
 
 ---
 
-### Task 2: Promote the capture store `Predictex.Spike` → `Predictex.Capture`
+### Task 2: Retire `FifaLiveCapture`; promote the capture store to `Predictex.Capture`
+
+Retiring the spike worker *first* means the `Spike`→`Capture` rename has no live caller to
+rewire (the only code user of `Spike.record_capture` is `FifaLiveCapture`; the producer +
+Recorder in Tasks 4–5 replace its function, and nothing is capturing in the interim since the
+spike worker only ever ran when armed by hand). `Spike.summary` was rpc-only — no code refs.
 
 **Files:**
+- Delete: `lib/predictex/workers/fifa_live_capture.ex`, `test/predictex/workers/fifa_live_capture_test.exs`
 - Create: `lib/predictex/capture.ex`, `lib/predictex/capture/snapshot.ex`
-- Delete: `lib/predictex/spike.ex`, `lib/predictex/spike/fifa_capture.ex`
-- Modify: `lib/predictex/workers/fifa_live_capture.ex` (alias swap — still alive until Task 7),
-  and any test referencing `Predictex.Spike`.
-- Test: `test/predictex/capture_test.exs` (move/rename from any existing spike test)
+- Delete: `lib/predictex/spike.ex`, `lib/predictex/spike/fifa_capture.ex`, any `test/predictex/spike*_test.exs`
+- Modify: `config/test.exs` (drop the `:fifa_capture_fetch_fun` stub if present)
+- Test: `test/predictex/capture_test.exs`
 
 **Interfaces:**
 - Produces: `Capture.record_snapshot(attrs) :: {:ok, Snapshot.t()} | {:error, cs}`,
@@ -286,24 +295,28 @@ end
 `Predictex.Spike` module, swapping the alias to `Predictex.Capture.Snapshot`. (Read `lib/predictex/spike.ex`
 in full and carry over the analysis helpers unchanged except for the alias and the two renamed function names.)
 
-- [ ] **Step 5: Update the one live caller, then delete the spike modules**
+- [ ] **Step 5: Delete the retired spike worker and the old spike modules**
 
-In `lib/predictex/workers/fifa_live_capture.ex` swap `alias Predictex.Spike` →
-`alias Predictex.Capture` and `Spike.record_capture(` → `Capture.record_snapshot(`. Update any test
-that referenced `Predictex.Spike`. Then:
+`FifaLiveCapture` is the only code caller of `Spike.record_capture`; the producer (Task 5) +
+Recorder (Task 4) replace its job. Remove them together so nothing references `Spike`:
 
 ```bash
+git rm lib/predictex/workers/fifa_live_capture.ex test/predictex/workers/fifa_live_capture_test.exs
 git rm lib/predictex/spike.ex lib/predictex/spike/fifa_capture.ex
 ```
 
+Also `grep -rn "FifaLiveCapture\|Predictex.Spike\|fifa_capture_fetch_fun" lib config test` and
+clear any leftover — including the `:fifa_capture_fetch_fun` stub in `config/test.exs` and any
+`test/predictex/spike*_test.exs`.
+
 - [ ] **Step 6: Run + commit**
 
-Run: `mix test test/predictex/capture_test.exs test/predictex/workers/fifa_live_capture_test.exs && mix compile --warnings-as-errors`
-Expected: PASS, clean. Then `mix format`.
+Run: `mix compile --warnings-as-errors && mix test test/predictex/capture_test.exs`
+Expected: clean compile (no references to the deleted modules), PASS. Then `mix format`.
 
 ```bash
-git add lib/predictex/capture.ex lib/predictex/capture/snapshot.ex lib/predictex/workers/fifa_live_capture.ex test/predictex/capture_test.exs
-git commit -m "refactor(capture): promote Spike capture store to permanent Predictex.Capture (predictex-rfm)"
+git add -A
+git commit -m "refactor(capture): retire FifaLiveCapture; promote capture store to Predictex.Capture (predictex-rfm)"
 ```
 
 ---
@@ -682,23 +695,24 @@ git commit -m "feat(capture): producer publishes snapshots; pre-kickoff window (
 
 ```elixir
 # add to test/predictex/workers/live_score_sync_test.exs
-  test "is unique so the cron trigger can't stack with the self-reschedule chain" do
-    f = window_fixture()
-    put_fetch(fn _url -> {:ok, 200, %{"MatchStatus" => 3}} end)
+  test "is unique so the cron trigger can't stack a duplicate" do
     assert {:ok, _} = Oban.insert(Live.new(%{}))
     # a second identical insert within the unique window is deduped
     assert {:ok, job2} = Oban.insert(Live.new(%{}))
     assert job2.conflict?
-    _ = f
   end
 ```
+
+> **Note:** this test proves uniqueness *exists* (a duplicate insert dedupes); it canNOT
+> observe the `:executing` subtlety below, which only manifests under a real running queue.
+> The `states` choice is load-bearing — see Step 3.
 
 - [ ] **Step 2: Run to verify it fails**
 
 Run: `mix test test/predictex/workers/live_score_sync_test.exs -k "unique"`
 Expected: FAIL (`conflict?` false — no uniqueness yet).
 
-- [ ] **Step 3: Add uniqueness to the worker**
+- [ ] **Step 3: Add uniqueness to the worker (states must EXCLUDE `:executing`)**
 
 Change the `use Oban.Worker` line in `lib/predictex/workers/live_score_sync.ex` to:
 
@@ -706,7 +720,13 @@ Change the `use Oban.Worker` line in `lib/predictex/workers/live_score_sync.ex` 
   use Oban.Worker,
     queue: :default,
     max_attempts: 3,
-    unique: [period: 40, states: [:available, :scheduled, :executing]]
+    # states MUST exclude :executing. The 30s chain reschedules from INSIDE a running
+    # (:executing) job with identical args; if :executing were counted, that insert would
+    # conflict with the current job and the reschedule would be dropped — the chain dies
+    # after one tick and you'd capture only once per */5 cron. Excluding it: the reschedule
+    # (a :scheduled job) inserts fine; during a match the */5 cron dedupes against that
+    # scheduled job, so there is no stacking either way.
+    unique: [period: 40, states: [:available, :scheduled]]
 ```
 
 - [ ] **Step 4: Add the Cron entry**
@@ -733,38 +753,12 @@ git commit -m "feat(capture): auto-start the producer via Oban Cron, unique to a
 
 ---
 
-### Task 7: Retire `FifaLiveCapture`
+### Task 6 wrap: full gate
 
-**Files:**
-- Delete: `lib/predictex/workers/fifa_live_capture.ex`, `test/predictex/workers/fifa_live_capture_test.exs`
-- Modify: any reference (grep first), `config/test.exs` if it stubs `:fifa_capture_fetch_fun`.
-
-**Interfaces:** none produced; this removes the now-redundant spike worker (its job = producer + Recorder).
-
-- [ ] **Step 1: Confirm nothing depends on it**
-
-Run: `grep -rn "FifaLiveCapture\|fifa_capture_fetch_fun" lib config test`
-Expected: only the worker, its test, and (maybe) a `config/test.exs` stub.
-
-- [ ] **Step 2: Remove it**
-
-```bash
-git rm lib/predictex/workers/fifa_live_capture.ex test/predictex/workers/fifa_live_capture_test.exs
-```
-
-Remove any `:fifa_capture_fetch_fun` line from `config/test.exs`.
-
-- [ ] **Step 3: Full gate**
+After Task 6's commit, run the whole gate before deploy:
 
 Run: `mix format --check-formatted && mix compile --warnings-as-errors && mix test`
-Expected: all pass, no warnings, no references to the deleted module.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add -A
-git commit -m "chore(capture): retire FifaLiveCapture; producer + Recorder replace it (predictex-rfm)"
-```
+Expected: all pass, no warnings, no references to any deleted module (`FifaLiveCapture`, `Spike`).
 
 ---
 
@@ -775,13 +769,18 @@ git commit -m "chore(capture): retire FifaLiveCapture; producer + Recorder repla
    fixture that `fifa_captures` gains rows and `/fixtures/:id` goes live with no manual `rpc`.
 3. Removes the manual-arm step that lost England v Croatia. Closes the is_live-stuck edge
    (predictex-d17): the window now bounds polling and the chain stops post-window.
+4. **Ops note:** the post-match readout rpc changes name — `Predictex.Spike.summary("<id>")`
+   is now `Predictex.Capture.summary("<id>")`. Update any saved snippet/runbook.
 
 ## Self-review notes
 
-- Spec coverage: unified capture (Tasks 1–5), event-source persistence (Tasks 2–3), buzz unchanged
-  (Tasks 1,4,5), auto-start (Task 6), retire spike (Task 7). Producer/subscriber + PubSub fan-out as
-  designed (predictex-rfm); persist-in-producer remains deferred (predictex-4ya).
+- Spec coverage (6 tasks): shared decoder (1), retire spike + promote Capture store (2),
+  event-source persistence (Recorder, 3), buzz (Updater, 4), unified producer/publish + pre-kickoff
+  window (5), auto-start cron + uniqueness (6). Producer/subscriber + PubSub fan-out as designed
+  (predictex-rfm); persist-in-producer remains deferred (predictex-4ya).
 - Each commit deployable: producer keeps working through Tasks 1–4 (subscribers idle until Task 5
   wires publishing); Task 5 is the atomic cutover after the subscribers are supervised.
+- Oban uniqueness `states` exclude `:executing` (Task 6) — including it would dedupe the in-job
+  reschedule and kill the 30s chain; the unit test can't observe this, hence the load-bearing comment.
 - The `match_id` in the snapshot message is `fixture.fifa_match_id` (the FIFA id the captures key on),
   while `fixture_id` is our local id (used by LiveUpdater to load + write). Both travel in the message.
