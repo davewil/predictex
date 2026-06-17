@@ -10,7 +10,7 @@ defmodule Predictex.Workers.LiveScoreSync do
 
   require Logger
   import Ecto.Query
-  alias Predictex.{Repo, Tournament}
+  alias Predictex.Repo
   alias Predictex.Tournament.Fixture
 
   @detail_base "https://api.fifa.com/api/v3/live/football/17/285023/289273"
@@ -52,27 +52,7 @@ defmodule Predictex.Workers.LiveScoreSync do
   end
 
   defp apply_update(f, body) do
-    live? = body["MatchStatus"] not in [0, 1]
-
-    attrs = %{
-      is_live: live?,
-      live_home_goals: get_in(body, ["HomeTeam", "Score"]) || f.live_home_goals,
-      live_away_goals: get_in(body, ["AwayTeam", "Score"]) || f.live_away_goals,
-      live_minute: body["MatchTime"]
-    }
-
-    changed? =
-      f.is_live != attrs.is_live or f.live_home_goals != attrs.live_home_goals or
-        f.live_away_goals != attrs.live_away_goals or f.live_minute != attrs.live_minute
-
-    case Tournament.update_fixture(f, attrs) do
-      {:ok, _} ->
-        if changed?,
-          do: Phoenix.PubSub.broadcast(Predictex.PubSub, "fixture:#{f.id}", {:live_update, f.id})
-
-      {:error, cs} ->
-        Logger.warning("live score update failed for #{f.id}: #{inspect(cs.errors)}")
-    end
+    Predictex.LiveScore.apply_to_fixture(f, Predictex.LiveScore.attrs_from_body(body, f))
   end
 
   defp reschedule(args, secs), do: args |> new(schedule_in: secs) |> Oban.insert()
