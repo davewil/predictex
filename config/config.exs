@@ -93,7 +93,8 @@ config :predictex, Oban,
     {Oban.Plugins.Cron,
      crontab: [
        {"*/15 * * * *", Predictex.Workers.ResultSync},
-       {"0 * * * *", Predictex.Workers.CohortSync}
+       {"0 * * * *", Predictex.Workers.CohortSync},
+       {"*/5 * * * *", Predictex.Workers.LiveScoreSync}
      ]}
   ]
 

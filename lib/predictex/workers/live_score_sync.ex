@@ -11,7 +11,27 @@ defmodule Predictex.Workers.LiveScoreSync do
 
   Drive on prod: `rpc "Predictex.Workers.LiveScoreSync.start()"`.
   """
-  use Oban.Worker, queue: :default, max_attempts: 3
+  # states is [:scheduled] — deliberately just the one state, for two reasons:
+  #   1. :executing is excluded. The 30s chain reschedules from INSIDE a running
+  #      (:executing) job with identical args. If :executing counted toward uniqueness
+  #      that insert would conflict with the current job and the reschedule would be
+  #      dropped — the chain would die after one tick and we'd capture only once per
+  #      */5 cron. With :executing excluded the reschedule (a :scheduled job) inserts
+  #      fine, so the self-chain survives. This is the load-bearing invariant.
+  #   2. [:scheduled] is Oban 2.23's no-warning special case (Oban.Job.warn_unique/1,
+  #      deps/oban/lib/oban/job.ex:844). A fuller list like [:available, :scheduled]
+  #      would warn under --warnings-as-errors: Oban wants either all of the :incomplete
+  #      states or exactly [:scheduled], and including all :incomplete states would re-add
+  #      :executing and kill the chain (reason 1). So [:scheduled] is the only list that
+  #      satisfies both compile-clean and chain-survival.
+  # Cron dedupe: the chain refreshes a :scheduled job every 30s, so during a match there
+  # is always a :scheduled job inserted ≤30s ago, inside period: 40. The */5 cron's insert
+  # finds it and dedupes. When the window closes the chain stops, no :scheduled job remains,
+  # and the next cron tick correctly starts a fresh chain.
+  use Oban.Worker,
+    queue: :default,
+    max_attempts: 3,
+    unique: [period: 40, states: [:scheduled]]
 
   require Logger
   import Ecto.Query

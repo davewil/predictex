@@ -66,6 +66,13 @@ defmodule Predictex.Workers.LiveScoreSyncTest do
     assert fixture_id == f.id
   end
 
+  test "is unique so the cron trigger can't stack a duplicate" do
+    assert {:ok, _} = Oban.insert(Live.new(%{}, schedule_in: 30))
+    # a second identical insert within the unique window is deduped
+    assert {:ok, job2} = Oban.insert(Live.new(%{}, schedule_in: 30))
+    assert job2.conflict?
+  end
+
   test "no in-window fixtures → no broadcast, no reschedule" do
     {:ok, r} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})
 
