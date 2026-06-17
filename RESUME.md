@@ -12,7 +12,7 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.5.0`
+- **Latest deployed tag:** `v0.9.1`  (was v0.5.0 in this doc — `xox` group-stage FIFA self-import shipped ~v0.8.0; v0.9.0/v0.9.1 = the FIFA live-feed spike, see "Continue here")
 - **League invite code:** `wcpredict2026`
 - **Prod state:** 12 fixtures synced. **Admin console (`/admin`) + My Predictions
   (`/predictions`) live; results + cohort now auto-sync (Oban).** Admins can enter predictions
@@ -26,11 +26,45 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
+## ⏵ Continue here — Live Buzz / Live Scores (2026-06-17)
+Two threads, both serving the headline social feature **`predictex-c46`** (Live fixture
+drill-down + what-if leaderboard buzz). Full decoded FIFA contract lives in **bd memory
+`fifa-v3-live-api-contract`** (run `bd memories fifa`).
+
+**1. FIFA live-feed spike (`predictex-70h`) — DONE bar one live observation.**
+- **Source decided:** FIFA-native `api.fifa.com/api/v3` (free, no key, a DIFFERENT host to the
+  `play.fifa.com` CDN the app already uses). Endpoints: `/live/football/now` (live list, empty `[]`
+  when none) + `/live/football/17/285023/289273/{IdMatch}` (per-match detail, denormalized).
+  **Crosswalk:** v3 `IdMatch` == the `fifaId` already in `rounds.json` → integer-equality, no heuristic.
+- **Decoded contract (in bd memory):** score is NESTED at `HomeTeam.Score`/`AwayTeam.Score` (NOT
+  top-level); `MatchStatus` 0=finished, 1=upcoming, **live code still TBD** (≠0,1); `Type` 1=pen,
+  2=goal, 3=own; own goal listed under the BENEFICIARY team with `g.IdTeam`=beneficiary; scorer names
+  embedded in `HomeTeam.Players`/`AwayTeam.Players` (no separate feed).
+- **Shipped (v0.9.0/v0.9.1, tested):** `Predictex.Workers.FifaLiveCapture` (self-rescheduling Oban
+  capture worker → `fifa_captures` table) + `Predictex.Spike.summary/1` (post-match analysis). Baseline
+  of 4 finished matches banked at `tmp/fifa-capture/baseline/` (gitignored).
+- **ARMED on prod:** capture job scheduled for **Portugal v Congo DR** (IdMatch `400021502`, kickoff
+  2026-06-17 17:00Z, window 16:50–19:50Z @30s). **After full time:**
+  `rpc "Predictex.Spike.summary(\"400021502\")"`. The ONE open fact = the live `MatchStatus` code.
+- **Throwaway:** drop `fifa_captures` + `Predictex.Spike*` + `FifaLiveCapture` once LiveScoreSync ships.
+
+**2. Live Buzz feature (`predictex-c46`) — SPEC + PLAN WRITTEN, not yet executed.**
+- Spec `docs/superpowers/specs/2026-06-17-live-buzz-design.md`; plan
+  `docs/superpowers/plans/2026-06-17-live-buzz.md` (**9 TDD tasks, foundation-first**).
+- **Decisions (locked):** full c46; dedicated **`/fixtures/:id`** route; **PubSub** real-time; gated on
+  a new **`:live_buzz`** FunWithFlags flag; **`LiveScoreSync` runs ungated, only the UI is flagged.**
+- **Key design call:** LiveScoreSync writes additive **`live_*` columns** (+`fifa_match_id`), NEVER
+  `status`/`home_goals` — openfootball stays the result authority. This avoids the two-writer clobber
+  (ResultSync would otherwise reset a `:live` fixture to `:scheduled` every 15 min). "Live" = `MatchStatus`
+  ∉ [0,1]. `Standings.project/3` reuses the pure `rank/2` for non-persisted projected leaderboards.
+- **NEXT:** execute the plan (subagent-driven recommended). Nothing changes prod behaviour until
+  `rpc "FunWithFlags.enable(:live_buzz)"`.
+
 ## Stack & toolchain
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **251 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
+- **300 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
 - **Oban 2.23** (Postgres-backed jobs) added in v0.5.0 — supervised in `application.ex`, cron in `config.exs`, `testing: :manual` in tests. The substrate for `xox` next.
 
 ## Architecture (Gather → Decide → Act; pure cores, effects at edges)
@@ -81,6 +115,10 @@ Releases ship **no Mix** — use release functions, not mix tasks.
   docker compose -f /root/predictex/docker-compose.prod.yml exec app \
     bin/predictex eval "Predictex.Release.sync_results()"   # seed/refresh fixtures (repo started internally)
   ```
+- **`rpc` does NOT auto-print the return value** — it only emits what the expression writes to
+  stdout. A bare `...start()` runs but shows nothing; wrap in `|> IO.inspect()` to see the result.
+  (`Spike.summary/1` prints its own report.) Also: the prompt's `git:(main) ✗` is the dirty-repo
+  marker, not a failed command.
 
 ## Done (beads issues closed)
 Scoring engine · Ecto schemas · DB ingestion + seeds · DB-backed leaderboard (`0ae`) ·
@@ -154,4 +192,9 @@ playability unlock** — admins can now enter predictions on behalf of players. 
   data model, crosswalk, three integration forks).
 - `docs/superpowers/{specs,plans}/2026-06-16-xox-fifa-import*` — **`xox` design + implementation plan**
   (member self-import; group-stage; server-side composite-key crosswalk; manual-validation gate).
+- `docs/superpowers/{specs/2026-06-17-live-buzz-design.md,plans/2026-06-17-live-buzz.md}` — **Live Buzz /
+  Live Scores (`c46`)** design + 9-task plan (FIFA live feed, `live_*` columns, `:live_buzz` flag,
+  `Standings.project/3`, `/fixtures/:id` PubSub drill-down). See "Continue here" up top.
+- **bd memory `fifa-v3-live-api-contract`** — decoded FIFA v3 live API (endpoints, score path, Type/own-goal,
+  scorer-name join). `bd memories fifa`.
 - `priv/examples/league.sample.json` — sample league file for the DB-free `mix predictex.leaderboard`.
