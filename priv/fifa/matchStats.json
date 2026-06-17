@@ -1,0 +1,1802 @@
+{
+  "1": {
+    "homeWin": 52,
+    "awayWin": 16,
+    "draw": 32,
+    "homePureScore": 2,
+    "awayPureScore": 0,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 37
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 25
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 11
+      }
+    ]
+  },
+  "2": {
+    "homeWin": 33,
+    "awayWin": 33,
+    "draw": 34,
+    "homePureScore": 2,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 33
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 23
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 14
+      }
+    ]
+  },
+  "3": {
+    "homeWin": 33,
+    "awayWin": 33,
+    "draw": 34,
+    "homePureScore": 1,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 23
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 21
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 17
+      }
+    ]
+  },
+  "4": {
+    "homeWin": 33,
+    "awayWin": 33,
+    "draw": 34,
+    "homePureScore": 4,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": true,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 29
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 21
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 15
+      }
+    ]
+  },
+  "5": {
+    "homeWin": 15,
+    "awayWin": 62,
+    "draw": 23,
+    "homePureScore": 1,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 35
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 34
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 4,
+        "percentage": 8
+      }
+    ]
+  },
+  "6": {
+    "homeWin": 34,
+    "awayWin": 33,
+    "draw": 33,
+    "homePureScore": 1,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 32
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 17
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 12
+      }
+    ]
+  },
+  "7": {
+    "homeWin": 16,
+    "awayWin": 49,
+    "draw": 35,
+    "homePureScore": 0,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 37
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 21
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 1,
+        "percentage": 14
+      }
+    ]
+  },
+  "8": {
+    "homeWin": 27,
+    "awayWin": 37,
+    "draw": 36,
+    "homePureScore": 2,
+    "awayPureScore": 0,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 31
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 21
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 15
+      }
+    ]
+  },
+  "9": {
+    "homeWin": 86,
+    "awayWin": 6,
+    "draw": 8,
+    "homePureScore": 7,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 4,
+        "awayScore": 0,
+        "percentage": 33
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 21
+      },
+      {
+        "homeScore": 5,
+        "awayScore": 0,
+        "percentage": 19
+      }
+    ]
+  },
+  "10": {
+    "homeWin": 33,
+    "awayWin": 33,
+    "draw": 34,
+    "homePureScore": 2,
+    "awayPureScore": 2,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 33
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 2,
+        "percentage": 17
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 14
+      }
+    ]
+  },
+  "11": {
+    "homeWin": 33,
+    "awayWin": 33,
+    "draw": 34,
+    "homePureScore": 1,
+    "awayPureScore": 0,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 32
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 18
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 1,
+        "percentage": 13
+      }
+    ]
+  },
+  "12": {
+    "homeWin": 37,
+    "awayWin": 26,
+    "draw": 37,
+    "homePureScore": 5,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 33
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 18
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 18
+      }
+    ]
+  },
+  "13": {
+    "homeWin": 85,
+    "awayWin": 7,
+    "draw": 8,
+    "homePureScore": 0,
+    "awayPureScore": 0,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 4,
+        "awayScore": 0,
+        "percentage": 30
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 23
+      },
+      {
+        "homeScore": 5,
+        "awayScore": 0,
+        "percentage": 18
+      }
+    ]
+  },
+  "14": {
+    "homeWin": 37,
+    "awayWin": 26,
+    "draw": 37,
+    "homePureScore": 1,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 35
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 18
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 15
+      }
+    ]
+  },
+  "15": {
+    "homeWin": 20,
+    "awayWin": 40,
+    "draw": 40,
+    "homePureScore": 1,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 29
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 23
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 15
+      }
+    ]
+  },
+  "16": {
+    "homeWin": 33,
+    "awayWin": 33,
+    "draw": 34,
+    "homePureScore": 2,
+    "awayPureScore": 2,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 31
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 21
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 13
+      }
+    ]
+  },
+  "17": {
+    "homeWin": 42,
+    "awayWin": 17,
+    "draw": 41,
+    "homePureScore": 3,
+    "awayPureScore": 1,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 34
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 22
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 12
+      }
+    ]
+  },
+  "18": {
+    "homeWin": 16,
+    "awayWin": 57,
+    "draw": 27,
+    "homePureScore": 1,
+    "awayPureScore": 4,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 28
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 28
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 4,
+        "percentage": 12
+      }
+    ]
+  },
+  "19": {
+    "homeWin": 92,
+    "awayWin": 3,
+    "draw": 5,
+    "homePureScore": 2,
+    "awayPureScore": 0,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 31
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 19
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 18
+      }
+    ]
+  },
+  "20": {
+    "homeWin": 86,
+    "awayWin": 3,
+    "draw": 11,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 40
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 19
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 12
+      }
+    ]
+  },
+  "21": {
+    "homeWin": 97,
+    "awayWin": 1,
+    "draw": 2,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 37
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 19
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 12
+      }
+    ]
+  },
+  "22": {
+    "homeWin": 63,
+    "awayWin": 7,
+    "draw": 30,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 34
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 20
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 9
+      }
+    ]
+  },
+  "23": {
+    "homeWin": 78,
+    "awayWin": 5,
+    "draw": 17,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 30
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 20
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 16
+      }
+    ]
+  },
+  "24": {
+    "homeWin": 3,
+    "awayWin": 92,
+    "draw": 5,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 35
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 21
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 14
+      }
+    ]
+  },
+  "25": {
+    "homeWin": 81,
+    "awayWin": 4,
+    "draw": 15,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 35
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 24
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 13
+      }
+    ]
+  },
+  "26": {
+    "homeWin": 74,
+    "awayWin": 6,
+    "draw": 20,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 33
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 22
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 16
+      }
+    ]
+  },
+  "27": {
+    "homeWin": 85,
+    "awayWin": 4,
+    "draw": 11,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 38
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 18
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 16
+      }
+    ]
+  },
+  "28": {
+    "homeWin": 40,
+    "awayWin": 17,
+    "draw": 43,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 27
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 24
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 2,
+        "percentage": 18
+      }
+    ]
+  },
+  "29": {
+    "homeWin": 75,
+    "awayWin": 7,
+    "draw": 18,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 29
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 20
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 12
+      }
+    ]
+  },
+  "30": {
+    "homeWin": 6,
+    "awayWin": 79,
+    "draw": 15,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 30
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 17
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 17
+      }
+    ]
+  },
+  "31": {
+    "homeWin": 99,
+    "awayWin": 0,
+    "draw": 1,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 29
+      },
+      {
+        "homeScore": 4,
+        "awayScore": 0,
+        "percentage": 29
+      },
+      {
+        "homeScore": 5,
+        "awayScore": 0,
+        "percentage": 13
+      }
+    ]
+  },
+  "32": {
+    "homeWin": 73,
+    "awayWin": 7,
+    "draw": 20,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 29
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 22
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 15
+      }
+    ]
+  },
+  "33": {
+    "homeWin": 72,
+    "awayWin": 7,
+    "draw": 21,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 35
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 13
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 11
+      }
+    ]
+  },
+  "34": {
+    "homeWin": 87,
+    "awayWin": 4,
+    "draw": 9,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 26
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 23
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 14
+      }
+    ]
+  },
+  "35": {
+    "homeWin": 93,
+    "awayWin": 2,
+    "draw": 5,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 40
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 23
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 10
+      }
+    ]
+  },
+  "36": {
+    "homeWin": 3,
+    "awayWin": 91,
+    "draw": 6,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 35
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 20
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 1,
+        "percentage": 13
+      }
+    ]
+  },
+  "37": {
+    "homeWin": 97,
+    "awayWin": 1,
+    "draw": 2,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 32
+      },
+      {
+        "homeScore": 4,
+        "awayScore": 0,
+        "percentage": 16
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 14
+      }
+    ]
+  },
+  "38": {
+    "homeWin": 90,
+    "awayWin": 3,
+    "draw": 7,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 34
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 21
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 13
+      }
+    ]
+  },
+  "39": {
+    "homeWin": 90,
+    "awayWin": 3,
+    "draw": 7,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 37
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 20
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 11
+      }
+    ]
+  },
+  "40": {
+    "homeWin": 4,
+    "awayWin": 80,
+    "draw": 16,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 25
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 23
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 1,
+        "percentage": 20
+      }
+    ]
+  },
+  "41": {
+    "homeWin": 88,
+    "awayWin": 3,
+    "draw": 9,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 29
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 24
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 18
+      }
+    ]
+  },
+  "42": {
+    "homeWin": 98,
+    "awayWin": 1,
+    "draw": 1,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 33
+      },
+      {
+        "homeScore": 4,
+        "awayScore": 0,
+        "percentage": 27
+      },
+      {
+        "homeScore": 5,
+        "awayScore": 0,
+        "percentage": 12
+      }
+    ]
+  },
+  "43": {
+    "homeWin": 46,
+    "awayWin": 14,
+    "draw": 40,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 27
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 2,
+        "percentage": 21
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 16
+      }
+    ]
+  },
+  "44": {
+    "homeWin": 4,
+    "awayWin": 78,
+    "draw": 18,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 26
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 1,
+        "percentage": 23
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 17
+      }
+    ]
+  },
+  "45": {
+    "homeWin": 97,
+    "awayWin": 1,
+    "draw": 2,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 38
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 19
+      },
+      {
+        "homeScore": 4,
+        "awayScore": 0,
+        "percentage": 15
+      }
+    ]
+  },
+  "46": {
+    "homeWin": 91,
+    "awayWin": 2,
+    "draw": 7,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 30
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 24
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 16
+      }
+    ]
+  },
+  "47": {
+    "homeWin": 2,
+    "awayWin": 94,
+    "draw": 4,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 38
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 17
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 16
+      }
+    ]
+  },
+  "48": {
+    "homeWin": 89,
+    "awayWin": 2,
+    "draw": 9,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 37
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 20
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 13
+      }
+    ]
+  },
+  "49": {
+    "homeWin": 62,
+    "awayWin": 7,
+    "draw": 31,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 35
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 23
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 13
+      }
+    ]
+  },
+  "50": {
+    "homeWin": 77,
+    "awayWin": 7,
+    "draw": 16,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 30
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 23
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 14
+      }
+    ]
+  },
+  "51": {
+    "homeWin": 4,
+    "awayWin": 88,
+    "draw": 8,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 28
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 23
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 18
+      }
+    ]
+  },
+  "52": {
+    "homeWin": 96,
+    "awayWin": 1,
+    "draw": 3,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 41
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 26
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 1,
+        "percentage": 9
+      }
+    ]
+  },
+  "53": {
+    "homeWin": 8,
+    "awayWin": 55,
+    "draw": 37,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 34
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 24
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 2,
+        "percentage": 10
+      }
+    ]
+  },
+  "54": {
+    "homeWin": 5,
+    "awayWin": 79,
+    "draw": 16,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 29
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 26
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 12
+      }
+    ]
+  },
+  "55": {
+    "homeWin": 7,
+    "awayWin": 76,
+    "draw": 17,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 27
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 23
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 12
+      }
+    ]
+  },
+  "56": {
+    "homeWin": 3,
+    "awayWin": 89,
+    "draw": 8,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 35
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 19
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 13
+      }
+    ]
+  },
+  "57": {
+    "homeWin": 2,
+    "awayWin": 94,
+    "draw": 4,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 32
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 21
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 16
+      }
+    ]
+  },
+  "58": {
+    "homeWin": 51,
+    "awayWin": 13,
+    "draw": 36,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 32
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 20
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 2,
+        "percentage": 14
+      }
+    ]
+  },
+  "59": {
+    "homeWin": 44,
+    "awayWin": 22,
+    "draw": 34,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 26
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 20
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 2,
+        "percentage": 12
+      }
+    ]
+  },
+  "60": {
+    "homeWin": 34,
+    "awayWin": 24,
+    "draw": 42,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 28
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 19
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 0,
+        "percentage": 11
+      }
+    ]
+  },
+  "61": {
+    "homeWin": 7,
+    "awayWin": 77,
+    "draw": 16,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 24
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 22
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 3,
+        "percentage": 15
+      }
+    ]
+  },
+  "62": {
+    "homeWin": 92,
+    "awayWin": 3,
+    "draw": 5,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 45
+      },
+      {
+        "homeScore": 3,
+        "awayScore": 0,
+        "percentage": 16
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 11
+      }
+    ]
+  },
+  "64": {
+    "homeWin": 16,
+    "awayWin": 46,
+    "draw": 38,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 27
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 16
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 1,
+        "percentage": 16
+      }
+    ]
+  },
+  "63": {
+    "homeWin": 4,
+    "awayWin": 83,
+    "draw": 13,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 29
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 24
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 13
+      }
+    ]
+  },
+  "65": {
+    "homeWin": 2,
+    "awayWin": 94,
+    "draw": 4,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 32
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 25
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 13
+      }
+    ]
+  },
+  "66": {
+    "homeWin": 60,
+    "awayWin": 9,
+    "draw": 31,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 30
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 23
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 13
+      }
+    ]
+  },
+  "67": {
+    "homeWin": 2,
+    "awayWin": 96,
+    "draw": 2,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 32
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 20
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 4,
+        "percentage": 18
+      }
+    ]
+  },
+  "68": {
+    "homeWin": 71,
+    "awayWin": 7,
+    "draw": 22,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 36
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 0,
+        "percentage": 16
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 15
+      }
+    ]
+  },
+  "69": {
+    "homeWin": 8,
+    "awayWin": 70,
+    "draw": 22,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 34
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 3,
+        "percentage": 18
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 12
+      }
+    ]
+  },
+  "70": {
+    "homeWin": 36,
+    "awayWin": 17,
+    "draw": 47,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 33
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 0,
+        "percentage": 15
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 1,
+        "percentage": 12
+      }
+    ]
+  },
+  "71": {
+    "homeWin": 2,
+    "awayWin": 97,
+    "draw": 1,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 0,
+        "awayScore": 3,
+        "percentage": 36
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 2,
+        "percentage": 20
+      },
+      {
+        "homeScore": 0,
+        "awayScore": 4,
+        "percentage": 19
+      }
+    ]
+  },
+  "72": {
+    "homeWin": 16,
+    "awayWin": 43,
+    "draw": 41,
+    "homePureScore": null,
+    "awayPureScore": null,
+    "firstGoalIsOwn": false,
+    "quickPicks": [
+      {
+        "homeScore": 1,
+        "awayScore": 1,
+        "percentage": 28
+      },
+      {
+        "homeScore": 1,
+        "awayScore": 2,
+        "percentage": 27
+      },
+      {
+        "homeScore": 2,
+        "awayScore": 2,
+        "percentage": 9
+      }
+    ]
+  }
+}
