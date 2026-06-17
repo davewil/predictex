@@ -12,7 +12,8 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.9.1`  (was v0.5.0 in this doc — `xox` group-stage FIFA self-import shipped ~v0.8.0; v0.9.0/v0.9.1 = the FIFA live-feed spike, see "Continue here")
+- **Latest deployed tag:** `v0.10.2`  (v0.10.0 = Live Buzz `/fixtures/:id` + FunWithFlags admin
+  dashboard; v0.10.1 = buzz redesign; v0.10.2 = demo-data variety. `:live_buzz` flag is **ON** in prod.)
 - **League invite code:** `wcpredict2026`
 - **Prod state:** 12 fixtures synced. **Admin console (`/admin`) + My Predictions
   (`/predictions`) live; results + cohort now auto-sync (Oban).** Admins can enter predictions
@@ -26,45 +27,59 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
-## ⏵ Continue here — Live Buzz / Live Scores (2026-06-17)
-Two threads, both serving the headline social feature **`predictex-c46`** (Live fixture
-drill-down + what-if leaderboard buzz). Full decoded FIFA contract lives in **bd memory
-`fifa-v3-live-api-contract`** (run `bd memories fifa`).
+## ⏵ Continue here — execute the auto-capture plan (`predictex-rfm`) (2026-06-17)
+The Live Buzz feature (`predictex-c46`) is **SHIPPED, LIVE and ENABLED on prod** (v0.10.2).
+The next build is **auto-starting capture** so no match is ever missed again. FIFA contract:
+bd memory `fifa-v3-live-api-contract` (run `bd memories fifa`); live `MatchStatus` confirmed = **3**.
 
-**1. FIFA live-feed spike (`predictex-70h`) — DONE bar one live observation.**
-- **Source decided:** FIFA-native `api.fifa.com/api/v3` (free, no key, a DIFFERENT host to the
-  `play.fifa.com` CDN the app already uses). Endpoints: `/live/football/now` (live list, empty `[]`
-  when none) + `/live/football/17/285023/289273/{IdMatch}` (per-match detail, denormalized).
-  **Crosswalk:** v3 `IdMatch` == the `fifaId` already in `rounds.json` → integer-equality, no heuristic.
-- **Decoded contract (in bd memory):** score is NESTED at `HomeTeam.Score`/`AwayTeam.Score` (NOT
-  top-level); `MatchStatus` 0=finished, 1=upcoming, **live code still TBD** (≠0,1); `Type` 1=pen,
-  2=goal, 3=own; own goal listed under the BENEFICIARY team with `g.IdTeam`=beneficiary; scorer names
-  embedded in `HomeTeam.Players`/`AwayTeam.Players` (no separate feed).
-- **Shipped (v0.9.0/v0.9.1, tested):** `Predictex.Workers.FifaLiveCapture` (self-rescheduling Oban
-  capture worker → `fifa_captures` table) + `Predictex.Spike.summary/1` (post-match analysis). Baseline
-  of 4 finished matches banked at `tmp/fifa-capture/baseline/` (gitignored).
-- **ARMED on prod:** capture job scheduled for **Portugal v Congo DR** (IdMatch `400021502`, kickoff
-  2026-06-17 17:00Z, window 16:50–19:50Z @30s). **After full time:**
-  `rpc "Predictex.Spike.summary(\"400021502\")"`. The ONE open fact = the live `MatchStatus` code.
-- **Throwaway:** drop `fifa_captures` + `Predictex.Spike*` + `FifaLiveCapture` once LiveScoreSync ships.
+**NEXT SESSION starts here →** execute `docs/superpowers/plans/2026-06-17-auto-capture.md`
+(**6 TDD tasks, advisor-reviewed, each commit deployable**) **subagent-driven** — the flow that
+built c46 cleanly. `bd ready` surfaces **`predictex-rfm`** (and `i1s`) as the unblocked starters.
 
-**2. Live Buzz feature (`predictex-c46`) — SPEC + PLAN WRITTEN, not yet executed.**
-- Spec `docs/superpowers/specs/2026-06-17-live-buzz-design.md`; plan
-  `docs/superpowers/plans/2026-06-17-live-buzz.md` (**9 TDD tasks, foundation-first**).
-- **Decisions (locked):** full c46; dedicated **`/fixtures/:id`** route; **PubSub** real-time; gated on
-  a new **`:live_buzz`** FunWithFlags flag; **`LiveScoreSync` runs ungated, only the UI is flagged.**
-- **Key design call:** LiveScoreSync writes additive **`live_*` columns** (+`fifa_match_id`), NEVER
-  `status`/`home_goals` — openfootball stays the result authority. This avoids the two-writer clobber
-  (ResultSync would otherwise reset a `:live` fixture to `:scheduled` every 15 min). "Live" = `MatchStatus`
-  ∉ [0,1]. `Standings.project/3` reuses the pure `rank/2` for non-persisted projected leaderboards.
-- **NEXT:** execute the plan (subagent-driven recommended). Nothing changes prod behaviour until
-  `rpc "FunWithFlags.enable(:live_buzz)"`.
+**What shipped (`predictex-c46`, v0.10.2) — LIVE + ENABLED on prod; left OPEN (you haven't reviewed):**
+- `/fixtures/:id` real-time drill-down: everyone's picks (revealed only AFTER kickoff — anti-copy),
+  projected what-if standings with ▲/▼ rank movement, ⚡ buzz headlines ("X moves up to #N"), team
+  flags, font-score, LIVE pulse. Redesigned on the design system (was a bare skeleton).
+- `Workers.LiveScoreSync` writes additive `live_*` (+`fifa_match_id`), broadcasts `{:live_update}` on
+  PubSub; `Standings.project/3` reuses pure `rank/2`; `Predictex.Buzz` (`scenarios_with_deltas/3`,
+  `headlines/4`). Two-writer rule holds — openfootball/`ResultSync` still owns `status`/goals.
+  "Live" = `MatchStatus` ∉ [0,1]; the in-play code is **confirmed = 3**.
+- **FunWithFlags + admin dashboard** `/admin/feature-flags` (behind `:require_admin`, plug-level
+  `require_admin_player/2`). Toggle via the UI or `rpc "FunWithFlags.enable/disable(:live_buzz)"`.
+- **Demo data:** `Predictex.Demo.seed/0` — 6 tagged players (`@demo.predictex.local`) with varied picks
+  so the buzz moves; `Predictex.Demo.purge/0` removes them. Loaded on prod (purge before real friends).
+- **Backfill done:** 72/104 fixtures have `fifa_match_id` (all group-stage; knockouts = `predictex-i9k`).
+- **Spike capture:** `FifaLiveCapture` → `fifa_captures`; `Predictex.Spike.summary/1` reads a match back.
+  Full Portugal v DR Congo capture banked (696 rows, 16:50–19:49Z).
+
+**⚠️ Capture is NOT auto-started yet — that IS `predictex-rfm` (the next build).** Until it ships, a
+live match must be armed by hand (we lost recording England v Croatia to exactly this):
+`rpc "Predictex.Workers.LiveScoreSync.start()"` (buzz) + `rpc "Predictex.Workers.FifaLiveCapture.start()"`
+(recording). Both stop between match windows.
+
+**NEXT — `predictex-rfm`: auto-start unified live capture. Plan ready + advisor-reviewed.**
+- Plan `docs/superpowers/plans/2026-06-17-auto-capture.md` (**6 TDD tasks, each commit deployable**).
+- ONE producer worker (Oban Cron `*/5`, ~10 min pre-kickoff) fetches `/detail`, publishes
+  `{:snapshot, …}` on PubSub `"fifa:snapshots"` → two subscribers: **Recorder** (persist raw body to
+  `fifa_captures` = the replayable event source) + **`Live.Updater`** (decode→`live_*`→`{:live_update}`
+  = the buzz). Shared **`Predictex.LiveScore`** decoder; `Spike`→permanent **`Predictex.Capture`** (same
+  table); `FifaLiveCapture` retired. Closes the manual-arm gap + the `is_live`-stuck bug (`predictex-d17`).
+- **Advisor watch:** Oban uniqueness `states` MUST exclude `:executing` (Task 6) — else the in-job 30s
+  reschedule dedupes and the chain dies. Commented in the plan.
+
+**Parked backlog (this session's brainstorm, banked as beads):**
+- `predictex-i1s` — match replay engine (stream-based: `Stream.cycle` + `Stream.interval`, any recorded
+  match → isolated demo fixture). Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.
+  Consumes the shared `LiveScore` decoder (lands in rfm).
+- `predictex-cil` — admin start/stop replay button (depends on i1s).
+- `predictex-4ya` — deferred: persist-in-producer (lossless recording) — revisit if replay shows gaps.
+- `predictex-aqf` — FixtureLive scenario/buzz label-casing polish (P4).
 
 ## Stack & toolchain
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **300 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
+- **333 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
 - **Oban 2.23** (Postgres-backed jobs) added in v0.5.0 — supervised in `application.ex`, cron in `config.exs`, `testing: :manual` in tests. The substrate for `xox` next.
 
 ## Architecture (Gather → Decide → Act; pure cores, effects at edges)
