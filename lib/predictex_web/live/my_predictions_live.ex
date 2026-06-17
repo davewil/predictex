@@ -53,7 +53,7 @@ defmodule PredictexWeb.MyPredictionsLive do
               </div>
               <div class="font-score text-3xl font-bold">{@dash.total}</div>
               <div class="text-xs opacity-80">
-                {@dash.fixtures_total} fixtures · {@dash.round_bonus_total} bonus
+                {@dash.fixtures_total} from fixtures · {@dash.round_bonus_total} bonus
               </div>
             </div>
           </div>

@@ -50,6 +50,11 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert html =~ "My Predictions"
     assert html =~ "Mexico"
     assert html =~ "No pick imported"
+
+    # points breakdown labels regular-scoring points as "from fixtures", not a fixture count
+    # (predictex-d64 — same mislabel as the leaderboard champion card).
+    assert html =~ "from fixtures"
+    refute html =~ ~r/\d fixtures ·/
   end
 
   test "a member sees their own picks, not another player's", %{conn: conn, round: round} do
