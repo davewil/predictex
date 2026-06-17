@@ -36,7 +36,7 @@ defmodule Predictex.Application do
 
   defp capture_subscribers do
     if Application.get_env(:predictex, :start_capture_subscribers, true) do
-      [Predictex.Capture.Recorder]
+      [Predictex.Capture.Recorder, Predictex.Live.Updater]
     else
       []
     end
