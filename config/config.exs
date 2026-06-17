@@ -97,6 +97,12 @@ config :predictex, Oban,
      ]}
   ]
 
+config :fun_with_flags, :cache, enabled: true, ttl: 300
+config :fun_with_flags, :persistence,
+  adapter: FunWithFlags.Store.Persistent.Ecto,
+  repo: Predictex.Repo
+config :fun_with_flags, :cache_bust_notifications, enabled: false
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

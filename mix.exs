@@ -70,7 +70,8 @@ defmodule Predictex.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:stream_data, "~> 1.0", only: [:dev, :test]},
-      {:floki, ">= 0.30.0", only: :test}
+      {:floki, ">= 0.30.0", only: :test},
+      {:fun_with_flags, "~> 1.12"}
     ]
   end
 
