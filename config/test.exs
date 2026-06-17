@@ -61,3 +61,7 @@ config :predictex, :fifa_reference_fun, fn -> {:ok, []} end
 
 # LiveScoreSync (predictex-c46) fetch stubbed in tests; worker tests override per-test.
 config :predictex, :live_score_fetch_fun, fn _url -> {:ok, 200, %{}} end
+
+# Capture subscribers (predictex-rfm) must NOT auto-start in test — they'd collide on the
+# registered name with recorder_test's own start_supervised! and react to unrelated broadcasts.
+config :predictex, start_capture_subscribers: false

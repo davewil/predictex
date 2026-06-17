@@ -7,17 +7,18 @@ defmodule Predictex.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      PredictexWeb.Telemetry,
-      Predictex.Repo,
-      {Oban, Application.fetch_env!(:predictex, Oban)},
-      {DNSCluster, query: Application.get_env(:predictex, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Predictex.PubSub},
-      # Start a worker by calling: Predictex.Worker.start_link(arg)
-      # {Predictex.Worker, arg},
-      # Start to serve requests, typically the last entry
-      PredictexWeb.Endpoint
-    ]
+    children =
+      [
+        PredictexWeb.Telemetry,
+        Predictex.Repo,
+        {Oban, Application.fetch_env!(:predictex, Oban)},
+        {DNSCluster, query: Application.get_env(:predictex, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: Predictex.PubSub},
+        # Start a worker by calling: Predictex.Worker.start_link(arg)
+        # {Predictex.Worker, arg},
+        # Start to serve requests, typically the last entry
+        PredictexWeb.Endpoint
+      ] ++ capture_subscribers()
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
@@ -31,5 +32,13 @@ defmodule Predictex.Application do
   def config_change(changed, _new, removed) do
     PredictexWeb.Endpoint.config_change(changed, removed)
     :ok
+  end
+
+  defp capture_subscribers do
+    if Application.get_env(:predictex, :start_capture_subscribers, true) do
+      [Predictex.Capture.Recorder]
+    else
+      []
+    end
   end
 end
