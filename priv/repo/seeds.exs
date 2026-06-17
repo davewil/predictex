@@ -125,11 +125,11 @@ defmodule DemoSeed do
     end)
   end
 
-  # quickPicks is FIFA's most-predicted scorelines (desc by %); fall back to the "pure" consensus.
+  # quickPicks is FIFA's most-predicted scorelines (desc by %); the head is the crowd favourite.
+  # Matches with no quickPicks return nil and are skipped (none in the current group-stage snapshot).
   defp favourite(stats, match_id) do
     case stats[to_string(match_id)] do
       %{"quickPicks" => [%{"homeScore" => h, "awayScore" => a} | _]} -> {h, a}
-      %{"homePureScore" => h, "awayPureScore" => a} when is_integer(h) and is_integer(a) -> {h, a}
       _ -> nil
     end
   end
