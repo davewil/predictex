@@ -58,3 +58,6 @@ end
 # Cohort sync source stubbed in tests (no network); worker tests override per-test.
 config :predictex, :cohort_source_fun, fn -> {:ok, %{rounds: [], match_stats: %{}}} end
 config :predictex, :fifa_reference_fun, fn -> {:ok, []} end
+
+# FIFA live-capture spike (predictex-70h) source stubbed in tests; worker tests override.
+config :predictex, :fifa_capture_fetch_fun, fn _url -> {:ok, 200, %{"stub" => true}} end
