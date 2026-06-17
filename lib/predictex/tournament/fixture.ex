@@ -28,6 +28,11 @@ defmodule Predictex.Tournament.Fixture do
     field :cohort_home_pct, :integer
     field :cohort_draw_pct, :integer
     field :cohort_away_pct, :integer
+    field :live_home_goals, :integer
+    field :live_away_goals, :integer
+    field :live_minute, :string
+    field :is_live, :boolean, default: false
+    field :fifa_match_id, :string
 
     belongs_to :round, Predictex.Tournament.Round
     has_many :predictions, Predictex.Predictions.Prediction
@@ -50,6 +55,11 @@ defmodule Predictex.Tournament.Fixture do
     :cohort_home_pct,
     :cohort_draw_pct,
     :cohort_away_pct,
+    :live_home_goals,
+    :live_away_goals,
+    :live_minute,
+    :is_live,
+    :fifa_match_id,
     :round_id
   ]
 
