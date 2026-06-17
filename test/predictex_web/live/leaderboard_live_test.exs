@@ -44,5 +44,11 @@ defmodule PredictexWeb.LeaderboardLiveTest do
     assert html =~ "50"
     assert html =~ "Copy WhatsApp text"
     refute html =~ "No players yet"
+
+    # champion breakdown labels the points correctly: 30 are from regular fixture scoring,
+    # 20 from the round bonus. Regression: the card used to read "30 fixtures", which reads as
+    # a count of fixtures rather than a points total.
+    assert html =~ "30 from fixtures · 20 bonus"
+    refute html =~ "30 fixtures ·"
   end
 end

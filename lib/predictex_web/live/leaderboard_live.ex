@@ -67,7 +67,7 @@ defmodule PredictexWeb.LeaderboardLive do
                 {@champion.name}
               </div>
               <div class="text-xs text-accent/80">
-                {@champion.fixtures_total} fixtures · {@champion.round_bonus_total} bonus
+                {@champion.fixtures_total} from fixtures · {@champion.round_bonus_total} bonus
               </div>
             </div>
             <div class="shrink-0 text-right">

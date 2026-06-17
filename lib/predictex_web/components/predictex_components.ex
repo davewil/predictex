@@ -88,10 +88,16 @@ defmodule PredictexWeb.PredictexComponents do
         </span>
       </div>
 
-      <div class="hidden w-20 shrink-0 text-right font-score text-sm text-base-content/60 sm:block">
+      <div
+        class="hidden w-20 shrink-0 text-right font-score text-sm text-base-content/60 sm:block"
+        title="Points from fixtures (regular scoring)"
+      >
         {@fixtures}
       </div>
-      <div class="hidden w-16 shrink-0 text-right font-score text-sm text-base-content/60 sm:block">
+      <div
+        class="hidden w-16 shrink-0 text-right font-score text-sm text-base-content/60 sm:block"
+        title="Bonus points"
+      >
         {@bonus}
       </div>
       <div class={[
