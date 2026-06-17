@@ -27,52 +27,50 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
-## ⏵ Continue here — execute the auto-capture plan (`predictex-rfm`) (2026-06-17)
-The Live Buzz feature (`predictex-c46`) is **SHIPPED, LIVE and ENABLED on prod** (v0.10.2).
-The next build is **auto-starting capture** so no match is ever missed again. FIFA contract:
-bd memory `fifa-v3-live-api-contract` (run `bd memories fifa`); live `MatchStatus` confirmed = **3**.
+## ⏵ Continue here — auto-capture (`predictex-rfm`) SHIPPED to `main`; deploy is your call (2026-06-18)
+`predictex-rfm` (auto-start unified live capture) is **CODE-COMPLETE, REVIEWED, on `main`, NOT deployed**.
+6-task TDD via subagent-driven-development (commits `4d0c566..7e32c46`), full gate green (**335 tests**),
+whole-branch **opus review: READY-WITH-FIXES, no Critical, 5 invariants hold**. A plain push ran Quality
+CI only — **prod still runs v0.10.2** (the manual-arm capture). **Deploy needs a `vX.Y.Z` tag — your
+production-readiness call.** FIFA contract: bd memory `fifa-v3-live-api-contract`; live `MatchStatus` = **3**.
 
-**NEXT SESSION starts here →** execute `docs/superpowers/plans/2026-06-17-auto-capture.md`
-(**6 TDD tasks, advisor-reviewed, each commit deployable**) **subagent-driven** — the flow that
-built c46 cleanly. `bd ready` surfaces **`predictex-rfm`** (and `i1s`) as the unblocked starters.
+**What shipped (`predictex-rfm`) — producer/PubSub-subscriber architecture:**
+- **`Predictex.LiveScore`** — shared PURE decoder (`attrs_from_body/2`, `apply_to_fixture/2`); single
+  source of the body→`live_*`→broadcast contract (the replay engine `predictex-i1s` consumes it too).
+- **`Predictex.Capture`** + `Capture.Snapshot` — the spike store promoted to a permanent home (same
+  `fifa_captures` table, no migration); `FifaLiveCapture` + `Predictex.Spike` RETIRED. **Ops rename:
+  `Spike.summary/1` → `Capture.summary/1`.**
+- **Two supervised, config-gated subscribers** on PubSub `"fifa:snapshots"`: `Capture.Recorder`
+  (persists raw bodies = replayable event source) + `Live.Updater` (decode→`live_*`→`{:live_update}`
+  buzz). `:one_for_one`; gated OFF in test (`:start_capture_subscribers`).
+- **`Workers.LiveScoreSync` is now the PRODUCER**: pre-kickoff-windowed, self-rescheduling (30s), writes
+  NO fixture column — publishes `{:snapshot, fixture_id, body, captured_at, fifa_match_id, url}` per
+  in-window fixture. **Auto-started by Oban Cron `*/5`** with `unique: [period: 40, states: [:scheduled]]`
+  — the ONLY value that excludes `:executing` (so the in-job reschedule survives) AND compiles
+  warning-clean on Oban 2.23 (`warn_unique/1` job.ex:844 special case). Two-writer rule holds.
+- **Closes the manual-arm gap** (we lost England v Croatia to it). No more `rpc ".start()"`.
 
-**What shipped (`predictex-c46`, v0.10.2) — LIVE + ENABLED on prod; left OPEN (you haven't reviewed):**
-- `/fixtures/:id` real-time drill-down: everyone's picks (revealed only AFTER kickoff — anti-copy),
-  projected what-if standings with ▲/▼ rank movement, ⚡ buzz headlines ("X moves up to #N"), team
-  flags, font-score, LIVE pulse. Redesigned on the design system (was a bare skeleton).
-- `Workers.LiveScoreSync` writes additive `live_*` (+`fifa_match_id`), broadcasts `{:live_update}` on
-  PubSub; `Standings.project/3` reuses pure `rank/2`; `Predictex.Buzz` (`scenarios_with_deltas/3`,
-  `headlines/4`). Two-writer rule holds — openfootball/`ResultSync` still owns `status`/goals.
-  "Live" = `MatchStatus` ∉ [0,1]; the in-play code is **confirmed = 3**.
-- **FunWithFlags + admin dashboard** `/admin/feature-flags` (behind `:require_admin`, plug-level
-  `require_admin_player/2`). Toggle via the UI or `rpc "FunWithFlags.enable/disable(:live_buzz)"`.
-- **Demo data:** `Predictex.Demo.seed/0` — 6 tagged players (`@demo.predictex.local`) with varied picks
-  so the buzz moves; `Predictex.Demo.purge/0` removes them. Loaded on prod (purge before real friends).
-- **Backfill done:** 72/104 fixtures have `fifa_match_id` (all group-stage; knockouts = `predictex-i9k`).
-- **Spike capture:** `FifaLiveCapture` → `fifa_captures`; `Predictex.Spike.summary/1` reads a match back.
-  Full Portugal v DR Congo capture banked (696 rows, 16:50–19:49Z).
+**DEPLOY RUNBOOK (when you decide):** tag `vX.Y.Z` (additive, no migration). After deploy the Cron arms
+the producer ~10min before each kickoff automatically — confirm `fifa_captures` gains rows + `/fixtures/:id`
+goes live with NO manual rpc. The old manual `rpc "Predictex.Spike.summary(\"<id>\")"` readout is now
+`Predictex.Capture.summary("<id>")`.
 
-**⚠️ Capture is NOT auto-started yet — that IS `predictex-rfm` (the next build).** Until it ships, a
-live match must be armed by hand (we lost recording England v Croatia to exactly this):
-`rpc "Predictex.Workers.LiveScoreSync.start()"` (buzz) + `rpc "Predictex.Workers.FifaLiveCapture.start()"`
-(recording). Both stop between match windows.
+**⚠️ Follow-ups filed from the whole-branch review:**
+- **`predictex-cvx` (P2 bug)** — producer window `@post_min 150` truncates knockout ET/penalties
+  (~155-185min) → buzz goes dark + `is_live` sticks true. **NOT group-stage blocker** (group games finish
+  in-window; knockouts have no `fifa_match_id` yet, `predictex-i9k`). The rfm plan's "closes `predictex-d17`"
+  claim is OVERSTATED — true only for matches ending ≤150min post-kickoff. **Fix before knockouts:** bump
+  `@post_min ~210` and/or an independent `is_live` auto-clear sweep (robust — self-heals a dropped frame).
+- **`predictex-l3n` (P3)** — capture-system polish: port summary/analyze/format tests, no-op write guard,
+  Recorder `_fixture_id` comment, `handle_info` catchalls.
+- (Dismissed in review: the `Score:0` "falsy-fallback" worry — `0` is not falsy in Elixir; inoculating
+  regression test added in `7e32c46`.)
 
-**NEXT — `predictex-rfm`: auto-start unified live capture. Plan ready + advisor-reviewed.**
-- Plan `docs/superpowers/plans/2026-06-17-auto-capture.md` (**6 TDD tasks, each commit deployable**).
-- ONE producer worker (Oban Cron `*/5`, ~10 min pre-kickoff) fetches `/detail`, publishes
-  `{:snapshot, …}` on PubSub `"fifa:snapshots"` → two subscribers: **Recorder** (persist raw body to
-  `fifa_captures` = the replayable event source) + **`Live.Updater`** (decode→`live_*`→`{:live_update}`
-  = the buzz). Shared **`Predictex.LiveScore`** decoder; `Spike`→permanent **`Predictex.Capture`** (same
-  table); `FifaLiveCapture` retired. Closes the manual-arm gap + the `is_live`-stuck bug (`predictex-d17`).
-- **Advisor watch:** Oban uniqueness `states` MUST exclude `:executing` (Task 6) — else the in-job 30s
-  reschedule dedupes and the chain dies. Commented in the plan.
-
-**Parked backlog (this session's brainstorm, banked as beads):**
-- `predictex-i1s` — match replay engine (stream-based: `Stream.cycle` + `Stream.interval`, any recorded
-  match → isolated demo fixture). Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.
-  Consumes the shared `LiveScore` decoder (lands in rfm).
+**Parked backlog (now unblocked — shared `LiveScore` decoder + `Capture` store exist):**
+- `predictex-i1s` — match replay engine (stream-based; any recorded match → isolated demo fixture).
+  Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`. Consumes the shared `LiveScore`.
 - `predictex-cil` — admin start/stop replay button (depends on i1s).
-- `predictex-4ya` — deferred: persist-in-producer (lossless recording) — revisit if replay shows gaps.
+- `predictex-4ya` — deferred (now unblocked): persist-in-producer (lossless recording) — revisit if replay shows gaps.
 - `predictex-aqf` — FixtureLive scenario/buzz label-casing polish (P4).
 
 ## Stack & toolchain
