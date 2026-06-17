@@ -34,28 +34,31 @@ defmodule Predictex.Demo do
     %{name: "Leo", email: "leo@#{@demo_domain}"}
   ]
 
-  # Varied scoreline predictions per player index.
-  # Index 0 (Sav) calls results exactly → highest total.
-  # Each subsequent player misses one more fixture or picks a wrong outcome.
-  # The "live" fixture (non-completed, last in fixture list) gets different
-  # scorelines for every player so next-goal scenarios shuffle the order.
+  # Scoreline palette — a spread of plausible results. Each (player, fixture)
+  # pair picks deterministically from this so that, on ANY single fixture, the
+  # six demo players hold ~six different scorelines. That divergence is what
+  # makes the live "buzz" move: when a goal goes in, different players' points
+  # jump by different amounts, so ranks actually shuffle (overtakes, headlines).
   #
-  # Format: {home_goals, away_goals, booster?}
-  # One booster per player (used on a different completed fixture each time).
-  @scorelines_by_player_index [
-    # Sav: exact on all completed fixtures, favourite on live
-    [{3, 2, true}, {2, 0, false}, {4, 1, false}, {1, 0, false}],
-    # Dave: exact on 2, correct outcome on 1, wrong on 1
-    [{3, 2, false}, {2, 0, true}, {3, 1, false}, {0, 1, false}],
-    # Mia: exact on 1, correct outcome on 2, wrong on 1
-    [{3, 2, false}, {1, 0, false}, {4, 1, true}, {2, 1, false}],
-    # Tom: correct outcome on 2, wrong on 2
-    [{2, 1, false}, {2, 0, false}, {2, 0, false}, {1, 1, false}],
-    # Priya: correct outcome on 1, wrong on 3
-    [{1, 0, false}, {1, 0, false}, {2, 1, true}, {3, 1, false}],
-    # Leo: wrong outcomes on most completed, different live pick
-    [{0, 0, false}, {0, 1, false}, {1, 2, false}, {0, 2, true}]
+  # The step constants (player*7, fixture*3) are coprime-ish with the palette
+  # length (10), so both axes spread well without clustering.
+  @palette [
+    {1, 0},
+    {2, 1},
+    {1, 1},
+    {0, 0},
+    {2, 0},
+    {0, 1},
+    {1, 2},
+    {3, 1},
+    {0, 2},
+    {2, 2}
   ]
+
+  defp scoreline(player_idx, fixture_idx) do
+    {h, a} = Enum.at(@palette, rem(player_idx * 7 + fixture_idx * 3, length(@palette)))
+    {h, a}
+  end
 
   @doc """
   Seed ~6 demo players with varied predictions across existing fixtures.
@@ -92,19 +95,17 @@ defmodule Predictex.Demo do
       players
       |> Enum.with_index()
       |> Enum.reduce(0, fn {player, player_idx}, total ->
-        scorelines = Enum.at(@scorelines_by_player_index, player_idx, [])
-
         fixtures
         |> Enum.with_index()
         |> Enum.reduce(0, fn {fixture, fix_idx}, count ->
-          {home, away, booster} = Enum.at(scorelines, fix_idx, {1, 0, false})
+          {home, away} = scoreline(player_idx, fix_idx)
 
           case Predictions.admin_upsert_prediction(%{
                  player_id: player.id,
                  fixture_id: fixture.id,
                  home_goals: home,
                  away_goals: away,
-                 booster: booster
+                 booster: false
                }) do
             {:ok, _} -> count + 1
             {:error, _} -> count
