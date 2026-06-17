@@ -42,9 +42,10 @@ New migration on `fixtures`:
 ### `Predictex.Workers.LiveScoreSync` (new)
 Sibling of `Workers.FifaLiveCapture`: windowed self-reschedule, injectable fetch
 (`:live_score_fetch_fun`), Gather → Decide → Act.
-- **Live detection via `/now` membership** — robust without us having confirmed the live
-  `MatchStatus` code: a fixture is live iff its `IdMatch` appears in
-  `/api/v3/live/football/now`. (Detail endpoint supplies score + minute.)
+- **Live detection via detail endpoint** — the per-match detail endpoint is polled; a
+  fixture is considered live iff `MatchStatus not in [0, 1]` (0 = finished, 1 = upcoming).
+  This is robust to any unconfirmed live `MatchStatus` codes, since every non-terminal,
+  non-upcoming status is treated as in-play. (Detail endpoint also supplies score + minute.)
 - **Act:** set `is_live: true`, `live_home_goals`, `live_away_goals`, `live_minute` on the
   matched fixture (crosswalk: FIFA `IdMatch` == `fifaId` in `rounds.json`; or date+team
   via `Fifa.Crosswalk`). On finish (no longer in `/now`): set `is_live: false`, leave the

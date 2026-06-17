@@ -151,6 +151,44 @@ defmodule PredictexWeb.FixtureLiveTest do
     assert render(lv) =~ "90"
   end
 
+  test "is_live transition tick triggers full recompute and shows LIVE indicator", %{conn: conn} do
+    # Drives the `old.is_live != new.is_live` branch in handle_info.
+    # Mount on a past-kickoff fixture that is NOT yet live (is_live: false, no live score).
+    # The score starts at nil/0, so score_changed? stays false on the transition tick —
+    # only the is_live flip triggers load_all. After the update, the LIVE badge renders.
+    FunWithFlags.enable(:live_buzz)
+    viewer = player_fixture(%{display_name: "Viewer"})
+    round = round!()
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+
+    {:ok, fx} =
+      Tournament.create_fixture(%{
+        external_ref: "islive-#{System.unique_integer([:positive])}",
+        team1: "Portugal",
+        team2: "Morocco",
+        round_id: round.id,
+        kickoff_at: past,
+        status: :live,
+        is_live: false
+      })
+
+    {:ok, lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+    refute html =~ "LIVE"
+
+    # Transition: flip is_live true and set a live score (score also changes on the same
+    # DB write, which is the realistic production path — LiveScoreSync sets both atomically).
+    {:ok, _} =
+      Tournament.update_fixture(fx, %{
+        is_live: true,
+        live_home_goals: 1,
+        live_away_goals: 0,
+        live_minute: "32'"
+      })
+
+    send(lv.pid, {:live_update, fx.id})
+    assert render(lv) =~ "LIVE"
+  end
+
   test "score-change tick re-renders updated score", %{conn: conn} do
     FunWithFlags.enable(:live_buzz)
     viewer = player_fixture(%{display_name: "Viewer"})

@@ -57,6 +57,8 @@ defmodule PredictexWeb.LeaderboardLiveTest do
     # a count of fixtures rather than a points total.
     assert html =~ "30 from fixtures · 20 bonus"
     refute html =~ "30 fixtures ·"
+    # flag is off (setup disables it) — "Live now" card must be absent
+    refute html =~ "Live now"
   end
 
   test "shows a Live now card linking to the drill-down when flag on", %{conn: conn} do

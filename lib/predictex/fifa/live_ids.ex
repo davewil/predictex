@@ -22,12 +22,16 @@ defmodule Predictex.Fifa.LiveIds do
     end
   end
 
-  @doc "Fetch rounds.json (injectable) and write fifa_match_id. Returns {ok, total}."
+  @doc """
+  Writes `fifa_match_id` for each fixture matched in `rounds` and returns `{ok_count, total}`.
+  The caller is responsible for fetching and passing `rounds`; this function does not fetch.
+  """
   def assign(rounds) do
     by_id = Map.new(Tournament.list_fixtures(), &{&1.id, &1})
 
     plan(rounds, Map.values(by_id))
     |> Enum.reduce({0, 0}, fn %{fixture_id: fid, fifa_match_id: mid}, {ok, total} ->
+      # Safe: fid always comes from by_id's own keyset (produced by plan/2), so fetch! cannot miss.
       case Tournament.update_fixture(Map.fetch!(by_id, fid), %{fifa_match_id: mid}) do
         {:ok, _} -> {ok + 1, total + 1}
         {:error, _} -> {ok, total + 1}

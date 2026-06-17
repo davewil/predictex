@@ -123,6 +123,9 @@ defmodule PredictexWeb.PredictexComponents do
   ## Examples
 
       <.fixture_card fx={fx} stage={@active.round.stage} fifa_url={@fifa_url} />
+      <.fixture_card fx={fx} stage={@active.round.stage} fifa_url={@fifa_url} live_buzz?={@live_buzz?} />
+
+  `live_buzz?` defaults to `false` and can be omitted when the feature flag is off.
   """
   attr :fx, :map, required: true
   attr :stage, :atom, required: true

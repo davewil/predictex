@@ -48,7 +48,7 @@ defmodule PredictexWeb.FixtureLive do
     {:noreply, socket}
   end
 
-  # Compute all assigns from scratch (used at mount and when score changes).
+  # Compute all assigns from scratch (mount + any material state change).
   defp load_all(socket, fixture) do
     now = DateTime.utc_now()
     locked? = Predictions.locked?(fixture, now)
