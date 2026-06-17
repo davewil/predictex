@@ -20,7 +20,13 @@ defmodule Predictex.Workers.FifaLiveCapture do
 
       bin/predictex rpc "Predictex.Spike.list_captures(\\"400021502\\") |> length()"
   """
-  use Oban.Worker, queue: :default, max_attempts: 1
+  # max_attempts: 3 — `capture_one` already rescues, and `reschedule` is the last
+  # statement, so the only way `perform` raises is `Oban.insert` itself failing, in
+  # which case nothing was scheduled and a retry is the safe, wanted behaviour. The
+  # case that must not silently die is the wait-job failing when it fires at the window
+  # start: a retry there is the difference between full capture and zero capture for a
+  # match that can't be replayed. Worst case is a couple of near-duplicate rows.
+  use Oban.Worker, queue: :default, max_attempts: 3
 
   require Logger
 
