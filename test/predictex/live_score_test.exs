@@ -51,6 +51,19 @@ defmodule Predictex.LiveScoreTest do
     assert %{live_home_goals: 2, live_away_goals: 1} = LiveScore.attrs_from_body(body, f)
   end
 
+  test "attrs_from_body/2 keeps a genuine 0-0 score (Score: 0 is not falsy-dropped)" do
+    f = fixture(%{live_home_goals: 2, live_away_goals: 1})
+
+    body = %{
+      "MatchStatus" => 3,
+      "MatchTime" => "5'",
+      "HomeTeam" => %{"Score" => 0},
+      "AwayTeam" => %{"Score" => 0}
+    }
+
+    assert %{live_home_goals: 0, live_away_goals: 0} = LiveScore.attrs_from_body(body, f)
+  end
+
   test "apply_to_fixture/2 writes only live_* and broadcasts on change" do
     f = fixture(%{status: :scheduled})
     Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{f.id}")
