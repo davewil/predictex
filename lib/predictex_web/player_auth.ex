@@ -290,6 +290,28 @@ defmodule PredictexWeb.PlayerAuth do
     end
   end
 
+  @doc """
+  Plug for routes that require the player to be an admin.
+
+  The plug-level counterpart of the `:require_admin` `on_mount` hook (which only
+  runs for LiveViews). Used to gate forwarded plug routers — e.g. the FunWithFlags
+  dashboard. Assumes `:fetch_current_scope_for_player` has already run in the
+  pipeline, and is chained after `require_authenticated_player/2`, so a logged-out
+  user is redirected to login first and this only ever rejects authenticated
+  non-admins (to `/`).
+  """
+  def require_admin_player(conn, _opts) do
+    if conn.assigns.current_scope && conn.assigns.current_scope.player &&
+         conn.assigns.current_scope.player.is_admin do
+      conn
+    else
+      conn
+      |> put_flash(:error, "You must be an admin to access this page.")
+      |> redirect(to: ~p"/")
+      |> halt()
+    end
+  end
+
   defp maybe_store_return_to(%{method: "GET"} = conn) do
     put_session(conn, :player_return_to, current_path(conn))
   end

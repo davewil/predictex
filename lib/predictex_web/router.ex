@@ -82,6 +82,15 @@ defmodule PredictexWeb.Router do
     post "/players/update-password", PlayerSessionController, :update_password
   end
 
+  # FunWithFlags admin dashboard — forwarded plug router, so it needs the
+  # plug-level admin guard (the on_mount :require_admin hook only covers LiveViews).
+  # Chained require_authenticated -> require_admin mirrors the :require_admin live_session.
+  scope path: "/admin/feature-flags" do
+    pipe_through [:browser, :require_authenticated_player, :require_admin_player]
+
+    forward "/", FunWithFlags.UI.Router, namespace: "admin/feature-flags"
+  end
+
   scope "/", PredictexWeb do
     pipe_through [:browser]
 
