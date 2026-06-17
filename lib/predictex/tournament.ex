@@ -49,6 +49,8 @@ defmodule Predictex.Tournament do
 
   def list_fixtures, do: Repo.all(Fixture)
 
+  def list_live_fixtures, do: Repo.all(from f in Fixture, where: f.is_live == true)
+
   def count_fixtures, do: Repo.aggregate(Fixture, :count)
 
   def completed_fixture_count do

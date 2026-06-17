@@ -10,13 +10,17 @@ defmodule PredictexWeb.LeaderboardLive do
   @impl true
   def mount(_params, _session, socket) do
     standings = Standings.leaderboard()
+    live_buzz? = FunWithFlags.enabled?(:live_buzz)
+    live_fixtures = if live_buzz?, do: Tournament.list_live_fixtures(), else: []
 
     {:ok,
      socket
      |> assign(:page_title, "Leaderboard")
      |> assign(:completed, Tournament.completed_fixture_count())
      |> assign(:standings, standings)
-     |> assign(:whatsapp_text, whatsapp_text(standings))}
+     |> assign(:whatsapp_text, whatsapp_text(standings))
+     |> assign(:live_buzz?, live_buzz?)
+     |> assign(:live_fixtures, live_fixtures)}
   end
 
   @impl true
@@ -44,6 +48,17 @@ defmodule PredictexWeb.LeaderboardLive do
             📋 Copy WhatsApp text
           </button>
         </div>
+
+        <section :if={@live_buzz? and @live_fixtures != []} class="mb-4">
+          <h2 class="font-semibold">Live now</h2>
+          <ul>
+            <li :for={f <- @live_fixtures}>
+              <.link navigate={~p"/fixtures/#{f.id}"}>
+                {f.team1} v {f.team2} — {f.live_home_goals}-{f.live_away_goals}
+              </.link>
+            </li>
+          </ul>
+        </section>
 
         <div :if={@standings == []} class="rounded-box bg-base-200 p-6 text-center">
           <p class="font-medium">No players yet</p>
