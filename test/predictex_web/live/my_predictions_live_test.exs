@@ -1,5 +1,7 @@
 defmodule PredictexWeb.MyPredictionsLiveTest do
-  use PredictexWeb.ConnCase, async: true
+  # async: false because the live_buzz flag test mutates global FunWithFlags state (ETS)
+  # and would race with other async tests.
+  use PredictexWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import Predictex.AccountsFixtures
@@ -87,5 +89,39 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
 
     html = lv |> element("button", "Matchday 2") |> render_click()
     assert html =~ "Japan"
+  end
+
+  test "shows live score on the card only when the flag is on", %{conn: conn, round: round} do
+    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
+
+    player = player_fixture(%{display_name: "LiveTester"})
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+
+    live_fx =
+      fixture!(round, %{
+        kickoff_at: past,
+        status: :live,
+        is_live: true,
+        live_home_goals: 1,
+        live_away_goals: 0,
+        live_minute: "23'"
+      })
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: player.id,
+        fixture_id: live_fx.id,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    FunWithFlags.disable(:live_buzz)
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    refute html =~ "LIVE"
+
+    FunWithFlags.enable(:live_buzz)
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    assert html =~ "LIVE"
+    assert html =~ "1-0"
   end
 end

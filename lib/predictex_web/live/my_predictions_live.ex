@@ -18,7 +18,8 @@ defmodule PredictexWeb.MyPredictionsLive do
      |> assign(:page_title, "My Predictions")
      |> assign(:dash, dash)
      |> assign(:active_ordinal, active)
-     |> assign(:fifa_url, Application.get_env(:predictex, :fifa_predictor_url))}
+     |> assign(:fifa_url, Application.get_env(:predictex, :fifa_predictor_url))
+     |> assign(:live_buzz?, FunWithFlags.enabled?(:live_buzz))}
   end
 
   @impl true
@@ -91,6 +92,7 @@ defmodule PredictexWeb.MyPredictionsLive do
             fx={fx}
             stage={@active.round.stage}
             fifa_url={@fifa_url}
+            live_buzz?={@live_buzz?}
           />
         </div>
 

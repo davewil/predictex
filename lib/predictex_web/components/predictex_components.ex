@@ -127,6 +127,7 @@ defmodule PredictexWeb.PredictexComponents do
   attr :fx, :map, required: true
   attr :stage, :atom, required: true
   attr :fifa_url, :string, default: nil
+  attr :live_buzz?, :boolean, default: false
 
   def fixture_card(assigns) do
     assigns =
@@ -153,6 +154,11 @@ defmodule PredictexWeb.PredictexComponents do
         <span>{kickoff(@fx.fixture.kickoff_at)}</span>
         <span class={status_color(@fx)}>{status_label(@fx)}</span>
       </div>
+
+      <%!-- live score badge — only when :live_buzz feature flag is on and fixture is in play --%>
+      <span :if={@live_buzz? and @fx.fixture.is_live} class="font-bold text-error">
+        LIVE {@fx.fixture.live_minute} · {@fx.fixture.live_home_goals}-{@fx.fixture.live_away_goals}
+      </span>
 
       <%!-- teams + the player's predicted scoreline --%>
       <div class="mt-3 flex items-center justify-center gap-2.5">
