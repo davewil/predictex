@@ -16,16 +16,26 @@ defmodule Predictex.BuzzTest do
 
     {:ok, fx} =
       Tournament.create_fixture(%{
-        external_ref: "x", team1: "Portugal", team2: "Congo DR", round_id: r.id,
-        kickoff_at: ~U[2026-06-17 17:00:00Z], status: :live,
-        live_home_goals: 0, live_away_goals: 0
+        external_ref: "x",
+        team1: "Portugal",
+        team2: "Congo DR",
+        round_id: r.id,
+        kickoff_at: ~U[2026-06-17 17:00:00Z],
+        status: :live,
+        live_home_goals: 0,
+        live_away_goals: 0
       })
 
     # Completed fixture in the same round — Bob predicts wrong outcome (0-1 vs actual 1-0).
     {:ok, completed_fx} =
       Tournament.create_fixture(%{
-        external_ref: "y", team1: "Spain", team2: "Brazil", round_id: r.id,
-        status: :completed, home_goals: 1, away_goals: 0
+        external_ref: "y",
+        team1: "Spain",
+        team2: "Brazil",
+        round_id: r.id,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
       })
 
     ana = player_fixture(%{display_name: "Ana", email: "a@b.c"})
@@ -34,15 +44,22 @@ defmodule Predictex.BuzzTest do
     # Ana predicts the live fixture (admin path bypasses kickoff lockout)
     {:ok, _} =
       Predictions.admin_upsert_prediction(%{
-        player_id: ana.id, fixture_id: fx.id, home_goals: 1, away_goals: 0
+        player_id: ana.id,
+        fixture_id: fx.id,
+        home_goals: 1,
+        away_goals: 0
       })
 
     # Bob predicts 3-1 on actual 1-0: outcome correct (+10), goals wrong → 10 pts base.
     # Round not complete (live fixture present) → no round bonus. Bob at 10, Ana at 0
     # at base. In home_next projection Ana earns exact (30) > Bob (10) → rank flip.
-    {:ok, _} = Predictions.create_prediction(%{
-      player_id: bob.id, fixture_id: completed_fx.id, home_goals: 3, away_goals: 1
-    })
+    {:ok, _} =
+      Predictions.create_prediction(%{
+        player_id: bob.id,
+        fixture_id: completed_fx.id,
+        home_goals: 3,
+        away_goals: 1
+      })
 
     %{fx: fx, ana: ana, bob: bob}
   end

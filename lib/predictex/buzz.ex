@@ -8,9 +8,21 @@ defmodule Predictex.Buzz do
   @doc "The three scenario leaderboards for the current live score."
   def scenarios(fixture_id, home, away) do
     [
-      %{key: :end_now, label: "if it ends #{home}-#{away}", leaderboard: Standings.project(fixture_id, home, away)},
-      %{key: :home_next, label: "if home scores next", leaderboard: Standings.project(fixture_id, home + 1, away)},
-      %{key: :away_next, label: "if away scores next", leaderboard: Standings.project(fixture_id, home, away + 1)}
+      %{
+        key: :end_now,
+        label: "if it ends #{home}-#{away}",
+        leaderboard: Standings.project(fixture_id, home, away)
+      },
+      %{
+        key: :home_next,
+        label: "if home scores next",
+        leaderboard: Standings.project(fixture_id, home + 1, away)
+      },
+      %{
+        key: :away_next,
+        label: "if away scores next",
+        leaderboard: Standings.project(fixture_id, home, away + 1)
+      }
     ]
   end
 
