@@ -60,6 +60,7 @@ defmodule PredictexWeb.Router do
 
     live_session :require_authenticated_player,
       on_mount: [{PredictexWeb.PlayerAuth, :require_authenticated}] do
+      live "/fixtures/:id", FixtureLive, :show
       live "/predictions", MyPredictionsLive, :index
       live "/import", ImportLive, :index
       live "/players/settings", PlayerLive.Settings, :edit
