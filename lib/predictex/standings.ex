@@ -24,8 +24,7 @@ defmodule Predictex.Standings do
 
   @doc "Ranked standings for the whole league, sorted by total (desc), ties by name."
   def leaderboard do
-    fixtures = Repo.all(from f in Fixture, preload: :round)
-    players = Repo.all(from p in Player, preload: :predictions)
+    {players, fixtures} = load_ranking_inputs()
     rank(players, fixtures)
   end
 
@@ -47,7 +46,31 @@ defmodule Predictex.Standings do
     |> Enum.sort_by(&{-&1.total, &1.name})
   end
 
+  @doc """
+  Projected leaderboard as if `fixture_id` finished `home`-`away`. Swaps that one fixture
+  to `:completed` in memory and reuses the pure `rank/2`, so booster, risky/cohort, and
+  round bonus are all honoured. Persists nothing.
+  """
+  def project(fixture_id, home, away) do
+    {players, fixtures} = load_ranking_inputs()
+
+    projected =
+      Enum.map(fixtures, fn f ->
+        if f.id == fixture_id,
+          do: %{f | status: :completed, home_goals: home, away_goals: away},
+          else: f
+      end)
+
+    rank(players, projected)
+  end
+
   # --- internals ---
+
+  defp load_ranking_inputs do
+    fixtures = Repo.all(from f in Fixture, preload: :round)
+    players = Repo.all(from p in Player, preload: :predictions)
+    {players, fixtures}
+  end
 
   defp score_player(player, fixtures_by_id, rounds_meta) do
     scored =
