@@ -1,44 +1,42 @@
-defmodule Predictex.Spike do
+defmodule Predictex.Capture do
   @moduledoc """
-  SPIKE (predictex-70h) — throwaway helpers for the FIFA live-feed capture.
+  Permanent capture store for raw FIFA v3 API responses (predictex-rfm).
 
-  `record_capture/1` persists one raw API response; `list_captures/1` reads a match's
+  `record_snapshot/1` persists one raw API response; `list_snapshots/1` reads a match's
   capture timeline back. `summary/1` prints (and returns) an analysis of a captured
   match — status/score transitions, the distinct `MatchStatus` values seen, the first
   populated `now` entry, and the goal timeline — so the post-match readout is one call:
 
-      bin/predictex rpc "Predictex.Spike.summary(\\"400021502\\")"
-
-  Remove once LiveScoreSync ships and the `fifa_captures` table is dropped.
+      bin/predictex rpc "Predictex.Capture.summary(\\"400021502\\")"
   """
   import Ecto.Query, only: [from: 2]
 
   alias Predictex.Repo
-  alias Predictex.Spike.FifaCapture
+  alias Predictex.Capture.Snapshot
 
-  def record_capture(attrs) do
-    %FifaCapture{}
-    |> FifaCapture.changeset(attrs)
+  def record_snapshot(attrs) do
+    %Snapshot{}
+    |> Snapshot.changeset(attrs)
     |> Repo.insert()
   end
 
-  def list_captures(match_id) do
+  def list_snapshots(match_id) do
     Repo.all(
-      from c in FifaCapture,
+      from c in Snapshot,
         where: c.match_id == ^match_id,
         order_by: [asc: c.captured_at]
     )
   end
 
-  @doc "Read a match's captures, print a human summary, and return the analysis map."
+  @doc "Read a match's snapshots, print a human summary, and return the analysis map."
   def summary(match_id) do
-    result = match_id |> list_captures() |> analyze()
+    result = match_id |> list_snapshots() |> analyze()
     IO.puts(format(result))
     result
   end
 
   @doc """
-  Pure analysis of a capture list. Returns a map with the capture counts, the distinct
+  Pure analysis of a snapshot list. Returns a map with the capture counts, the distinct
   `MatchStatus` values seen, the status/score `transitions` (one row each time status or
   score changed), the first populated `now` entry, and the goal timeline from the last
   detail snapshot (scorer ids resolved to names via the embedded `Players`).

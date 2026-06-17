@@ -1,10 +1,5 @@
-defmodule Predictex.Spike.FifaCapture do
-  @moduledoc """
-  SPIKE (predictex-70h) — one raw FIFA v3 API response captured during a match window.
-
-  Throwaway analysis table: `body` is the decoded JSON as-is, `error` is set instead
-  when the fetch failed. Drop the table + this module once LiveScoreSync is built.
-  """
+defmodule Predictex.Capture.Snapshot do
+  @moduledoc "One raw FIFA v3 API response captured during a match window (predictex-rfm)."
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -20,8 +15,8 @@ defmodule Predictex.Spike.FifaCapture do
 
   @fields [:captured_at, :endpoint, :url, :match_id, :http_status, :body, :error]
 
-  def changeset(capture, attrs) do
-    capture
+  def changeset(snapshot, attrs) do
+    snapshot
     |> cast(attrs, @fields)
     |> validate_required([:captured_at, :endpoint, :url, :match_id])
   end
