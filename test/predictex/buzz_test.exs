@@ -76,4 +76,40 @@ defmodule Predictex.BuzzTest do
     lines = Buzz.narratives(fx.id, 0, 0, ana.id)
     assert Enum.any?(lines, &String.contains?(&1, "you"))
   end
+
+  test "scenarios_with_deltas/3 rows carry rank, prev_rank and delta", %{fx: fx, ana: ana} do
+    # Base: Bob #1 (10 pts), Ana #2 (0 pts). In :home_next (1-0) Ana earns 30 pts → #1,
+    # Bob drops to #2. Ana's delta should be prev_rank(2) - rank(1) = +1 (climbed).
+    result = Buzz.scenarios_with_deltas(fx.id, 0, 0)
+
+    home_next = Enum.find(result, &(&1.key == :home_next))
+    assert home_next != nil
+
+    ana_row = Enum.find(home_next.rows, &(&1.player_id == ana.id))
+    assert ana_row != nil
+    assert ana_row.rank == 1
+    assert ana_row.prev_rank == 2
+    assert ana_row.delta == 1
+  end
+
+  test "headlines/4 includes a movement line and renders 'you' for the viewer", %{
+    fx: fx,
+    ana: ana,
+    bob: bob
+  } do
+    # In :home_next (1-0), Ana climbs from #2 to #1, overtaking Bob.
+    # As the viewer, Ana should see a "you overtake" line.
+    lines = Buzz.headlines(fx.id, 0, 0, ana.id)
+
+    assert length(lines) > 0
+    assert Enum.any?(lines, &String.contains?(&1, "you"))
+
+    assert Enum.any?(
+             lines,
+             &(String.contains?(&1, "overtake") or String.contains?(&1, "moves up to #"))
+           )
+
+    # Bob's name (the overtaken player) should appear in Ana's line
+    assert Enum.any?(lines, &String.contains?(&1, bob.display_name))
+  end
 end
