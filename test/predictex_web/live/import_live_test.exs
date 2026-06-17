@@ -203,6 +203,15 @@ defmodule PredictexWeb.ImportLiveTest do
       refute text =~ "json"
       refute text =~ "console"
     end
+
+    test "the paste box placeholder interpolates the round number (no raw template leak)", ctx do
+      %{conn: conn} = ctx
+      group_round(1)
+      stub_rounds([fifa_round(1, [])])
+      {:ok, _view, html} = live(ua(conn, @iphone), ~p"/import")
+      assert html =~ "Paste your Round 1 picks here"
+      refute html =~ "{@round}"
+    end
   end
 
   describe "desktop bookmarklet import" do

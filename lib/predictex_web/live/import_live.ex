@@ -301,7 +301,7 @@ defmodule PredictexWeb.ImportLive do
         name="paste[json]"
         rows="6"
         class="textarea textarea-bordered w-full"
-        placeholder="Paste your Round {@round} picks here"
+        placeholder={"Paste your Round #{@round} picks here"}
       ></textarea>
       <button type="submit" class="btn btn-primary mt-2">Check my picks</button>
     </form>
