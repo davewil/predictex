@@ -75,8 +75,10 @@ stay fast).
   hooks installed (`bd hooks install`, which sets `core.hooksPath`). If `lefthook` is absent
   the block no-ops (install it to restore the gate).
 - **Never `git commit --no-verify`.** Bypassing the gate is a process defect, not a shortcut —
-  it relocates the failure to CI. A Claude Code PreToolUse hook (`scripts/guard-no-verify.sh`,
-  wired in `.claude/settings.json`) blocks the agent from doing it.
+  it relocates the failure to CI. A Claude Code PreToolUse hook (`scripts/guard-no-verify.py`,
+  wired in `.claude/settings.json`) blocks the agent from doing it — it tokenizes the command
+  (shlex) so quoted flags, `-nm`-style clusters, `bash -c` subshells, and `-c core.hooksPath`
+  are all caught, while flags merely named inside a commit message are not.
 - **If CI catches something the gate missed, fix the gate first** (add the check to `precommit`),
   then fix the bug — every recurring failure class earns a permanent check.
 
