@@ -32,7 +32,7 @@ the app scores them against real results and ranks a leaderboard.
   `/import`). `/predictions` only *displays* them.
 
 ## ⏵ Continue here (2026-06-18)
-Two threads are healthy and shipped; the open thread is the **dev-tooling gate** (one item left to verify).
+Two threads are healthy and shipped; the **dev-tooling gate is now fully closed** (`unx`/`kvo`/`0cf` all done).
 
 **Live capture + buzz — DONE and live (v0.11.0–v0.11.4).** Auto-start unified capture (`rfm`) is validated
 end-to-end on full matches (Ghana v Panama: 167 frames, `is_live` cleared cleanly, two-writer rule held).
@@ -49,23 +49,21 @@ against them produced a tooling backlog, now mostly shipped:
   --no-verify` is blocked by a tokenizing Claude Code PreToolUse hook (`scripts/guard-no-verify.py`).
 - **`kvo` ✓** — `credo --strict` (tuned `.credo.exs`) in the gate + CI; `sobelow` in CI (baseline in
   `.sobelow-skips`). Verified green in CI.
-- **`0cf` ◐ IN PROGRESS** — `scripts/pre-deploy` written (mix precommit + sobelow + docker build + a
-  `bin/predictex eval` boot smoke test). **Logic + gate steps verified; the docker build+boot path is
-  UNVERIFIED** — this sandbox blocks egress to the Tailwind release host (`mix assets.setup` fails), though
-  the same Dockerfile builds in CI and shipped v0.11.4 today. **TO CLOSE: run `scripts/pre-deploy` once on a
-  networked machine (Mac/OrbStack) and confirm build+boot pass.**
+- **`0cf` ✓** — `scripts/pre-deploy` (mix precommit + sobelow + docker build + a `bin/predictex eval` boot
+  smoke test). **Verified end-to-end on Mac/OrbStack (Docker 29.4.0):** ran green through all four steps —
+  the `mix assets.setup` Tailwind/esbuild download (which failed under the egress-blocked sandbox) succeeds
+  on a networked machine — reaching `== pre-deploy OK — safe to tag ==`. Run it before every `git tag vX.Y.Z`.
 
 **NEXT — recommended (`bd ready`):**
-1. **Verify + close `0cf`** (one local `scripts/pre-deploy` run).
-2. **`predictex-hco` (P2, deadline 2026-06-28)** — knockout readiness. Externally gated: FIFA publishes the
+1. **`predictex-hco` (P2, deadline 2026-06-28)** — knockout readiness. Externally gated: FIFA publishes the
    32 KO `fifa_match_id`s only after the group stage resolves, then backfill via `Fifa.LiveIds.assign`
    (relates `i9k`). ⚠️ **VERIFY before 2026-06-28** (carried from `cvx`): confirm the openfootball feed does
    NOT publish `ft` (→ `status: :completed`) mid-match for knockouts — if it does, `clear_stuck_live/1`'s
    status branch flickers (benign) rather than blacks out the buzz. cvx note has the full reasoning.
-3. **Remaining review backlog (P3):** `uhf` (centralize FunWithFlags reset in DataCase/ConnCase → lets 5
+2. **Remaining review backlog (P3):** `uhf` (centralize FunWithFlags reset in DataCase/ConnCase → lets 5
    flag tests go async, faster gate), `r90` (extract shared admin flash/reload helper), `bl8` (Live.Updater
    rescue: let-it-crash vs justify+test), `y58` (add a CSP header — from kvo's sobelow finding).
-4. **`predictex-i1s` (P3)** — match replay engine; replay a recorded capture onto a demo fixture. ⚠️ England
+3. **`predictex-i1s` (P3)** — match replay engine; replay a recorded capture onto a demo fixture. ⚠️ England
    v Croatia has **0 captures** (pre-`rfm`, lost to the manual-arm gap) → not replayable; guard zero-row
    match_ids (documented on i1s). Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.
 
