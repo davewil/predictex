@@ -84,4 +84,17 @@ defmodule Predictex.LiveScoreTest do
     assert :ok = LiveScore.apply_to_fixture(f, attrs)
     refute_received {:live_update, _id}
   end
+
+  test "clear_live/1 clears is_live, keeps the last score, and broadcasts" do
+    f = fixture(%{is_live: true, live_home_goals: 2, live_away_goals: 1, live_minute: "90'"})
+    Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{f.id}")
+
+    assert :ok = LiveScore.clear_live(f)
+    assert_received {:live_update, _id}
+
+    reloaded = Tournament.get_fixture!(f.id)
+
+    assert %Fixture{is_live: false, live_home_goals: 2, live_away_goals: 1, live_minute: "90'"} =
+             reloaded
+  end
 end

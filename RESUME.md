@@ -43,10 +43,11 @@ shifts via the `tz` lib). `afm` — the live game on `/predictions` is a tappabl
 Verified live on prod (BST `19:00Z→20:00`, GMT `14:30Z→14:30`).
 
 **NEXT — recommended order (`bd ready`):**
-1. **`predictex-cvx` (P2)** — knockout window fix (`@post_min ~210` +/or `is_live` auto-clear sweep).
-   Deadline-driven: blocks `predictex-hco` (knockout-readiness, first KO **2026-06-28**). Small, do it
-   while context is fresh. The group-stage capture proved is_live clears in-window; knockouts (ET/pens
-   ~155-185min) are the gap.
+1. **`predictex-cvx` (P2) — CODE-COMPLETE + REVIEWED (local, unpushed); awaiting prod validation.**
+   Knockout window fix: `@post_min` 150→210 + independent `clear_stuck_live/1` is_live auto-clear sweep
+   (status-`:completed` OR past-window). 353 tests green; details in the Follow-ups section below. **TODO:**
+   commit + deploy (tag `vX.Y.Z`, additive) — then validate on the first knockout (**2026-06-28**); also
+   blocks `predictex-hco` and needs the 32 KO fixtures backfilled with `fifa_match_id` (`predictex-i9k`).
 2. **`predictex-i1s` (P3)** — match replay engine. Now unblocked (consumes shared `LiveScore` + `Capture`);
    replay the 167-frame Ghana/Panama or 696-frame Portugal capture onto a demo fixture. The rewarding build.
 
@@ -75,12 +76,25 @@ the producer ~10min before each kickoff automatically — confirm `fifa_captures
 goes live with NO manual rpc. The old manual `rpc "Predictex.Spike.summary(\"<id>\")"` readout is now
 `Predictex.Capture.summary("<id>")`.
 
-**⚠️ Follow-ups filed from the whole-branch review:**
-- **`predictex-cvx` (P2 bug)** — producer window `@post_min 150` truncates knockout ET/penalties
-  (~155-185min) → buzz goes dark + `is_live` sticks true. **NOT group-stage blocker** (group games finish
-  in-window; knockouts have no `fifa_match_id` yet, `predictex-i9k`). The rfm plan's "closes `predictex-d17`"
-  claim is OVERSTATED — true only for matches ending ≤150min post-kickoff. **Fix before knockouts:** bump
-  `@post_min ~210` and/or an independent `is_live` auto-clear sweep (robust — self-heals a dropped frame).
+**⚠️ Follow-ups from the whole-branch review:**
+- **`predictex-cvx` (P2 bug) — CODE-COMPLETE + REVIEWED (pending prod validation on a knockout).**
+  Producer window `@post_min 150` truncated knockout ET/penalties (~155-185min) → buzz went dark +
+  `is_live` stuck true. **Fix shipped as code (a)+(b):** (a) `@post_min` 150→**210** (covers ET+pens+the
+  finished frame); (b) `LiveScoreSync.clear_stuck_live/1` — an **independent `is_live` auto-clear sweep**
+  that runs every tick (incl. the `*/5` cron ticks after the self-chain stops) and clears `is_live` when
+  openfootball marks `status: :completed` (authoritative; clears ≤~15min even *in-window*) OR kickoff is
+  past the window (time backstop for a double feed failure). New pure `LiveScore.clear_live/1` retains the
+  last score, clears `is_live`, broadcasts `{:live_update}`. `reschedule()` now runs **before**
+  publish/sweep so a crash there can't kill the 30s chain. Reviewed (code-reviewer: no blockers); 353 tests.
+  - This **genuinely addresses `predictex-d17`** (the status-branch self-heals an endpoint-stall stuck flag
+    even while the chain is alive) — so the rfm plan's earlier "closes d17" claim, *overstated for rfm*, is
+    true *for cvx*. d17 notes updated; close both after the same prod check.
+  - **Deliberately NOT gating publish on `status`** — openfootball derives `:completed` from a *regulation*
+    FT score, so it could in principle flag a knockout `:completed` mid-ET; gating publish on that would
+    blank the buzz during the shootout peak. FIFA drives capture; `:completed` only *clears*, where the
+    worst case is a benign flicker, not a blackout. ⚠️ **VERIFY before 2026-06-28:** confirm the openfootball
+    feed does not publish `ft` (→ `:completed`) mid-match for knockouts; if it does, the sweep's status
+    branch flickers (acceptable) rather than blacks out.
 - **`predictex-l3n` (P3)** — capture-system polish: port summary/analyze/format tests, no-op write guard,
   Recorder `_fixture_id` comment, `handle_info` catchalls.
 - (Dismissed in review: the `Score:0` "falsy-fallback" worry — `0` is not falsy in Elixir; inoculating

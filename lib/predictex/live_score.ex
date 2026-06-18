@@ -44,4 +44,20 @@ defmodule Predictex.LiveScore do
         err
     end
   end
+
+  @doc """
+  Clear `is_live` (retaining the last captured `live_*` score) and broadcast.
+
+  Self-heals a fixture left stuck `is_live: true` when the finished frame that would
+  have cleared it never arrived — e.g. a knockout ran past the producer window, or the
+  FIFA detail endpoint stopped returning 200 post-match (predictex-cvx / predictex-d17).
+  """
+  def clear_live(fixture) do
+    apply_to_fixture(fixture, %{
+      is_live: false,
+      live_home_goals: fixture.live_home_goals,
+      live_away_goals: fixture.live_away_goals,
+      live_minute: fixture.live_minute
+    })
+  end
 end

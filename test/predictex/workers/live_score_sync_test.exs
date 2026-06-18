@@ -10,20 +10,38 @@ defmodule Predictex.Workers.LiveScoreSyncTest do
   end
 
   defp window_fixture do
-    {:ok, r} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})
-    # kickoff 1 min ago: inside [kickoff-10min, kickoff+150min]
+    fixture(%{external_ref: "x", fifa_match_id: "400021502"})
+  end
+
+  defp fixture(attrs) do
+    # Share one round per test (ordinal is unique + must be 1..8) so a test can
+    # create several fixtures without colliding.
+    round =
+      Tournament.get_round_by_ordinal(1) ||
+        (
+          {:ok, r} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})
+          r
+        )
+
     {:ok, f} =
-      Tournament.create_fixture(%{
-        external_ref: "x",
-        team1: "A",
-        team2: "B",
-        round_id: r.id,
-        kickoff_at: DateTime.add(DateTime.utc_now(), -60),
-        fifa_match_id: "400021502"
-      })
+      Tournament.create_fixture(
+        Map.merge(
+          %{
+            external_ref: "x",
+            team1: "A",
+            team2: "B",
+            round_id: round.id,
+            # kickoff 1 min ago: inside the capture window by default
+            kickoff_at: DateTime.add(DateTime.utc_now(), -60)
+          },
+          attrs
+        )
+      )
 
     f
   end
+
+  defp minutes_ago(m), do: DateTime.add(DateTime.utc_now(), -m * 60)
 
   test "publishes a snapshot per in-window fixture and reschedules" do
     f = window_fixture()
@@ -88,5 +106,97 @@ defmodule Predictex.Workers.LiveScoreSyncTest do
 
     assert :ok = perform_job(Live, %{})
     refute_enqueued(worker: Live)
+  end
+
+  test "window covers a fixture +180min after kickoff (knockout ET/penalties stay live)" do
+    f = fixture(%{external_ref: "et", kickoff_at: minutes_ago(180), fifa_match_id: "555"})
+    Phoenix.PubSub.subscribe(Predictex.PubSub, "fifa:snapshots")
+    put_fetch(fn _url -> {:ok, 200, %{"MatchStatus" => 3}} end)
+
+    assert :ok = perform_job(Live, %{})
+    assert_received {:snapshot, fixture_id, _body, _at, "555", _url}
+    assert fixture_id == f.id
+  end
+
+  test "clears a :completed fixture's is_live while the chain runs for a concurrent live match (d17 fast-path)" do
+    done =
+      fixture(%{
+        external_ref: "done",
+        kickoff_at: minutes_ago(100),
+        fifa_match_id: "777",
+        is_live: true,
+        status: :completed
+      })
+
+    # a concurrent, genuinely-live match keeps the self-reschedule chain alive
+    _live =
+      fixture(%{
+        external_ref: "ongoing",
+        kickoff_at: minutes_ago(60),
+        fifa_match_id: "778",
+        is_live: true,
+        status: :scheduled
+      })
+
+    Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{done.id}")
+    put_fetch(fn _url -> {:ok, 200, %{"MatchStatus" => 3}} end)
+
+    assert :ok = perform_job(Live, %{})
+    assert_received {:live_update, fixture_id}
+    assert fixture_id == done.id
+    assert %{is_live: false} = Tournament.get_fixture!(done.id)
+    # chain still alive on account of the ongoing match — the sweep cleared independently
+    assert_enqueued(worker: Live)
+  end
+
+  test "clears is_live for a stuck fixture past the window (time backstop)" do
+    f =
+      fixture(%{
+        external_ref: "stuck",
+        kickoff_at: minutes_ago(250),
+        is_live: true,
+        status: :scheduled
+      })
+
+    Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{f.id}")
+
+    assert :ok = perform_job(Live, %{})
+    assert_received {:live_update, fixture_id}
+    assert fixture_id == f.id
+    assert %{is_live: false} = Tournament.get_fixture!(f.id)
+  end
+
+  test "does not clear a genuinely-live in-window fixture" do
+    f =
+      fixture(%{
+        external_ref: "livegame",
+        kickoff_at: minutes_ago(60),
+        fifa_match_id: "888",
+        is_live: true,
+        status: :scheduled
+      })
+
+    put_fetch(fn _url -> {:ok, 200, %{"MatchStatus" => 3}} end)
+
+    assert :ok = perform_job(Live, %{})
+    assert %{is_live: true} = Tournament.get_fixture!(f.id)
+  end
+
+  test "a swept fixture is not re-broadcast on the next tick" do
+    f =
+      fixture(%{
+        external_ref: "twice",
+        kickoff_at: minutes_ago(250),
+        is_live: true,
+        status: :scheduled
+      })
+
+    Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{f.id}")
+
+    assert :ok = perform_job(Live, %{})
+    assert_received {:live_update, _}
+
+    assert :ok = perform_job(Live, %{})
+    refute_received {:live_update, _}
   end
 end
