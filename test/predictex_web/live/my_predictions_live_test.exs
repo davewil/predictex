@@ -124,4 +124,49 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert html =~ "LIVE"
     assert html =~ "1-0"
   end
+
+  test "live badge links to the fixture drill-down when live_buzz is on and fixture is live",
+       %{conn: conn, round: round} do
+    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
+    FunWithFlags.enable(:live_buzz)
+
+    player = player_fixture(%{display_name: "CTATester"})
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+
+    live_fx =
+      fixture!(round, %{
+        kickoff_at: past,
+        status: :live,
+        is_live: true,
+        live_home_goals: 2,
+        live_away_goals: 1,
+        live_minute: "67'"
+      })
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: player.id,
+        fixture_id: live_fx.id,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    assert html =~ ~s(href="/fixtures/#{live_fx.id}")
+  end
+
+  test "live badge is not a link when fixture is not live", %{conn: conn, round: round} do
+    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
+    FunWithFlags.enable(:live_buzz)
+
+    player = player_fixture(%{display_name: "NotLiveTester"})
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    _fx = fixture!(round, %{kickoff_at: future, is_live: false})
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    refute html =~ ~s(href="/fixtures/)
+  end
 end

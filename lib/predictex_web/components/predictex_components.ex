@@ -158,6 +158,7 @@ defmodule PredictexWeb.PredictexComponents do
   attr :stage, :atom, required: true
   attr :fifa_url, :string, default: nil
   attr :live_buzz?, :boolean, default: false
+  attr :live_path, :string, default: nil
 
   def fixture_card(assigns) do
     assigns =
@@ -186,7 +187,19 @@ defmodule PredictexWeb.PredictexComponents do
       </div>
 
       <%!-- live score badge — only when :live_buzz feature flag is on and fixture is in play --%>
-      <span :if={@live_buzz? and @fx.fixture.is_live} class="font-bold text-error">
+      <%!-- when live_path is set the badge is a CTA link to the live drill-down --%>
+      <.link
+        :if={@live_buzz? and @fx.fixture.is_live and @live_path}
+        navigate={@live_path}
+        class="inline-flex items-center gap-1 font-bold text-error hover:underline"
+      >
+        LIVE {@fx.fixture.live_minute} · {@fx.fixture.live_home_goals}-{@fx.fixture.live_away_goals}
+        <span aria-hidden="true">›</span>
+      </.link>
+      <span
+        :if={@live_buzz? and @fx.fixture.is_live and is_nil(@live_path)}
+        class="font-bold text-error"
+      >
         LIVE {@fx.fixture.live_minute} · {@fx.fixture.live_home_goals}-{@fx.fixture.live_away_goals}
       </span>
 
