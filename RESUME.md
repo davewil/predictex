@@ -12,10 +12,12 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.1`  (v0.10.x = Live Buzz `/fixtures/:id` + FunWithFlags admin +
-  buzz redesign + demo variety; **v0.11.0 = auto-start unified live capture `predictex-rfm`**;
-  **v0.11.1 = server-side per-viewer kickoff times `fb5` + live-game CTA on `/predictions` `afm`**.
-  `:live_buzz` flag is **ON** in prod.)
+- **Latest deployed tag:** `v0.11.4`. Recent: **v0.11.0** auto-start unified live capture (`rfm`);
+  **v0.11.1** server-side per-viewer kickoff times (`fb5`) + live-game CTA on `/predictions` (`afm`);
+  **v0.11.2** knockout ET/pens capture window + `is_live` auto-clear sweep (`cvx`/`d17`);
+  **v0.11.3** `/predictions` live CTA opens 30 min pre-kickoff → live → post-match recap (`4zu`);
+  **v0.11.4** next-match countdown banner on `/predictions` (`vg7`, ungated — low-impact).
+  `:live_buzz` flag is **ON** in prod.
 - **League invite code:** `wcpredict2026`
 - **Prod state:** 12 fixtures synced. **Admin console (`/admin`) + My Predictions
   (`/predictions`) live; results + cohort now auto-sync (Oban).** Admins can enter predictions
@@ -29,89 +31,65 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
-## ⏵ Continue here — auto-capture LIVE + VALIDATED on prod (v0.11.1, 2026-06-18)
-`predictex-rfm` (auto-start unified live capture) is **DEPLOYED (v0.11.0) and VALIDATED end-to-end on a
-full match.** Ghana v Panama (fixture 68, `fifa_match_id` 400021510) auto-captured: **167 frames over
-~83 min**, `is_live` cleared cleanly on completion, openfootball owned `status/home_goals` (1-0) — the
-two-writer rule held live. No manual arming. FIFA contract: bd memory `fifa-v3-live-api-contract`; live
-`MatchStatus` = **3**.
+## ⏵ Continue here (2026-06-18)
+Two threads are healthy and shipped; the open thread is the **dev-tooling gate** (one item left to verify).
 
-**v0.11.1 also shipped (closed):** `fb5` — kickoff times now render in each viewer's **local timezone**
-server-side (JS reports the IANA zone via LiveSocket `_tz` connect-param + a `tz` cookie → `:browser`
-plug → session; `PredictexWeb.TimeZone` on_mount assigns `@tz`; pure `PredictexWeb.TimeHelpers.kickoff/2`
-shifts via the `tz` lib). `afm` — the live game on `/predictions` is a tappable **CTA** to `/fixtures/:id`.
-Verified live on prod (BST `19:00Z→20:00`, GMT `14:30Z→14:30`).
+**Live capture + buzz — DONE and live (v0.11.0–v0.11.4).** Auto-start unified capture (`rfm`) is validated
+end-to-end on full matches (Ghana v Panama: 167 frames, `is_live` cleared cleanly, two-writer rule held).
+Knockout ET/pens window + `is_live` auto-clear sweep shipped (`cvx`/`d17`). `/predictions` shows a live CTA
+to `/fixtures/:id` from 30 min pre-kickoff → live → post-match recap (`4zu`) and a next-match countdown
+banner (`vg7`). FIFA contract: bd memory `fifa-v3-live-api-contract` (live `MatchStatus` = **3**).
 
-**NEXT — recommended order (`bd ready`):**
-1. **`predictex-cvx` (P2) — CODE-COMPLETE + REVIEWED (local, unpushed); awaiting prod validation.**
-   Knockout window fix: `@post_min` 150→210 + independent `clear_stuck_live/1` is_live auto-clear sweep
-   (status-`:completed` OR past-window). 353 tests green; details in the Follow-ups section below. **TODO:**
-   commit + deploy (tag `vX.Y.Z`, additive) — then validate on the first knockout (**2026-06-28**); also
-   blocks `predictex-hco` and needs the 32 KO fixtures backfilled with `fifa_match_id` (`predictex-i9k`).
-2. **`predictex-i1s` (P3)** — match replay engine. Now unblocked (consumes shared `LiveScore` + `Capture`);
-   replay the 167-frame Ghana/Panama or 696-frame Portugal capture onto a demo fixture. The rewarding build.
+**Dev gate — built this session (principles review → `unx`/`kvo`/`0cf`).** The repo gained
+`docs/{engineering-principles,software-delivery-principles}.md` + `docs/ELIXIR_CODE_SMELLS.md`; a review
+against them produced a tooling backlog, now mostly shipped:
+- **`unx` ✓** — commit-boundary gate: `lefthook.yml` runs `mix precommit` (compile/deps/format/credo/test)
+  on every Elixir-staging commit. Beads owns `core.hooksPath`, so the gate is invoked from the committed
+  `.beads/hooks/pre-commit` *outside* the beads markers (no separate `lefthook install`). `git commit
+  --no-verify` is blocked by a tokenizing Claude Code PreToolUse hook (`scripts/guard-no-verify.py`).
+- **`kvo` ✓** — `credo --strict` (tuned `.credo.exs`) in the gate + CI; `sobelow` in CI (baseline in
+  `.sobelow-skips`). Verified green in CI.
+- **`0cf` ◐ IN PROGRESS** — `scripts/pre-deploy` written (mix precommit + sobelow + docker build + a
+  `bin/predictex eval` boot smoke test). **Logic + gate steps verified; the docker build+boot path is
+  UNVERIFIED** — this sandbox blocks egress to the Tailwind release host (`mix assets.setup` fails), though
+  the same Dockerfile builds in CI and shipped v0.11.4 today. **TO CLOSE: run `scripts/pre-deploy` once on a
+  networked machine (Mac/OrbStack) and confirm build+boot pass.**
+
+**NEXT — recommended (`bd ready`):**
+1. **Verify + close `0cf`** (one local `scripts/pre-deploy` run).
+2. **`predictex-hco` (P2, deadline 2026-06-28)** — knockout readiness. Externally gated: FIFA publishes the
+   32 KO `fifa_match_id`s only after the group stage resolves, then backfill via `Fifa.LiveIds.assign`
+   (relates `i9k`). ⚠️ **VERIFY before 2026-06-28** (carried from `cvx`): confirm the openfootball feed does
+   NOT publish `ft` (→ `status: :completed`) mid-match for knockouts — if it does, `clear_stuck_live/1`'s
+   status branch flickers (benign) rather than blacks out the buzz. cvx note has the full reasoning.
+3. **Remaining review backlog (P3):** `uhf` (centralize FunWithFlags reset in DataCase/ConnCase → lets 5
+   flag tests go async, faster gate), `r90` (extract shared admin flash/reload helper), `bl8` (Live.Updater
+   rescue: let-it-crash vs justify+test), `y58` (add a CSP header — from kvo's sobelow finding).
+4. **`predictex-i1s` (P3)** — match replay engine; replay a recorded capture onto a demo fixture. ⚠️ England
+   v Croatia has **0 captures** (pre-`rfm`, lost to the manual-arm gap) → not replayable; guard zero-row
+   match_ids (documented on i1s). Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.
 
 **DEPLOY:** tag `vX.Y.Z` (additive; no migration so far). **Do NOT deploy mid-capture** — the container
 recreate interrupts the running producer chain (the `*/5` cron re-arms within ~5min, but you lose frames).
-Wait for the in-progress match to finish, as we did for v0.11.1.
+Wait for the in-progress match to finish.
 
-**What shipped (`predictex-rfm`, v0.11.0) — producer/PubSub-subscriber architecture:**
-- **`Predictex.LiveScore`** — shared PURE decoder (`attrs_from_body/2`, `apply_to_fixture/2`); single
-  source of the body→`live_*`→broadcast contract (the replay engine `predictex-i1s` consumes it too).
-- **`Predictex.Capture`** + `Capture.Snapshot` — the spike store promoted to a permanent home (same
-  `fifa_captures` table, no migration); `FifaLiveCapture` + `Predictex.Spike` RETIRED. **Ops rename:
-  `Spike.summary/1` → `Capture.summary/1`.**
-- **Two supervised, config-gated subscribers** on PubSub `"fifa:snapshots"`: `Capture.Recorder`
-  (persists raw bodies = replayable event source) + `Live.Updater` (decode→`live_*`→`{:live_update}`
-  buzz). `:one_for_one`; gated OFF in test (`:start_capture_subscribers`).
-- **`Workers.LiveScoreSync` is now the PRODUCER**: pre-kickoff-windowed, self-rescheduling (30s), writes
-  NO fixture column — publishes `{:snapshot, fixture_id, body, captured_at, fifa_match_id, url}` per
-  in-window fixture. **Auto-started by Oban Cron `*/5`** with `unique: [period: 40, states: [:scheduled]]`
-  — the ONLY value that excludes `:executing` (so the in-job reschedule survives) AND compiles
-  warning-clean on Oban 2.23 (`warn_unique/1` job.ex:844 special case). Two-writer rule holds.
-- **Closes the manual-arm gap** (we lost England v Croatia to it). No more `rpc ".start()"`.
-
-**DEPLOY RUNBOOK (when you decide):** tag `vX.Y.Z` (additive, no migration). After deploy the Cron arms
-the producer ~10min before each kickoff automatically — confirm `fifa_captures` gains rows + `/fixtures/:id`
-goes live with NO manual rpc. The old manual `rpc "Predictex.Spike.summary(\"<id>\")"` readout is now
-`Predictex.Capture.summary("<id>")`.
-
-**⚠️ Follow-ups from the whole-branch review:**
-- **`predictex-cvx` (P2 bug) — CODE-COMPLETE + REVIEWED (pending prod validation on a knockout).**
-  Producer window `@post_min 150` truncated knockout ET/penalties (~155-185min) → buzz went dark +
-  `is_live` stuck true. **Fix shipped as code (a)+(b):** (a) `@post_min` 150→**210** (covers ET+pens+the
-  finished frame); (b) `LiveScoreSync.clear_stuck_live/1` — an **independent `is_live` auto-clear sweep**
-  that runs every tick (incl. the `*/5` cron ticks after the self-chain stops) and clears `is_live` when
-  openfootball marks `status: :completed` (authoritative; clears ≤~15min even *in-window*) OR kickoff is
-  past the window (time backstop for a double feed failure). New pure `LiveScore.clear_live/1` retains the
-  last score, clears `is_live`, broadcasts `{:live_update}`. `reschedule()` now runs **before**
-  publish/sweep so a crash there can't kill the 30s chain. Reviewed (code-reviewer: no blockers); 353 tests.
-  - This **genuinely addresses `predictex-d17`** (the status-branch self-heals an endpoint-stall stuck flag
-    even while the chain is alive) — so the rfm plan's earlier "closes d17" claim, *overstated for rfm*, is
-    true *for cvx*. d17 notes updated; close both after the same prod check.
-  - **Deliberately NOT gating publish on `status`** — openfootball derives `:completed` from a *regulation*
-    FT score, so it could in principle flag a knockout `:completed` mid-ET; gating publish on that would
-    blank the buzz during the shootout peak. FIFA drives capture; `:completed` only *clears*, where the
-    worst case is a benign flicker, not a blackout. ⚠️ **VERIFY before 2026-06-28:** confirm the openfootball
-    feed does not publish `ft` (→ `:completed`) mid-match for knockouts; if it does, the sweep's status
-    branch flickers (acceptable) rather than blacks out.
-- **`predictex-l3n` (P3)** — capture-system polish: port summary/analyze/format tests, no-op write guard,
-  Recorder `_fixture_id` comment, `handle_info` catchalls.
-- (Dismissed in review: the `Score:0` "falsy-fallback" worry — `0` is not falsy in Elixir; inoculating
-  regression test added in `7e32c46`.)
-
-**Parked backlog (now unblocked — shared `LiveScore` decoder + `Capture` store exist):**
-- `predictex-i1s` — match replay engine (stream-based; any recorded match → isolated demo fixture).
-  Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`. Consumes the shared `LiveScore`.
-- `predictex-cil` — admin start/stop replay button (depends on i1s).
-- `predictex-4ya` — deferred (now unblocked): persist-in-producer (lossless recording) — revisit if replay shows gaps.
-- `predictex-aqf` — FixtureLive scenario/buzz label-casing polish (P4).
+**Capture architecture (shipped, `rfm`):** `Predictex.LiveScore` (pure body→`live_*`→broadcast decoder,
+also consumed by the replay engine) · `Predictex.Capture` + `Capture.Snapshot` (permanent `fifa_captures`
+store; **ops: `Capture.summary("<id>")`**, the old `Spike.summary` is retired) · two supervised PubSub
+subscribers on `"fifa:snapshots"` (`Capture.Recorder` persists raw bodies; `Live.Updater`
+decode→`live_*`→`{:live_update}`) · `Workers.LiveScoreSync` is the PRODUCER, auto-started by Oban Cron
+`*/5` with `unique: [period: 40, states: [:scheduled]]` (the only value that survives the in-job reschedule
+AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`, openfootball owns
+`status`/final score.
 
 ## Stack & toolchain
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **333 tests** green (incl. 7 property laws). Gates: `mix test`, `mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix deps.unlock --check-unused`.
+- **367 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
+  deps.unlock --check-unused, format --check-formatted, **credo --strict**, test) — run on every Elixir commit
+  by lefthook and by CI's Quality job (CI also runs `sobelow`). Single source = the `precommit` alias in
+  mix.exs; tuning in `.credo.exs`/`.sobelow-skips`. Details: CLAUDE.md "Build & Test". Never `--no-verify`.
 - **Oban 2.23** (Postgres-backed jobs) added in v0.5.0 — supervised in `application.ex`, cron in `config.exs`, `testing: :manual` in tests. The substrate for `xox` next.
 
 ## Architecture (Gather → Decide → Act; pure cores, effects at edges)
@@ -214,10 +192,12 @@ playability unlock** — admins can now enter predictions on behalf of players. 
   openfootball name-snapshot + regression test remain.
 - `08p` Harden `Predictions.save_round_row/3` vs direct-API misuse (P4; not UI-reachable today).
 
-## Done (shipped, this session)
+## Earlier milestones (shipped)
 - **`a02` admin console** (v0.4.0/v0.4.1) · **`mt6` automated result-sync** + **`7ux` FIFA cohort
   auto-sync** (v0.5.0, Oban). Specs/plans in `docs/superpowers/{specs,plans}/2026-06-15-admin-console*`,
   `2026-06-16-result-sync-automation*`, `2026-06-16-cohort-sync*`.
+- **Recent (v0.11.x, see "Live right now"):** `rfm` auto-capture · `fb5` per-viewer tz · `afm`+`4zu` live
+  CTA + recap · `vg7` countdown · `cvx`/`d17` KO window. **Dev gate:** `unx` lefthook gate · `kvo` credo+sobelow.
 
 ## Conventions & gotchas (learned the hard way)
 - **Tracking is beads (`bd`)**, not TodoWrite/markdown TODOs. `bd ready`, `bd show <id>`, `bd update <id> --claim`, `bd close <id>`.
