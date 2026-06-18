@@ -111,6 +111,33 @@ defmodule PredictexWeb.PredictexComponents do
   end
 
   @doc """
+  Renders a kickoff time in the viewer's local timezone via the `LocalTime` JS hook.
+
+  The server renders the UTC time as a no-JS fallback (labeled "UTC"). The `LocalTime`
+  hook replaces the text on mount with the browser's local timezone equivalent.
+  When `at` is nil, renders a plain "TBC" span.
+
+  Requires a unique `id` — used by the `phx-hook` binding.
+
+  ## Examples
+
+      <.local_time at={@fixture.kickoff_at} id={"kickoff-card-\#{@fx.fixture.id}"} />
+      <.local_time at={@fixture.kickoff_at} id={"kickoff-\#{@fixture.id}"} />
+  """
+  attr :at, :any, default: nil
+  attr :id, :string, required: true
+
+  def local_time(%{at: nil} = assigns), do: ~H"<span>TBC</span>"
+
+  def local_time(assigns) do
+    ~H"""
+    <time id={@id} phx-hook="LocalTime" datetime={DateTime.to_iso8601(@at)}>
+      {Calendar.strftime(@at, "%a %d %b · %H:%M")} UTC
+    </time>
+    """
+  end
+
+  @doc """
   The reused FixtureCard — one player's pick for one fixture, in every state:
   result-in (with EXACT + points), booster 2×, locked, open (edit on FIFA),
   no-pick-imported, and knockout (first-team / first-scorer).
@@ -154,7 +181,7 @@ defmodule PredictexWeb.PredictexComponents do
 
       <%!-- header: kickoff + status --%>
       <div class="flex justify-between pr-12 text-[10px] font-semibold uppercase tracking-wider text-base-content/55">
-        <span>{kickoff(@fx.fixture.kickoff_at)}</span>
+        <.local_time at={@fx.fixture.kickoff_at} id={"kickoff-card-#{@fx.fixture.id}"} />
         <span class={status_color(@fx)}>{status_label(@fx)}</span>
       </div>
 
@@ -394,9 +421,6 @@ defmodule PredictexWeb.PredictexComponents do
   defp side_label(:home, fixture), do: "#{Flags.flag(fixture.team1)} #{fixture.team1}"
   defp side_label(:away, fixture), do: "#{Flags.flag(fixture.team2)} #{fixture.team2}"
   defp side_label(_, _), do: "—"
-
-  defp kickoff(nil), do: "TBC"
-  defp kickoff(%DateTime{} = dt), do: Calendar.strftime(dt, "%a %d %b · %H:%M")
 
   defp chip_tone("success"), do: "bg-success/15 text-success"
   defp chip_tone("accent"), do: "bg-accent/15 text-accent"

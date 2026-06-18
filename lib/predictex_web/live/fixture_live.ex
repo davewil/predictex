@@ -120,7 +120,7 @@ defmodule PredictexWeb.FixtureLive do
             :if={not @fixture.is_live}
             class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
           >
-            {kickoff(@fixture.kickoff_at)}
+            <.local_time at={@fixture.kickoff_at} id={"kickoff-#{@fixture.id}"} />
           </p>
         </div>
 
@@ -220,7 +220,4 @@ defmodule PredictexWeb.FixtureLive do
     do: Phoenix.HTML.raw(~s(<span class="text-error">▼#{abs(delta)}</span>))
 
   defp movement(_), do: Phoenix.HTML.raw(~s(<span class="text-base-content/25">–</span>))
-
-  defp kickoff(nil), do: "TBC"
-  defp kickoff(%DateTime{} = dt), do: Calendar.strftime(dt, "%a %d %b · %H:%M UTC")
 end
