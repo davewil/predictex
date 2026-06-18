@@ -66,6 +66,15 @@ the comments there) runs in the gate and CI. **sobelow** runs in CI; its accepte
 lives in `.sobelow-skips` (a missing CSP — tracked separately — and a low-confidence
 `File.read!` on a trusted admin path). New findings beyond the baseline fail CI.
 
+### Before tagging a release: `scripts/pre-deploy`
+
+Run `scripts/pre-deploy` before `git tag vX.Y.Z`. It's the deploy-boundary half of the gate:
+`mix precommit` + `mix sobelow` + a local **Docker image build** + a **release-boot smoke
+test** (`bin/predictex eval`, with dummy secrets — it doesn't start the endpoint or hit the
+DB). This catches a broken image or a release that won't boot on your machine, instead of
+after a tag burns a full build/deploy CI cycle. (`docker-compose.prod.yml` lives on the
+server, not the repo, so compose-config validation isn't part of the local script.)
+
 ### The pre-commit gate (jidoka — no local↔remote seam)
 
 Every commit that stages Elixir files runs `mix precommit`, so a change that would fail CI

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# scripts/pre-deploy (predictex-0cf) — local production-surface verification.
+#
+# Run this BEFORE tagging a release (`git tag vX.Y.Z`). It mirrors the checks CI's Deploy
+# job relies on, so a broken build or a release that won't boot fails on your machine in
+# seconds instead of after a tag + a full build/deploy CI cycle (the deploy-boundary half
+# of the shift-left gate; the commit-boundary half is `mix precommit` via lefthook).
+#
+# NOTE: docker-compose.prod.yml lives on the server (/root/predictex), not in this repo, so
+# compose-config validation is not done here — the image build + release-boot smoke test are
+# the locally-checkable production surface. The boot test runs `bin/predictex eval`, which
+# evaluates config/runtime.exs (prod) but does NOT start the endpoint or connect to the DB,
+# so dummy secrets are sufficient and nothing external is touched.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+IMAGE="predictex:predeploy"
+
+step() { printf '\n\033[1m== %s ==\033[0m\n' "$1"; }
+fail() { printf '\033[31mFAIL: %s\033[0m\n' "$1" >&2; exit 1; }
+
+command -v docker >/dev/null 2>&1 || fail "docker not found (needed for the image build + boot check)"
+
+step "Quality gate — mix precommit (compile · deps · format · credo · test)"
+mix precommit
+
+step "Security scan — sobelow"
+mix sobelow --skip --exit Low
+
+step "Docker image build"
+docker build -t "$IMAGE" .
+
+step "Release boot smoke test — bin/predictex eval"
+boot_out=$(docker run --rm \
+  -e SECRET_KEY_BASE=predeploy_dummy_secret_key_base_at_least_sixty_four_characters_xxxxx \
+  -e DATABASE_URL=ecto://postgres:postgres@localhost/predictex_predeploy \
+  -e LEAGUE_INVITE_CODE=predeploy \
+  "$IMAGE" bin/predictex eval "IO.puts(:boot_ok)" 2>&1 || true)
+if ! printf '%s' "$boot_out" | grep -q "boot_ok"; then
+  printf '%s\n' "$boot_out" | tail -30
+  fail "release did not boot"
+fi
+
+printf '\n\033[32m== pre-deploy OK — safe to tag ==\033[0m\n'
