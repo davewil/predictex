@@ -160,6 +160,7 @@ defmodule PredictexWeb.PredictexComponents do
   attr :stage, :atom, required: true
   attr :fifa_url, :string, default: nil
   attr :live_buzz?, :boolean, default: false
+  attr :live_cta?, :boolean, default: false
   attr :live_path, :string, default: nil
   attr :tz, :string, default: "Etc/UTC"
 
@@ -189,15 +190,14 @@ defmodule PredictexWeb.PredictexComponents do
         <span class={status_color(@fx)}>{status_label(@fx)}</span>
       </div>
 
-      <%!-- live score badge — only when :live_buzz feature flag is on and fixture is in play --%>
-      <%!-- when live_path is set the badge is a CTA link to the live drill-down --%>
+      <%!-- live drill-down CTA — flag-gated; opens 30m pre-kickoff, runs through live, --%>
+      <%!-- then stays as a post-match recap (predictex-4zu). Label varies by match state. --%>
       <.link
-        :if={@live_buzz? and @fx.fixture.is_live and @live_path}
+        :if={@live_buzz? and @live_cta? and @live_path}
         navigate={@live_path}
-        class="inline-flex items-center gap-1 font-bold text-error hover:underline"
+        class={["inline-flex items-center gap-1 font-bold hover:underline", cta_color(@fx)]}
       >
-        LIVE {@fx.fixture.live_minute} · {@fx.fixture.live_home_goals}-{@fx.fixture.live_away_goals}
-        <span aria-hidden="true">›</span>
+        {cta_label(@fx)} <span aria-hidden="true">›</span>
       </.link>
       <span
         :if={@live_buzz? and @fx.fixture.is_live and is_nil(@live_path)}
@@ -428,6 +428,17 @@ defmodule PredictexWeb.PredictexComponents do
   defp status_label(%{status: :completed}), do: "Full time"
   defp status_label(%{locked?: true}), do: "🔒 Locked"
   defp status_label(_), do: "● Open"
+
+  # Live drill-down CTA wording + colour by match state (predictex-4zu): live score while
+  # in play, "Match recap" once full-time, "Match preview" in the pre-kickoff window.
+  defp cta_label(%{fixture: %{is_live: true} = f}),
+    do: "LIVE #{f.live_minute} · #{f.live_home_goals}-#{f.live_away_goals}"
+
+  defp cta_label(%{status: :completed}), do: "Match recap"
+  defp cta_label(_fx), do: "Match preview"
+
+  defp cta_color(%{fixture: %{is_live: true}}), do: "text-error"
+  defp cta_color(_fx), do: "text-primary"
 
   defp home_score(nil), do: "–"
   defp home_score(p), do: p.home_goals

@@ -128,6 +128,21 @@ defmodule Predictex.Predictions do
   def locked?(%Fixture{kickoff_at: nil}, _now), do: false
   def locked?(%Fixture{kickoff_at: kickoff}, now), do: DateTime.compare(now, kickoff) != :lt
 
+  # The live drill-down (FixtureLive) CTA opens this long before kickoff.
+  @cta_lead_seconds 30 * 60
+
+  @doc """
+  Whether the live drill-down CTA should be offered for a fixture at `now`.
+
+  Open-ended from `@cta_lead_seconds` (30 min) before kickoff onwards: it covers the
+  pre-kickoff preview window, the live match, and stays afterwards as a post-match recap
+  (predictex-4zu). Pure — the caller supplies `now`.
+  """
+  def cta_window?(%Fixture{kickoff_at: nil}, _now), do: false
+
+  def cta_window?(%Fixture{kickoff_at: kickoff}, now),
+    do: DateTime.compare(now, DateTime.add(kickoff, -@cta_lead_seconds, :second)) != :lt
+
   # --- internals ---
 
   defp fetch_fixture(attrs) do

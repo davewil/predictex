@@ -156,7 +156,7 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert html =~ ~s(href="/fixtures/#{live_fx.id}")
   end
 
-  test "live badge is not a link when fixture is not live", %{conn: conn, round: round} do
+  test "no CTA more than 30 minutes before kickoff", %{conn: conn, round: round} do
     on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
     FunWithFlags.enable(:live_buzz)
 
@@ -164,6 +164,48 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
 
     _fx = fixture!(round, %{kickoff_at: future, is_live: false})
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    refute html =~ ~s(href="/fixtures/)
+  end
+
+  test "CTA opens 30 min before kickoff with a 'Match preview' label",
+       %{conn: conn, round: round} do
+    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
+    FunWithFlags.enable(:live_buzz)
+
+    player = player_fixture(%{display_name: "PreviewTester"})
+    soon = DateTime.utc_now() |> DateTime.add(20 * 60, :second) |> DateTime.truncate(:second)
+    fx = fixture!(round, %{kickoff_at: soon, is_live: false})
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    assert html =~ ~s(href="/fixtures/#{fx.id}")
+    assert html =~ "Match preview"
+  end
+
+  test "CTA stays after full-time as a 'Match recap' link", %{conn: conn, round: round} do
+    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
+    FunWithFlags.enable(:live_buzz)
+
+    player = player_fixture(%{display_name: "RecapTester"})
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+    fx = fixture!(round, %{kickoff_at: past, status: :completed, home_goals: 2, away_goals: 1})
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    assert html =~ ~s(href="/fixtures/#{fx.id}")
+    assert html =~ "Match recap"
+  end
+
+  test "no CTA inside the window when live_buzz is off", %{conn: conn, round: round} do
+    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
+    FunWithFlags.disable(:live_buzz)
+
+    player = player_fixture(%{display_name: "FlagOffTester"})
+    soon = DateTime.utc_now() |> DateTime.add(20 * 60, :second) |> DateTime.truncate(:second)
+    _fx = fixture!(round, %{kickoff_at: soon})
 
     {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
 

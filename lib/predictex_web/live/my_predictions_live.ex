@@ -6,7 +6,7 @@ defmodule PredictexWeb.MyPredictionsLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.Dashboard
+  alias Predictex.{Dashboard, Predictions}
 
   @impl true
   def mount(_params, _session, socket) do
@@ -18,6 +18,7 @@ defmodule PredictexWeb.MyPredictionsLive do
      |> assign(:page_title, "My Predictions")
      |> assign(:dash, dash)
      |> assign(:active_ordinal, active)
+     |> assign(:now, DateTime.utc_now())
      |> assign(:fifa_url, Application.get_env(:predictex, :fifa_predictor_url))
      |> assign(:live_buzz?, FunWithFlags.enabled?(:live_buzz))}
   end
@@ -93,6 +94,7 @@ defmodule PredictexWeb.MyPredictionsLive do
             stage={@active.round.stage}
             fifa_url={@fifa_url}
             live_buzz?={@live_buzz?}
+            live_cta?={Predictions.cta_window?(fx.fixture, @now)}
             live_path={~p"/fixtures/#{fx.fixture.id}"}
             tz={@tz}
           />

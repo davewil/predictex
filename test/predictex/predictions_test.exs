@@ -2,6 +2,7 @@ defmodule Predictex.PredictionsTest do
   use Predictex.DataCase, async: true
 
   alias Predictex.{Predictions, Tournament}
+  alias Predictex.Tournament.Fixture
 
   import Predictex.AccountsFixtures
 
@@ -172,5 +173,38 @@ defmodule Predictex.PredictionsTest do
     preds = Predictions.list_player_predictions(player.id)
     assert length(preds) == 1
     assert hd(preds).fixture_id == f1.id
+  end
+
+  describe "cta_window?/2 (live drill-down CTA visibility)" do
+    @kickoff ~U[2026-06-18 19:00:00Z]
+
+    test "false more than 30 minutes before kickoff" do
+      now = DateTime.add(@kickoff, -31 * 60, :second)
+      refute Predictions.cta_window?(%Fixture{kickoff_at: @kickoff}, now)
+    end
+
+    test "true at exactly 30 minutes before kickoff (boundary)" do
+      now = DateTime.add(@kickoff, -30 * 60, :second)
+      assert Predictions.cta_window?(%Fixture{kickoff_at: @kickoff}, now)
+    end
+
+    test "true within the 30-minute pre-kickoff window" do
+      now = DateTime.add(@kickoff, -5 * 60, :second)
+      assert Predictions.cta_window?(%Fixture{kickoff_at: @kickoff}, now)
+    end
+
+    test "true while the match is live (after kickoff)" do
+      now = DateTime.add(@kickoff, 50 * 60, :second)
+      assert Predictions.cta_window?(%Fixture{kickoff_at: @kickoff}, now)
+    end
+
+    test "true long after kickoff (open-ended, for the post-match recap)" do
+      now = DateTime.add(@kickoff, 3 * 24 * 60 * 60, :second)
+      assert Predictions.cta_window?(%Fixture{kickoff_at: @kickoff}, now)
+    end
+
+    test "false when kickoff is unknown" do
+      refute Predictions.cta_window?(%Fixture{kickoff_at: nil}, DateTime.utc_now())
+    end
   end
 end
