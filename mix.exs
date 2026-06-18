@@ -96,7 +96,14 @@ defmodule Predictex.MixProject do
         "esbuild predictex --minify",
         "phx.digest"
       ],
-      precommit: ["compile --warnings-as-errors", "deps.unlock --unused", "format", "test"]
+      # The single source for the pre-commit gate (lefthook.yml) AND the CI Quality job.
+      # Verify-don't-mutate (--check-formatted / --check-unused) so local == remote exactly.
+      precommit: [
+        "compile --warnings-as-errors",
+        "deps.unlock --check-unused",
+        "format --check-formatted",
+        "test"
+      ]
     ]
   end
 end

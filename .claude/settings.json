@@ -1,5 +1,16 @@
 {
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "command": "$CLAUDE_PROJECT_DIR/scripts/guard-no-verify.sh",
+            "type": "command"
+          }
+        ]
+      }
+    ],
     "PreCompact": [
       {
         "hooks": [

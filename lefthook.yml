@@ -1,0 +1,14 @@
+# Pre-commit gate (predictex-unx) — the single jidoka enforcement point.
+#
+# Runs the SAME checks as CI's Quality job (.github/workflows/ci-deploy.yml):
+# compile --warnings-as-errors, deps.unlock --check-unused, format --check-formatted, test.
+# The `precommit` mix alias (mix.exs) is the single source for that list, so "passes
+# locally" and "passes in CI" cannot diverge — there is no exploitable local↔remote seam.
+#
+# One-time per checkout: `lefthook install` (also run by `mix setup`).
+# The gate only fires when Elixir sources are staged, so docs/beads-only commits stay fast.
+pre-commit:
+  commands:
+    gate:
+      glob: "*.{ex,exs}"
+      run: mix precommit

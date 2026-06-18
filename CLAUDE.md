@@ -53,13 +53,34 @@ bd close <id>         # Complete work
 
 ## Build & Test
 
-_Add your build and test commands here_
-
 ```bash
-# Example:
-# npm install
-# npm test
+mix setup          # deps, db, assets
+mix test           # full suite (creates/migrates the test db first)
+mix precommit      # the gate: compile --warnings-as-errors, deps.unlock --check-unused,
+                   # format --check-formatted, test — the SAME checks CI's Quality job runs
 ```
+
+### The pre-commit gate (jidoka — no local↔remote seam)
+
+Every commit that stages Elixir files runs `mix precommit`, so a change that would fail CI
+fails locally first. `mix precommit` (mix.exs) is the single source for that check list, and
+CI's Quality job runs the same commands — keep them in lockstep. The gate is `lefthook run
+pre-commit` (scoped by a `*.{ex,exs}` glob in `lefthook.yml`, so docs/beads-only commits
+stay fast).
+
+- **Wiring:** beads owns `core.hooksPath` (`.beads/hooks`), so the gate is invoked from the
+  committed `.beads/hooks/pre-commit` (a block *outside* the beads markers, which `bd hooks
+  install` preserves). It runs automatically once beads hooks are active — no separate
+  `lefthook install`. Requirements per checkout: the `lefthook` binary on PATH, and beads
+  hooks installed (`bd hooks install`, which sets `core.hooksPath`). If `lefthook` is absent
+  the block no-ops (install it to restore the gate).
+- **Never `git commit --no-verify`.** Bypassing the gate is a process defect, not a shortcut —
+  it relocates the failure to CI. A Claude Code PreToolUse hook (`scripts/guard-no-verify.sh`,
+  wired in `.claude/settings.json`) blocks the agent from doing it.
+- **If CI catches something the gate missed, fix the gate first** (add the check to `precommit`),
+  then fix the bug — every recurring failure class earns a permanent check.
+
+See `docs/engineering-principles.md` (§1, §5) and `docs/software-delivery-principles.md` (§4, §5).
 
 ## Architecture Overview
 
