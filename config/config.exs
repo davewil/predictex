@@ -79,6 +79,8 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :elixir, :time_zone_database, Tz.TimeZoneDatabase
+
 # Outbound link to the official FIFA Match Predictor (My Predictions dashboard).
 # Overridable at runtime via FIFA_PREDICTOR_URL.
 config :predictex, :fifa_predictor_url, "https://play.fifa.com/match-predictor/match"

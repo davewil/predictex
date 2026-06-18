@@ -25,25 +25,13 @@ import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/predictex"
 import topbar from "../vendor/topbar"
 
-const LocalTime = {
-  mounted() { this.render(); },
-  updated() { this.render(); },
-  render() {
-    const iso = this.el.getAttribute("datetime");
-    if (!iso) return;
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return;
-    const date = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "2-digit", month: "short" }).format(d);
-    const time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
-    this.el.textContent = `${date} · ${time}`;
-  }
-};
-
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
+const tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || "Etc/UTC"
+document.cookie = `tz=${tz}; path=/; max-age=31536000; SameSite=Lax`
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, LocalTime},
+  params: {_csrf_token: csrfToken, _tz: tz},
+  hooks: {...colocatedHooks},
 })
 
 // Show progress bar on live navigation and form submits

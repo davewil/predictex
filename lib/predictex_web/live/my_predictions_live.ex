@@ -94,6 +94,7 @@ defmodule PredictexWeb.MyPredictionsLive do
             fifa_url={@fifa_url}
             live_buzz?={@live_buzz?}
             live_path={~p"/fixtures/#{fx.fixture.id}"}
+            tz={@tz}
           />
         </div>
 

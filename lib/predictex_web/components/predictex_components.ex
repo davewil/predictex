@@ -111,28 +111,30 @@ defmodule PredictexWeb.PredictexComponents do
   end
 
   @doc """
-  Renders a kickoff time in the viewer's local timezone via the `LocalTime` JS hook.
+  Renders a kickoff time in the viewer's local timezone, computed server-side.
 
-  The server renders the UTC time as a no-JS fallback (labeled "UTC"). The `LocalTime`
-  hook replaces the text on mount with the browser's local timezone equivalent.
-  When `at` is nil, renders a plain "TBC" span.
+  `tz` is the viewer's IANA timezone (assigned by the `PredictexWeb.TimeZone`
+  on_mount hook); `PredictexWeb.TimeHelpers.kickoff/2` does the UTC->local shift.
+  The `<time datetime=...>` still carries the canonical UTC ISO8601 for any
+  machine reader. When `at` is nil, renders a plain "TBC" span.
 
-  Requires a unique `id` — used by the `phx-hook` binding.
+  Requires a unique `id`.
 
   ## Examples
 
-      <.local_time at={@fixture.kickoff_at} id={"kickoff-card-\#{@fx.fixture.id}"} />
-      <.local_time at={@fixture.kickoff_at} id={"kickoff-\#{@fixture.id}"} />
+      <.local_time at={@fixture.kickoff_at} id={"kickoff-card-\#{@fx.fixture.id}"} tz={@tz} />
+      <.local_time at={@fixture.kickoff_at} id={"kickoff-\#{@fixture.id}"} tz={@tz} />
   """
   attr :at, :any, default: nil
   attr :id, :string, required: true
+  attr :tz, :string, default: "Etc/UTC"
 
   def local_time(%{at: nil} = assigns), do: ~H"<span>TBC</span>"
 
   def local_time(assigns) do
     ~H"""
-    <time id={@id} phx-hook="LocalTime" datetime={DateTime.to_iso8601(@at)}>
-      {Calendar.strftime(@at, "%a %d %b · %H:%M")} UTC
+    <time id={@id} datetime={DateTime.to_iso8601(@at)}>
+      {PredictexWeb.TimeHelpers.kickoff(@at, @tz)}
     </time>
     """
   end
@@ -159,6 +161,7 @@ defmodule PredictexWeb.PredictexComponents do
   attr :fifa_url, :string, default: nil
   attr :live_buzz?, :boolean, default: false
   attr :live_path, :string, default: nil
+  attr :tz, :string, default: "Etc/UTC"
 
   def fixture_card(assigns) do
     assigns =
@@ -182,7 +185,7 @@ defmodule PredictexWeb.PredictexComponents do
 
       <%!-- header: kickoff + status --%>
       <div class="flex justify-between pr-12 text-[10px] font-semibold uppercase tracking-wider text-base-content/55">
-        <.local_time at={@fx.fixture.kickoff_at} id={"kickoff-card-#{@fx.fixture.id}"} />
+        <.local_time at={@fx.fixture.kickoff_at} id={"kickoff-card-#{@fx.fixture.id}"} tz={@tz} />
         <span class={status_color(@fx)}>{status_label(@fx)}</span>
       </div>
 

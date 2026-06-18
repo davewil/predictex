@@ -13,6 +13,19 @@ defmodule PredictexWeb.Router do
     plug :fetch_current_scope_for_player
     # Classify UA (mobile/desktop); read by LiveViews via the session
     plug PredictexWeb.PlatformPlug
+    # Stash the viewer's IANA tz (set client-side as a cookie) into the session,
+    # so the disconnected mount can render local kickoff times before the socket connects.
+    plug :put_tz
+  end
+
+  # Copy the `tz` cookie (written by app.js) into the session for the on_mount hook.
+  defp put_tz(conn, _opts) do
+    conn = fetch_cookies(conn)
+
+    case conn.cookies["tz"] do
+      tz when is_binary(tz) and tz != "" -> put_session(conn, "tz", tz)
+      _ -> conn
+    end
   end
 
   pipeline :api do
@@ -59,7 +72,10 @@ defmodule PredictexWeb.Router do
     pipe_through [:browser, :require_authenticated_player]
 
     live_session :require_authenticated_player,
-      on_mount: [{PredictexWeb.PlayerAuth, :require_authenticated}] do
+      on_mount: [
+        {PredictexWeb.PlayerAuth, :require_authenticated},
+        {PredictexWeb.TimeZone, :assign_tz}
+      ] do
       live "/fixtures/:id", FixtureLive, :show
       live "/predictions", MyPredictionsLive, :index
       live "/import", ImportLive, :index

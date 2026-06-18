@@ -120,7 +120,7 @@ defmodule PredictexWeb.FixtureLive do
             :if={not @fixture.is_live}
             class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
           >
-            <.local_time at={@fixture.kickoff_at} id={"kickoff-#{@fixture.id}"} />
+            <.local_time at={@fixture.kickoff_at} id={"kickoff-#{@fixture.id}"} tz={@tz} />
           </p>
         </div>
 
