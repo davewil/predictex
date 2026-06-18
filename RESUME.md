@@ -12,8 +12,10 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.10.2`  (v0.10.0 = Live Buzz `/fixtures/:id` + FunWithFlags admin
-  dashboard; v0.10.1 = buzz redesign; v0.10.2 = demo-data variety. `:live_buzz` flag is **ON** in prod.)
+- **Latest deployed tag:** `v0.11.1`  (v0.10.x = Live Buzz `/fixtures/:id` + FunWithFlags admin +
+  buzz redesign + demo variety; **v0.11.0 = auto-start unified live capture `predictex-rfm`**;
+  **v0.11.1 = server-side per-viewer kickoff times `fb5` + live-game CTA on `/predictions` `afm`**.
+  `:live_buzz` flag is **ON** in prod.)
 - **League invite code:** `wcpredict2026`
 - **Prod state:** 12 fixtures synced. **Admin console (`/admin`) + My Predictions
   (`/predictions`) live; results + cohort now auto-sync (Oban).** Admins can enter predictions
@@ -27,14 +29,32 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
-## ⏵ Continue here — auto-capture (`predictex-rfm`) SHIPPED to `main`; deploy is your call (2026-06-18)
-`predictex-rfm` (auto-start unified live capture) is **CODE-COMPLETE, REVIEWED, on `main`, NOT deployed**.
-6-task TDD via subagent-driven-development (commits `4d0c566..7e32c46`), full gate green (**335 tests**),
-whole-branch **opus review: READY-WITH-FIXES, no Critical, 5 invariants hold**. A plain push ran Quality
-CI only — **prod still runs v0.10.2** (the manual-arm capture). **Deploy needs a `vX.Y.Z` tag — your
-production-readiness call.** FIFA contract: bd memory `fifa-v3-live-api-contract`; live `MatchStatus` = **3**.
+## ⏵ Continue here — auto-capture LIVE + VALIDATED on prod (v0.11.1, 2026-06-18)
+`predictex-rfm` (auto-start unified live capture) is **DEPLOYED (v0.11.0) and VALIDATED end-to-end on a
+full match.** Ghana v Panama (fixture 68, `fifa_match_id` 400021510) auto-captured: **167 frames over
+~83 min**, `is_live` cleared cleanly on completion, openfootball owned `status/home_goals` (1-0) — the
+two-writer rule held live. No manual arming. FIFA contract: bd memory `fifa-v3-live-api-contract`; live
+`MatchStatus` = **3**.
 
-**What shipped (`predictex-rfm`) — producer/PubSub-subscriber architecture:**
+**v0.11.1 also shipped (closed):** `fb5` — kickoff times now render in each viewer's **local timezone**
+server-side (JS reports the IANA zone via LiveSocket `_tz` connect-param + a `tz` cookie → `:browser`
+plug → session; `PredictexWeb.TimeZone` on_mount assigns `@tz`; pure `PredictexWeb.TimeHelpers.kickoff/2`
+shifts via the `tz` lib). `afm` — the live game on `/predictions` is a tappable **CTA** to `/fixtures/:id`.
+Verified live on prod (BST `19:00Z→20:00`, GMT `14:30Z→14:30`).
+
+**NEXT — recommended order (`bd ready`):**
+1. **`predictex-cvx` (P2)** — knockout window fix (`@post_min ~210` +/or `is_live` auto-clear sweep).
+   Deadline-driven: blocks `predictex-hco` (knockout-readiness, first KO **2026-06-28**). Small, do it
+   while context is fresh. The group-stage capture proved is_live clears in-window; knockouts (ET/pens
+   ~155-185min) are the gap.
+2. **`predictex-i1s` (P3)** — match replay engine. Now unblocked (consumes shared `LiveScore` + `Capture`);
+   replay the 167-frame Ghana/Panama or 696-frame Portugal capture onto a demo fixture. The rewarding build.
+
+**DEPLOY:** tag `vX.Y.Z` (additive; no migration so far). **Do NOT deploy mid-capture** — the container
+recreate interrupts the running producer chain (the `*/5` cron re-arms within ~5min, but you lose frames).
+Wait for the in-progress match to finish, as we did for v0.11.1.
+
+**What shipped (`predictex-rfm`, v0.11.0) — producer/PubSub-subscriber architecture:**
 - **`Predictex.LiveScore`** — shared PURE decoder (`attrs_from_body/2`, `apply_to_fixture/2`); single
   source of the body→`live_*`→broadcast contract (the replay engine `predictex-i1s` consumes it too).
 - **`Predictex.Capture`** + `Capture.Snapshot` — the spike store promoted to a permanent home (same
