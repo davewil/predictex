@@ -57,8 +57,14 @@ bd close <id>         # Complete work
 mix setup          # deps, db, assets
 mix test           # full suite (creates/migrates the test db first)
 mix precommit      # the gate: compile --warnings-as-errors, deps.unlock --check-unused,
-                   # format --check-formatted, test — the SAME checks CI's Quality job runs
+                   # format --check-formatted, credo --strict, test — same as CI's Quality job
+mix sobelow --skip --exit Low   # security scan (runs in CI; baseline in .sobelow-skips)
 ```
+
+Static analysis: **credo** (`.credo.exs`; alias-order/alias-usage off, nesting max 3 — see
+the comments there) runs in the gate and CI. **sobelow** runs in CI; its accepted baseline
+lives in `.sobelow-skips` (a missing CSP — tracked separately — and a low-confidence
+`File.read!` on a trusted admin path). New findings beyond the baseline fail CI.
 
 ### The pre-commit gate (jidoka — no local↔remote seam)
 

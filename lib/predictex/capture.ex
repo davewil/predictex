@@ -184,7 +184,7 @@ defmodule Predictex.Capture do
     |> Enum.join("\n")
   end
 
-  defp kv(map), do: map |> Enum.map(fn {k, v} -> "#{k}: #{v}" end) |> Enum.join(", ")
+  defp kv(map), do: Enum.map_join(map, ", ", fn {k, v} -> "#{k}: #{v}" end)
 
   defp transitions_block([]), do: "  (none)"
 

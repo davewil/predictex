@@ -1,4 +1,5 @@
 defmodule Predictex.Accounts.PlayerNotifier do
+  @moduledoc false
   import Swoosh.Email
 
   alias Predictex.Mailer

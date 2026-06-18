@@ -1,0 +1,3 @@
+
+Config.CSP: Missing Content-Security-Policy,lib/predictex_web/router.ex:12,2935B81
+Traversal.FileModule: Directory Traversal in `File.read!`,lib/predictex/results/ingest.ex:53,781FBFA

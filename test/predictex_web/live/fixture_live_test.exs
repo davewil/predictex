@@ -7,7 +7,7 @@ defmodule PredictexWeb.FixtureLiveTest do
   import Predictex.AccountsFixtures
   alias Predictex.{Predictions, Tournament}
 
-  defp round!() do
+  defp round! do
     {:ok, r} = Tournament.create_round(%{name: "Final", stage: :knockout, ordinal: 1})
     r
   end

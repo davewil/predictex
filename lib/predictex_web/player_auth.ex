@@ -1,4 +1,5 @@
 defmodule PredictexWeb.PlayerAuth do
+  @moduledoc false
   use PredictexWeb, :verified_routes
 
   import Plug.Conn

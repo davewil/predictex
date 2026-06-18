@@ -66,6 +66,12 @@ jobs:
       - name: Check unused deps
         run: mix deps.unlock --check-unused
 
+      - name: Lint (Credo)
+        run: mix credo --strict
+
+      - name: Security scan (Sobelow)
+        run: mix sobelow --skip --exit Low
+
       - name: Tests
         run: mix test
 

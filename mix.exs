@@ -73,7 +73,9 @@ defmodule Predictex.MixProject do
       {:floki, ">= 0.30.0", only: :test},
       {:fun_with_flags, "~> 1.12"},
       {:fun_with_flags_ui, "~> 1.0"},
-      {:tz, "~> 0.28"}
+      {:tz, "~> 0.28"},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -102,6 +104,7 @@ defmodule Predictex.MixProject do
         "compile --warnings-as-errors",
         "deps.unlock --check-unused",
         "format --check-formatted",
+        "credo --strict",
         "test"
       ]
     ]

@@ -98,9 +98,7 @@ defmodule Predictex.Fifa.Import do
     round = row["round"]
     match_id = row["matchId"]
 
-    if round not in @group_rounds do
-      {:error, :out_of_scope}
-    else
+    if round in @group_rounds do
       case Map.get(matches, {round, match_id}) do
         nil ->
           {:error, :unknown_match_id}
@@ -113,6 +111,8 @@ defmodule Predictex.Fifa.Import do
             fixture -> build_matched(row, match, fixture)
           end
       end
+    else
+      {:error, :out_of_scope}
     end
   end
 

@@ -101,7 +101,7 @@ defmodule Predictex.BuzzTest do
     # As the viewer, Ana should see a "you overtake" line.
     lines = Buzz.headlines(fx.id, 0, 0, ana.id)
 
-    assert length(lines) > 0
+    assert lines != []
     assert Enum.any?(lines, &String.contains?(&1, "you"))
 
     assert Enum.any?(
