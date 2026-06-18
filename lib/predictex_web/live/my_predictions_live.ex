@@ -7,10 +7,12 @@ defmodule PredictexWeb.MyPredictionsLive do
   use PredictexWeb, :live_view
 
   alias Predictex.{Dashboard, Predictions}
+  alias PredictexWeb.Flags
 
   @impl true
   def mount(_params, _session, socket) do
-    dash = Dashboard.for_player(socket.assigns.current_scope.player)
+    now = DateTime.utc_now()
+    dash = Dashboard.for_player(socket.assigns.current_scope.player, now)
     active = Enum.find_value(dash.rounds, fn r -> r.active? && r.round.ordinal end)
 
     {:ok,
@@ -18,7 +20,8 @@ defmodule PredictexWeb.MyPredictionsLive do
      |> assign(:page_title, "My Predictions")
      |> assign(:dash, dash)
      |> assign(:active_ordinal, active)
-     |> assign(:now, DateTime.utc_now())
+     |> assign(:now, now)
+     |> assign(:next_match, Dashboard.next_match(dash, now))
      |> assign(:fifa_url, Application.get_env(:predictex, :fifa_predictor_url))
      |> assign(:live_buzz?, FunWithFlags.enabled?(:live_buzz))}
   end
@@ -40,6 +43,36 @@ defmodule PredictexWeb.MyPredictionsLive do
       </div>
 
       <div :if={@dash.rounds != []} class="space-y-4">
+        <%!-- next-match countdown — soonest upcoming fixture across all rounds (predictex-vg7) --%>
+        <div
+          :if={@next_match}
+          id="next-match-banner"
+          class="flex flex-col items-center gap-1 rounded-box border border-accent/30 bg-accent/10 p-3 text-center"
+        >
+          <span class="text-[10px] font-extrabold uppercase tracking-wider text-accent">
+            Next match
+          </span>
+          <span class="flex items-center gap-2 text-sm font-bold">
+            {@next_match.fixture.team1}
+            <span class="text-base">{Flags.flag(@next_match.fixture.team1)}</span>
+            <span class="text-base-content/40">v</span>
+            <span class="text-base">{Flags.flag(@next_match.fixture.team2)}</span>
+            {@next_match.fixture.team2}
+          </span>
+          <span class="text-xs font-semibold text-base-content/70">
+            Kicks off
+            <time
+              id="next-match-countdown"
+              phx-hook=".Countdown"
+              data-kickoff={DateTime.to_iso8601(@next_match.fixture.kickoff_at)}
+              datetime={DateTime.to_iso8601(@next_match.fixture.kickoff_at)}
+              class="font-score font-bold tabular-nums text-base-content"
+            >
+              …
+            </time>
+          </span>
+        </div>
+
         <%!-- rank hero — always pitch green, light ink, regardless of theme --%>
         <div class="relative overflow-hidden rounded-box bg-gradient-to-br from-primary to-secondary p-4 text-white shadow-lg">
           <div class="flex items-center justify-between">
@@ -111,6 +144,36 @@ defmodule PredictexWeb.MyPredictionsLive do
           </a>
         </div>
       </div>
+
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".Countdown">
+        export default {
+          start() {
+            clearInterval(this.timer)
+            this.tick()
+            this.timer = setInterval(() => this.tick(), 1000)
+          },
+          mounted() { this.start() },
+          updated() { this.start() },
+          destroyed() { clearInterval(this.timer) },
+          tick() {
+            const target = new Date(this.el.dataset.kickoff).getTime()
+            let s = Math.floor((target - Date.now()) / 1000)
+            if (s <= 0) {
+              this.el.textContent = "now"
+              clearInterval(this.timer)
+              return
+            }
+            const pad = (n) => String(n).padStart(2, "0")
+            const d = Math.floor(s / 86400); s -= d * 86400
+            const h = Math.floor(s / 3600); s -= h * 3600
+            const m = Math.floor(s / 60); const sec = s - m * 60
+            this.el.textContent =
+              d > 0 ? `in ${d}d ${h}h`
+              : h > 0 ? `in ${h}h ${pad(m)}m`
+              : `in ${pad(m)}:${pad(sec)}`
+          }
+        }
+      </script>
     </Layouts.app>
     """
   end

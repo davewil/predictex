@@ -211,4 +211,44 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
 
     refute html =~ ~s(href="/fixtures/)
   end
+
+  test "shows a 'Next match' countdown banner for the soonest upcoming fixture",
+       %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "CountdownTester"})
+
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+    soon = DateTime.utc_now() |> DateTime.add(2 * 3600, :second) |> DateTime.truncate(:second)
+
+    _done =
+      fixture!(round, %{
+        team1: "Old",
+        team2: "Done",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    _next = fixture!(round, %{team1: "England", team2: "Croatia", kickoff_at: soon})
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    assert html =~ "Next match"
+    assert html =~ "England"
+    assert html =~ "Croatia"
+    # the colocated countdown hook is fed the kickoff timestamp to tick against
+    assert html =~ ~s(data-kickoff="#{DateTime.to_iso8601(soon)}")
+  end
+
+  test "no 'Next match' banner when nothing is upcoming", %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "NoNextTester"})
+    past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+
+    _done =
+      fixture!(round, %{kickoff_at: past, status: :completed, home_goals: 0, away_goals: 0})
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    refute html =~ "Next match"
+  end
 end

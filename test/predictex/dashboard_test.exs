@@ -143,6 +143,120 @@ defmodule Predictex.DashboardTest do
     view = Dashboard.build(rounds, %{}, %{entry: nil, rank: 1, of: 1}, now)
     assert Enum.find(view.rounds, & &1.active?).round.ordinal == 2
   end
+
+  describe "next_match/2" do
+    test "returns the soonest upcoming (future, non-completed) fixture across rounds" do
+      now = ~U[2026-06-15 12:00:00Z]
+
+      soon = %Fixture{
+        id: 10,
+        round_id: 1,
+        team1: "England",
+        team2: "Croatia",
+        status: :scheduled,
+        kickoff_at: dt(1800)
+      }
+
+      later = %Fixture{
+        id: 11,
+        round_id: 2,
+        team1: "Spain",
+        team2: "Iran",
+        status: :scheduled,
+        kickoff_at: dt(7200)
+      }
+
+      past = %Fixture{
+        id: 12,
+        round_id: 1,
+        team1: "A",
+        team2: "B",
+        status: :scheduled,
+        kickoff_at: dt(-60)
+      }
+
+      done = %Fixture{
+        id: 13,
+        round_id: 2,
+        team1: "C",
+        team2: "D",
+        status: :completed,
+        kickoff_at: dt(-3600)
+      }
+
+      rounds = [round_with(1, :group, [past, soon]), round_with(2, :group, [done, later])]
+      dash = Dashboard.build(rounds, %{}, %{entry: nil, rank: 1, of: 1}, now)
+
+      nm = Dashboard.next_match(dash, now)
+      assert nm.fixture.id == 10
+      assert nm.fixture.team1 == "England"
+    end
+
+    test "ignores fixtures whose kickoff has already passed (live/in-play)" do
+      now = ~U[2026-06-15 12:00:00Z]
+
+      live = %Fixture{
+        id: 20,
+        round_id: 1,
+        team1: "A",
+        team2: "B",
+        status: :scheduled,
+        is_live: true,
+        kickoff_at: dt(-300)
+      }
+
+      upcoming = %Fixture{
+        id: 21,
+        round_id: 1,
+        team1: "Up",
+        team2: "Coming",
+        status: :scheduled,
+        kickoff_at: dt(600)
+      }
+
+      dash =
+        Dashboard.build(
+          [round_with(1, :group, [live, upcoming])],
+          %{},
+          %{entry: nil, rank: 1, of: 1},
+          now
+        )
+
+      assert Dashboard.next_match(dash, now).fixture.id == 21
+    end
+
+    test "returns nil when there are no upcoming fixtures" do
+      now = ~U[2026-06-15 12:00:00Z]
+
+      done = %Fixture{
+        id: 30,
+        round_id: 1,
+        team1: "A",
+        team2: "B",
+        status: :completed,
+        kickoff_at: dt(-3600)
+      }
+
+      past = %Fixture{
+        id: 31,
+        round_id: 1,
+        team1: "C",
+        team2: "D",
+        status: :scheduled,
+        kickoff_at: dt(-60)
+      }
+
+      dash =
+        Dashboard.build(
+          [round_with(1, :group, [done, past])],
+          %{},
+          %{entry: nil, rank: 1, of: 1},
+          now
+        )
+
+      assert Dashboard.next_match(dash, now) == nil
+    end
+  end
 end
 
 defmodule Predictex.DashboardDBTest do

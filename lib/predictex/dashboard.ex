@@ -83,6 +83,23 @@ defmodule Predictex.Dashboard do
     }
   end
 
+  @doc """
+  The soonest upcoming fixture-view across all rounds — the earliest with a future kickoff
+  that has not yet completed — or `nil` if none. Drives the next-match countdown on
+  `/predictions` (predictex-vg7). Pure; the caller supplies `now`.
+  """
+  def next_match(dash, now \\ DateTime.utc_now()) do
+    dash.rounds
+    |> Enum.flat_map(& &1.fixtures)
+    |> Enum.filter(&upcoming?(&1, now))
+    |> Enum.sort_by(& &1.fixture.kickoff_at, DateTime)
+    |> List.first()
+  end
+
+  defp upcoming?(%{status: :completed}, _now), do: false
+  defp upcoming?(%{fixture: %{kickoff_at: nil}}, _now), do: false
+  defp upcoming?(%{fixture: %{kickoff_at: ko}}, now), do: DateTime.compare(ko, now) == :gt
+
   defp fixture_view(fixture, predictions_by_fixture, points_by_fixture, now) do
     prediction = Map.get(predictions_by_fixture, fixture.id)
 
