@@ -14,7 +14,7 @@ defmodule PredictexWeb.FixtureLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap}
+  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap, Capture}
   alias PredictexWeb.Flags
 
   @impl true
@@ -62,6 +62,7 @@ defmodule PredictexWeb.FixtureLive do
     |> assign(:picks, picks)
     |> assign(:recap?, recap?)
     |> assign(:points, if(recap?, do: MatchRecap.points(fixture, picks), else: %{}))
+    |> assign(:goals, if(recap?, do: recap_goals(fixture), else: []))
     |> assign(
       :scenarios,
       if(fixture.is_live, do: Buzz.scenarios_with_deltas(fixture.id, h, a), else: [])
@@ -71,6 +72,26 @@ defmodule PredictexWeb.FixtureLive do
       if(fixture.is_live, do: Buzz.headlines(fixture.id, h, a, viewer_id), else: [])
     )
   end
+
+  defp recap_goals(fixture) do
+    body =
+      if fixture.fifa_match_id do
+        fixture.fifa_match_id
+        |> Capture.list_snapshots()
+        |> Enum.filter(&(&1.endpoint == "detail" and is_map(&1.body)))
+        |> List.last()
+        |> case do
+          nil -> nil
+          snap -> snap.body
+        end
+      end
+
+    MatchRecap.goals(fixture, body)
+  end
+
+  defp goal_label(:penalty), do: " (pen)"
+  defp goal_label(:own_goal), do: " (OG)"
+  defp goal_label(:regular), do: ""
 
   defp score_changed?(old, new) do
     old.live_home_goals != new.live_home_goals or old.live_away_goals != new.live_away_goals
@@ -206,6 +227,29 @@ defmodule PredictexWeb.FixtureLive do
               </span>
             </div>
           </div>
+        </section>
+
+        <section :if={@recap?} class="space-y-2">
+          <h2 class="px-1 text-sm font-extrabold uppercase tracking-wider text-base-content/60">
+            Goals
+          </h2>
+          <div
+            :if={@goals == []}
+            class="rounded-box bg-base-100 p-4 text-sm text-base-content/50 shadow"
+          >
+            No goals.
+          </div>
+          <ul :if={@goals != []} class="divide-y divide-base-200 rounded-box bg-base-100 px-3 shadow">
+            <li :for={g <- @goals} class="flex items-center justify-between py-2 text-sm">
+              <span class="truncate">
+                <span class="font-score text-base-content/50">{g.minute}'</span>
+                {g.player}{goal_label(g.type)}
+              </span>
+              <span class="text-xs text-base-content/50">
+                {(g.side == :home && @fixture.team1) || @fixture.team2}
+              </span>
+            </li>
+          </ul>
         </section>
 
         <div

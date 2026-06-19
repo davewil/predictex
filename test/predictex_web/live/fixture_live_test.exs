@@ -5,7 +5,7 @@ defmodule PredictexWeb.FixtureLiveTest do
 
   import Phoenix.LiveViewTest
   import Predictex.AccountsFixtures
-  alias Predictex.{Predictions, Tournament}
+  alias Predictex.{Predictions, Tournament, Capture}
 
   defp round! do
     {:ok, r} = Tournament.create_round(%{name: "Final", stage: :knockout, ordinal: 1})
@@ -253,5 +253,72 @@ defmodule PredictexWeb.FixtureLiveTest do
 
     send(lv.pid, {:live_update, fx.id})
     assert render(lv) =~ "2-0"
+  end
+
+  test "settled group fixture renders a goal breakdown", %{conn: conn} do
+    {:ok, round} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    {:ok, fx} =
+      Tournament.create_fixture(%{
+        external_ref: "recap-2",
+        team1: "Egypt",
+        team2: "Belgium",
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0,
+        kickoff_at: past,
+        round_id: round.id,
+        goals: [%{side: :home, type: :penalty, player: "Salah", minute: "16"}]
+      })
+
+    viewer = player_fixture(%{display_name: "Zoe"})
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    assert html =~ "Salah"
+    assert html =~ "16"
+    assert html =~ "pen"
+  end
+
+  test "settled group fixture renders goals from FIFA snapshot when it reconciles", %{conn: conn} do
+    {:ok, round} = Tournament.create_round(%{name: "Matchday 2", stage: :group, ordinal: 2})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    {:ok, fx} =
+      Tournament.create_fixture(%{
+        external_ref: "recap-fifa-#{System.unique_integer([:positive])}",
+        team1: "Egypt",
+        team2: "Belgium",
+        status: :completed,
+        home_goals: 1,
+        away_goals: 1,
+        kickoff_at: past,
+        round_id: round.id,
+        fifa_match_id: "fifa-m99"
+      })
+
+    {:ok, _} =
+      Capture.record_snapshot(%{
+        captured_at: DateTime.utc_now() |> DateTime.truncate(:second),
+        endpoint: "detail",
+        url: "https://api.fifa.com/m99/detail",
+        match_id: "fifa-m99",
+        http_status: 200,
+        body: %{
+          "HomeTeam" => %{
+            "Players" => [%{"IdPlayer" => "p1", "PlayerName" => [%{"Description" => "Salah"}]}],
+            "Goals" => [%{"IdPlayer" => "p1", "Minute" => "16'", "Type" => 1}]
+          },
+          "AwayTeam" => %{
+            "Players" => [%{"IdPlayer" => "p2", "PlayerName" => [%{"Description" => "Lukaku"}]}],
+            "Goals" => [%{"IdPlayer" => "p2", "Minute" => "73'", "Type" => 2}]
+          }
+        }
+      })
+
+    viewer = player_fixture(%{display_name: "Zoe"})
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    assert html =~ "Lukaku"
   end
 end
