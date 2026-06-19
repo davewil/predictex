@@ -207,7 +207,9 @@ playability unlock** — admins can now enter predictions on behalf of players. 
 
 ## Conventions & gotchas (learned the hard way)
 - **Tracking is beads (`bd`)**, not TodoWrite/markdown TODOs. `bd ready`, `bd show <id>`, `bd update <id> --claim`, `bd close <id>`.
-- **Commit/push only when asked.** Trunk-based on `main`.
+- **Commit autonomously when green; push and tag/push are the user's explicit call** —
+  never auto-push, even at session end (commit, report it's local, await "push"). See
+  CLAUDE.md → "Conventions & Patterns → Commit / push / deploy boundary". Trunk-based on `main`.
 - **`force_ssl` is compile-time** (`config/prod.exs`) — never set it in `runtime.exs` (mismatch aborts the release boot; this bit us — v0.1.0/v0.2.0 failed on it).
 - **Magic-link/email auth is DORMANT**: backend kept, UI hidden, for a future email upgrade. Re-enabling needs a mailer + SPF/DKIM/DMARC.
 - Feature workflow used: brainstorm → spec (`docs/superpowers/specs/`) → plan (`docs/superpowers/plans/`) → subagent-driven execution.

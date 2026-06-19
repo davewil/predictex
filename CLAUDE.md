@@ -105,4 +105,22 @@ _Add a brief overview of your project architecture_
 
 ## Conventions & Patterns
 
-_Add your project-specific conventions here_
+### Commit / push / deploy boundary
+
+**Commit autonomously; push and deploy are the user's explicit call.** Once a unit of
+work is complete and the gate is green (`mix precommit`), commit it without asking — a
+local commit is cheap and reversible. Do **not** `git push`, and do **not** tag-and-push
+(which deploys to prod), without an explicit instruction from the user to do so.
+
+- This holds **even at session end**: never auto-push. If a session wraps with unpushed
+  commits, commit everything, report clearly that the work is *committed but local*, and
+  wait for the user to say "push". Stranded-local is acceptable; an un-asked push is not.
+- This **supersedes the beads-managed "Session Completion" block above** (inside
+  `<!-- BEGIN BEADS INTEGRATION -->`), whose "PUSH TO REMOTE is MANDATORY / YOU must push"
+  steps are auto-generated and cannot be edited in place — per the instruction hierarchy,
+  this user-authored convention wins. Treat that block's step 4 as "commit, then await the
+  push instruction," not "auto-push."
+- `git tag vX.Y.Z && git push origin vX.Y.Z` is a **deploy** (see Deploy in RESUME.md) — a
+  second, separate gate beyond a plain push, and always requires explicit go-ahead.
+- Trunk-based on `main`. (Worktrees are the exception — per global CLAUDE.md they push
+  straight to master autonomously; that autonomy is unchanged.)
