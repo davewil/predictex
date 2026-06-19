@@ -14,12 +14,12 @@ defmodule PredictexWeb.FixtureLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Tournament, Predictions, Buzz}
+  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap}
   alias PredictexWeb.Flags
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    fixture = Tournament.get_fixture!(id)
+    fixture = Tournament.get_fixture!(id, :round)
 
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{id}")
@@ -31,7 +31,7 @@ defmodule PredictexWeb.FixtureLive do
   @impl true
   def handle_info({:live_update, _id}, socket) do
     old = socket.assigns.fixture
-    new = Tournament.get_fixture!(old.id)
+    new = Tournament.get_fixture!(old.id, :round)
     now = DateTime.utc_now()
     now_locked? = Predictions.locked?(new, now)
 
@@ -52,12 +52,16 @@ defmodule PredictexWeb.FixtureLive do
     viewer_id = socket.assigns.current_scope.player.id
     h = fixture.live_home_goals || 0
     a = fixture.live_away_goals || 0
+    recap? = fixture.status == :completed and fixture.round.stage == :group
+    picks = if(locked?, do: Predictions.list_fixture_predictions(fixture.id), else: [])
 
     socket
     |> assign(:fixture, fixture)
     |> assign(:viewer_id, viewer_id)
     |> assign(:picks_visible?, locked?)
-    |> assign(:picks, if(locked?, do: Predictions.list_fixture_predictions(fixture.id), else: []))
+    |> assign(:picks, picks)
+    |> assign(:recap?, recap?)
+    |> assign(:points, if(recap?, do: MatchRecap.points(fixture, picks), else: %{}))
     |> assign(
       :scenarios,
       if(fixture.is_live, do: Buzz.scenarios_with_deltas(fixture.id, h, a), else: [])
@@ -92,12 +96,14 @@ defmodule PredictexWeb.FixtureLive do
             </span>
 
             <span
-              :if={@fixture.is_live}
+              :if={@fixture.is_live or @recap?}
               class="font-score text-4xl font-extrabold tabular-nums sm:text-5xl"
             >
-              {@fixture.live_home_goals}<span class="px-1 text-base-content/30">–</span>{@fixture.live_away_goals}
+              {(@fixture.is_live && @fixture.live_home_goals) || @fixture.home_goals}<span class="px-1 text-base-content/30">–</span>{(@fixture.is_live &&
+                                                                                                                                         @fixture.live_away_goals) ||
+                @fixture.away_goals}
             </span>
-            <span :if={not @fixture.is_live} class="px-2 text-base-content/40">v</span>
+            <span :if={not @fixture.is_live and not @recap?} class="px-2 text-base-content/40">v</span>
 
             <span class="flex-1 truncate text-left" title={@fixture.team2}>
               <span class="text-xl">{Flags.flag(@fixture.team2)}</span> {@fixture.team2}
@@ -190,6 +196,12 @@ defmodule PredictexWeb.FixtureLive do
                   class="rounded bg-accent px-1 py-0.5 text-[9px] text-accent-content"
                 >
                   ⚡2×
+                </span>
+                <span
+                  :if={@recap?}
+                  class="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-bold text-success"
+                >
+                  +{Map.get(@points, p.player_id, 0)}
                 </span>
               </span>
             </div>

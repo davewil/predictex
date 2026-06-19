@@ -169,6 +169,41 @@ defmodule PredictexWeb.FixtureLiveTest do
     assert render(lv) =~ "LIVE"
   end
 
+  test "settled group fixture shows the final score and per-pick points", %{conn: conn} do
+    {:ok, round} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    {:ok, fx} =
+      Tournament.create_fixture(%{
+        external_ref: "recap-1",
+        team1: "Egypt",
+        team2: "Belgium",
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1,
+        kickoff_at: past,
+        round_id: round.id
+      })
+
+    viewer = player_fixture(%{display_name: "Zoe"})
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: viewer.id,
+        fixture_id: fx.id,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    # header score span present
+    assert html =~ "font-score text-4xl font-extrabold"
+    assert html =~ "Zoe"
+    # exact prediction earns 30 pts in group stage
+    assert html =~ "+30"
+  end
+
   test "score-change tick re-renders updated score", %{conn: conn} do
     viewer = player_fixture(%{display_name: "Viewer"})
     round = round!()

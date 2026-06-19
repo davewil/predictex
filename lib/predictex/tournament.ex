@@ -57,7 +57,7 @@ defmodule Predictex.Tournament do
     Repo.aggregate(from(f in Fixture, where: f.status == :completed), :count)
   end
 
-  def get_fixture!(id), do: Repo.get!(Fixture, id)
+  def get_fixture!(id, preloads \\ []), do: Repo.get!(Fixture, id) |> Repo.preload(preloads)
 
   def get_fixture_by_ref(external_ref), do: Repo.get_by(Fixture, external_ref: external_ref)
 
