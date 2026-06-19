@@ -3,13 +3,36 @@ defmodule PredictexWeb.Router do
 
   import PredictexWeb.PlayerAuth
 
+  # SHA-256 of the inline theme <script> in root.html.heex, base64-encoded — the exact bytes
+  # the browser hashes for the CSP 'sha256-...' source expression. Guarded by
+  # PredictexWeb.CSPTest, which recomputes this from the rendered page: if the inline script
+  # changes without updating this value, that test fails (and the browser would block it).
+  @theme_script_hash "6GNRXphE5cePbii63vY7NqMXODo9lGI9WNtFRNLGf8E="
+
+  # Content-Security-Policy for browser responses (predictex-y58). Strict script-src — inline
+  # execution is whitelisted only by the hash above, never 'unsafe-inline'. style/font-src
+  # allow Google Fonts (stylesheet + woff2); connect-src 'self' covers the same-origin
+  # LiveView websocket. Set via put_secure_browser_headers so sobelow's Config.CSP detects it.
+  @content_security_policy [
+                             "default-src 'self'",
+                             "script-src 'self' 'sha256-#{@theme_script_hash}'",
+                             "style-src 'self' https://fonts.googleapis.com",
+                             "font-src 'self' https://fonts.gstatic.com",
+                             "img-src 'self' data:",
+                             "connect-src 'self'",
+                             "base-uri 'self'",
+                             "frame-ancestors 'self'",
+                             "object-src 'none'"
+                           ]
+                           |> Enum.join("; ")
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
     plug :fetch_live_flash
     plug :put_root_layout, html: {PredictexWeb.Layouts, :root}
     plug :protect_from_forgery
-    plug :put_secure_browser_headers
+    plug :put_secure_browser_headers, %{"content-security-policy" => @content_security_policy}
     plug :fetch_current_scope_for_player
     # Classify UA (mobile/desktop); read by LiveViews via the session
     plug PredictexWeb.PlatformPlug

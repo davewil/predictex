@@ -62,7 +62,8 @@ against them produced a tooling backlog, now mostly shipped:
    status branch flickers (benign) rather than blacks out the buzz. cvx note has the full reasoning.
 2. **Remaining review backlog (P3):** `uhf` (centralize FunWithFlags reset in DataCase/ConnCase → lets 5
    flag tests go async, faster gate), `r90` (extract shared admin flash/reload helper), `bl8` (Live.Updater
-   rescue: let-it-crash vs justify+test), `y58` (add a CSP header — from kvo's sobelow finding).
+   rescue: let-it-crash vs justify+test). (`y58` CSP header — DONE: strict hash-based CSP on the :browser
+   pipeline, browser-verified, sobelow Config.CSP retired.)
 3. **`predictex-i1s` (P3)** — match replay engine; replay a recorded capture onto a demo fixture. ⚠️ England
    v Croatia has **0 captures** (pre-`rfm`, lost to the manual-arm gap) → not replayable; guard zero-row
    match_ids (documented on i1s). Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.
