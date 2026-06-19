@@ -12,16 +12,17 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.4`. Recent: **v0.11.0** auto-start unified live capture (`rfm`);
+- **Latest deployed tag:** `v0.11.5`. Recent: **v0.11.0** auto-start unified live capture (`rfm`);
   **v0.11.1** server-side per-viewer kickoff times (`fb5`) + live-game CTA on `/predictions` (`afm`);
   **v0.11.2** knockout ET/pens capture window + `is_live` auto-clear sweep (`cvx`/`d17`);
   **v0.11.3** `/predictions` live CTA opens 30 min pre-kickoff → live → post-match recap (`4zu`);
-  **v0.11.4** next-match countdown banner on `/predictions` (`vg7`, ungated — low-impact).
-  **Live buzz is now UNCONDITIONAL** — the `:live_buzz` flag was contracted away (`uhf`): the
-  parallel change is complete (accepted in prod → flag + gates + off-tests removed). ⚠️ **No
-  kill-switch any more** — if the FIFA live feed misbehaves, the lever is revert+redeploy, not a
-  flag flip. Needs a deploy to take effect (not yet tagged). FunWithFlags dep + `/admin/feature-flags`
-  dashboard are retained as the dark-ship mechanism for future flags.
+  **v0.11.4** next-match countdown banner on `/predictions` (`vg7`, ungated — low-impact);
+  **v0.11.5** contracted the `:live_buzz` flag (`uhf`).
+  **Live buzz is now UNCONDITIONAL** — the `:live_buzz` flag was contracted away (`uhf`, deployed
+  v0.11.5): the parallel change is complete (accepted in prod → flag + gates + off-tests removed).
+  No user-visible change (the flag was already ON). ⚠️ **No kill-switch any more** — if the FIFA
+  live feed misbehaves, the lever is revert+redeploy, not a flag flip. FunWithFlags dep +
+  `/admin/feature-flags` dashboard are retained as the dark-ship mechanism for future flags.
 - **League invite code:** `wcpredict2026`
 - **Prod state:** 12 fixtures synced. **Admin console (`/admin`) + My Predictions
   (`/predictions`) live; results + cohort now auto-sync (Oban).** Admins can enter predictions
