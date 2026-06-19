@@ -44,17 +44,27 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-19)
 
-**▶ NEXT SESSION — `predictex-p4o` Slice 2 (goal breakdown).** Slice 1 (per-pick points on settled
-group fixtures) is **shipped in v0.11.7**. Slice 2 is **Tasks 3–7** of the plan, run via
-**subagent-driven-development** (same as Slice 1: fresh implementer per task → task review → fix loop).
-- **Plan:** `docs/superpowers/plans/2026-06-19-p4o-match-recap.md` (Tasks 3–7 have complete code).
-- **Spec:** `docs/superpowers/specs/2026-06-19-p4o-match-recap-design.md`.
-- **SDD ledger (durable progress):** `.superpowers/sdd/progress.md` — Tasks 1–2 marked complete; **resume at Task 3**.
-  Two deferred Minor findings logged there for the final whole-branch review.
-- **Slice 2 = :** `Openfootball.goal_events/1` → persisted `goals` embed (**migration**) → `Capture.goal_events/1`
-  → `MatchRecap.goals/2` (FIFA-if-reconciles, else openfootball) → FixtureLive breakdown section. Group-stage
-  only (KO/ET deferred — openfootball goals include ET goals, would contradict the regulation header score).
-- After Slice 2: final whole-branch review (most-capable model), then deploy as **v0.11.8**.
+**▶ NEXT ACTION — DEPLOY `predictex-p4o` Slice 2 as `v0.11.8`.** Slice 2 (goal breakdown) is
+**code-complete and committed LOCALLY** (8 commits `e4e679f..4f5a502`, incl. one unrelated docs
+commit `8970e12`). **391 tests green.** Awaiting the user's explicit **push + tag** (deploy is the
+user's call — never auto-push/tag). To deploy: `git push` then `scripts/pre-deploy` then
+`git tag v0.11.8 && git push origin v0.11.8`.
+- Built via **subagent-driven-development**: Tasks 3–7, each task-reviewed clean; Task 7 had one
+  Important defect (FIFA minute doubled apostrophe `"73''"`) — fixed by normalising at the decoder
+  boundary (`Capture.goal_events/1` strips the trailing `'`) + re-reviewed clean.
+- **Final whole-branch review (opus):** *Ready to deploy — no Critical/Important.* Scoring provably
+  decoupled from the goals embed; both decoders emit one shape; count-based reconciliation fails safe to
+  canonical openfootball; migration additive/no-downtime; `round.stage == :group` guard airtight.
+- **Architecture shipped:** `Openfootball.goal_events/1` + persisted `goals` embed (**migration**
+  `add_goals_to_fixtures`) → `Capture.goal_events/1` (FIFA) → `MatchRecap.goals/2`
+  (FIFA-if-reconciles, else openfootball) → FixtureLive breakdown section. **Group-stage settled only**
+  (KO/ET deferred — openfootball goals include ET, would contradict the regulation header score).
+- **Plan:** `docs/superpowers/plans/2026-06-19-p4o-match-recap.md`. **Spec:**
+  `docs/superpowers/specs/2026-06-19-p4o-match-recap-design.md`. **Ledger:** `.superpowers/sdd/progress.md`.
+- **⚠️ Migration in this release** — first p4o migration; the deploy pipeline runs `Release.migrate`.
+- **Deferred (filed `predictex-uyf`, P4):** knockout-ET goal filtering (gated on `hco`); own-goal
+  Type-3 FIFA verification + a Type-3 `capture_test` assertion on the first real own-goal capture.
+- **After deploy:** then `predictex-hco` (P2, KO 28 Jun) or P3 backlog (`bl8`).
 
 **Workflow rule set this session:** commit autonomously when green; **push and tag/push (deploy) are the
 user's explicit call** — never auto-push, even at session end (commit, report it's local, await "push").
