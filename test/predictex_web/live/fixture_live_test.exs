@@ -276,7 +276,8 @@ defmodule PredictexWeb.FixtureLiveTest do
     {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
 
     assert html =~ "Salah"
-    assert html =~ "16"
+    assert html =~ "16&#39;"
+    refute html =~ "16&#39;&#39;"
     assert html =~ "pen"
   end
 
@@ -320,5 +321,7 @@ defmodule PredictexWeb.FixtureLiveTest do
     {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
 
     assert html =~ "Lukaku"
+    assert html =~ "73&#39;"
+    refute html =~ "73&#39;&#39;"
   end
 end

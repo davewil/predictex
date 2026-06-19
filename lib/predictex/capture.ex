@@ -130,7 +130,7 @@ defmodule Predictex.Capture do
         side: side,
         type: fifa_goal_type(goal["Type"]),
         player: Map.get(players, goal["IdPlayer"]) || goal["IdPlayer"],
-        minute: to_string(goal["Minute"])
+        minute: to_string(goal["Minute"]) |> String.trim_trailing("'")
       }
     end
     |> Enum.sort_by(&minute_key(&1.minute))

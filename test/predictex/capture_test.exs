@@ -16,8 +16,8 @@ defmodule Predictex.CaptureTest do
       }
 
       assert [
-               %{side: :home, type: :penalty, player: "Salah", minute: "16'"},
-               %{side: :away, type: :regular, player: "Lukaku", minute: "73'"}
+               %{side: :home, type: :penalty, player: "Salah", minute: "16"},
+               %{side: :away, type: :regular, player: "Lukaku", minute: "73"}
              ] =
                Predictex.Capture.goal_events(body)
     end
