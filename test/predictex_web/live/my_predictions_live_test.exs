@@ -219,4 +219,44 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
 
     refute html =~ "Next match"
   end
+
+  test "a :tick re-pulls and re-renders the dashboard without a page reload",
+       %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "Ticker"})
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    fx = fixture!(round, %{team1: "Spain", team2: "Japan", kickoff_at: future})
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: player.id,
+        fixture_id: fx.id,
+        home_goals: 0,
+        away_goals: 0
+      })
+
+    {:ok, lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    refute html =~ "LIVE"
+
+    # the match goes live in the DB after mount …
+    past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+
+    fx
+    |> Ecto.Changeset.change(%{
+      kickoff_at: past,
+      status: :live,
+      is_live: true,
+      live_home_goals: 2,
+      live_away_goals: 1,
+      live_minute: "67'"
+    })
+    |> Predictex.Repo.update!()
+
+    # … and the next tick reflects it over the socket, no remount
+    send(lv.pid, :tick)
+    rendered = render(lv)
+
+    assert rendered =~ "LIVE"
+    assert rendered =~ "2-1"
+  end
 end

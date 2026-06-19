@@ -15,6 +15,8 @@ defmodule PredictexWeb.MyPredictionsLive do
     dash = Dashboard.for_player(socket.assigns.current_scope.player, now)
     active = Enum.find_value(dash.rounds, fn r -> r.active? && r.round.ordinal end)
 
+    if connected?(socket), do: schedule_next_tick(dash, now)
+
     {:ok,
      socket
      |> assign(:page_title, "My Predictions")
@@ -28,6 +30,26 @@ defmodule PredictexWeb.MyPredictionsLive do
   @impl true
   def handle_event("select_round", %{"ordinal" => ord}, socket) do
     {:noreply, assign(socket, :active_ordinal, String.to_integer(ord))}
+  end
+
+  @impl true
+  def handle_info(:tick, socket) do
+    now = DateTime.utc_now()
+    dash = Dashboard.for_player(socket.assigns.current_scope.player, now)
+    schedule_next_tick(dash, now)
+
+    {:noreply,
+     socket
+     |> assign(:now, now)
+     |> assign(:dash, dash)
+     |> assign(:next_match, Dashboard.next_match(dash, now))}
+  end
+
+  defp schedule_next_tick(dash, now) do
+    case Dashboard.next_tick_delay(dash, now) do
+      nil -> :ok
+      ms -> Process.send_after(self(), :tick, ms)
+    end
   end
 
   @impl true
