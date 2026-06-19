@@ -62,6 +62,9 @@ user's call — never auto-push/tag). To deploy: `git push` then `scripts/pre-de
 - **Plan:** `docs/superpowers/plans/2026-06-19-p4o-match-recap.md`. **Spec:**
   `docs/superpowers/specs/2026-06-19-p4o-match-recap-design.md`. **Ledger:** `.superpowers/sdd/progress.md`.
 - **⚠️ Migration in this release** — first p4o migration; the deploy pipeline runs `Release.migrate`.
+- **⚠️ Do NOT deploy mid-capture** — WC fixtures are being captured (2026-06-19); a container recreate
+  interrupts the running producer chain (loses frames; `*/5` cron re-arms in ~5 min). Tag between matches.
+- **Gate verified green on HEAD `4f5a502`** (391 passed, credo clean) — run directly, not just subagent reports.
 - **Deferred (filed `predictex-uyf`, P4):** knockout-ET goal filtering (gated on `hco`); own-goal
   Type-3 FIFA verification + a Type-3 `capture_test` assertion on the first real own-goal capture.
 - **After deploy:** then `predictex-hco` (P2, KO 28 Jun) or P3 backlog (`bl8`).
