@@ -12,8 +12,8 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.6` (deployed + verified 2026-06-19: Deploy job ran, `/health` 200,
-  anon `/` renders under the new `live_session :public`). Recent: **v0.11.0** auto-start unified live
+- **Latest deployed tag:** `v0.11.7` (deployed + verified 2026-06-19: Deploy job ran, `/health` 200,
+  anon `/` 200). Recent: **v0.11.0** auto-start unified live
   capture (`rfm`);
   **v0.11.1** server-side per-viewer kickoff times (`fb5`) + live-game CTA on `/predictions` (`afm`);
   **v0.11.2** knockout ET/pens capture window + `is_live` auto-clear sweep (`cvx`/`d17`);
@@ -21,7 +21,9 @@ the app scores them against real results and ranks a leaderboard.
   **v0.11.4** next-match countdown banner on `/predictions` (`vg7`, ungated — low-impact);
   **v0.11.5** contracted the `:live_buzz` flag (`uhf`);
   **v0.11.6** public leaderboard highlights the logged-in player's own row (`kzz`) + shared
-  `AdminWriteResult` helper across admin LiveViews (`r90`, no user-visible change).
+  `AdminWriteResult` helper across admin LiveViews (`r90`, no user-visible change);
+  **v0.11.7** match recap **slice 1** (`p4o`): settled group-stage `/fixtures/:id` shows the final
+  score in the header + the leaderboard points each member's pick earned (`MatchRecap.points/2`).
   **Live buzz is now UNCONDITIONAL** — the `:live_buzz` flag was contracted away (`uhf`, deployed
   v0.11.5): the parallel change is complete (accepted in prod → flag + gates + off-tests removed).
   No user-visible change (the flag was already ON). ⚠️ **No kill-switch any more** — if the FIFA
@@ -40,7 +42,32 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
-## ⏵ Continue here (2026-06-18)
+## ⏵ Continue here (2026-06-19)
+
+**▶ NEXT SESSION — `predictex-p4o` Slice 2 (goal breakdown).** Slice 1 (per-pick points on settled
+group fixtures) is **shipped in v0.11.7**. Slice 2 is **Tasks 3–7** of the plan, run via
+**subagent-driven-development** (same as Slice 1: fresh implementer per task → task review → fix loop).
+- **Plan:** `docs/superpowers/plans/2026-06-19-p4o-match-recap.md` (Tasks 3–7 have complete code).
+- **Spec:** `docs/superpowers/specs/2026-06-19-p4o-match-recap-design.md`.
+- **SDD ledger (durable progress):** `.superpowers/sdd/progress.md` — Tasks 1–2 marked complete; **resume at Task 3**.
+  Two deferred Minor findings logged there for the final whole-branch review.
+- **Slice 2 = :** `Openfootball.goal_events/1` → persisted `goals` embed (**migration**) → `Capture.goal_events/1`
+  → `MatchRecap.goals/2` (FIFA-if-reconciles, else openfootball) → FixtureLive breakdown section. Group-stage
+  only (KO/ET deferred — openfootball goals include ET goals, would contradict the regulation header score).
+- After Slice 2: final whole-branch review (most-capable model), then deploy as **v0.11.8**.
+
+**Workflow rule set this session:** commit autonomously when green; **push and tag/push (deploy) are the
+user's explicit call** — never auto-push, even at session end (commit, report it's local, await "push").
+Authoritative in CLAUDE.md → "Conventions & Patterns → Commit / push / deploy boundary"; bd memory
+`commit-push-deploy-boundary`. Supersedes the auto-generated beads "Session Completion" push steps.
+
+**Also done 2026-06-19:** `hco` knockout-timing assumption **verified safe** (openfootball publishes `ft`
+whole-match post-final-whistle, not mid-ET → `clear_stuck_live/1` won't false-clear `is_live`; bd memory
+`openfootball-knockout-ft-timing`). `r90` shared `AdminWriteResult` helper + `kzz` leaderboard "YOU"
+highlight shipped (v0.11.6).
+
+---
+
 Two threads are healthy and shipped; the **dev-tooling gate is now fully closed** (`unx`/`kvo`/`0cf` all done).
 
 **Live capture + buzz — DONE and live (v0.11.0–v0.11.4).** Auto-start unified capture (`rfm`) is validated
@@ -64,13 +91,13 @@ against them produced a tooling backlog, now mostly shipped:
   on a networked machine — reaching `== pre-deploy OK — safe to tag ==`. Run it before every `git tag vX.Y.Z`.
 
 **NEXT — recommended (`bd ready`):**
-1. **`predictex-hco` (P2, deadline 2026-06-28)** — knockout readiness. Externally gated: FIFA publishes the
-   32 KO `fifa_match_id`s only after the group stage resolves, then backfill via `Fifa.LiveIds.assign`
-   (relates `i9k`). ⚠️ **VERIFY before 2026-06-28** (carried from `cvx`): confirm the openfootball feed does
-   NOT publish `ft` (→ `status: :completed`) mid-match for knockouts — if it does, `clear_stuck_live/1`'s
-   status branch flickers (benign) rather than blacks out the buzz. cvx note has the full reasoning.
-2. **Remaining review backlog (P3):** `r90` (extract shared admin flash/reload helper), `bl8`
-   (Live.Updater rescue: let-it-crash vs justify+test). (`y58` CSP — DONE: strict hash-based CSP,
+1. **`predictex-p4o` Slice 2** — see the ▶ pickup block at the top of this section.
+2. **`predictex-hco` (P2, deadline 2026-06-28)** — knockout readiness. The `cvx`-assumption **verify is DONE**
+   (openfootball `ft` is whole-match/post-final-whistle → sweep safe; bd memory `openfootball-knockout-ft-timing`).
+   Remaining is externally gated: FIFA publishes the 32 KO `fifa_match_id`s only after the group stage resolves,
+   then backfill via `Fifa.LiveIds.assign` (relates `i9k`); plus the first-KO live confirmation on 2026-06-28.
+3. **Remaining review backlog (P3):** `bl8` (Live.Updater rescue: let-it-crash vs justify+test). (`r90` shared
+   admin flash/reload helper — **DONE**, v0.11.6. `y58` CSP — DONE: strict hash-based CSP,
    browser-verified, sobelow Config.CSP retired. `uhf` — RESOLVED by contracting live_buzz: with the
    flag removed there's no flag state for tests to manage, so the "centralize reset / async" goal is
    moot. Filed follow-up for the separate test-suite async-safety review — the flag tests stay
