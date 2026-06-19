@@ -75,4 +75,70 @@ defmodule PredictexWeb.LeaderboardLiveTest do
     assert html =~ "Live now"
     assert html =~ "/fixtures/#{fx.id}"
   end
+
+  describe "current player highlight (predictex-kzz)" do
+    setup do
+      {:ok, round} = Tournament.create_round(%{name: "Round 1", stage: :group, ordinal: 1})
+
+      {:ok, f1} =
+        Tournament.create_fixture(%{
+          external_ref: "kzz-1",
+          team1: "Egypt",
+          team2: "Belgium",
+          status: :completed,
+          home_goals: 1,
+          away_goals: 2,
+          round_id: round.id
+        })
+
+      {:ok, f2} =
+        Tournament.create_fixture(%{
+          external_ref: "kzz-2",
+          team1: "Spain",
+          team2: "Japan",
+          status: :completed,
+          home_goals: 0,
+          away_goals: 0,
+          round_id: round.id
+        })
+
+      alice = player_fixture(%{display_name: "Alice"})
+      bob = player_fixture(%{display_name: "Bob"})
+
+      # Alice scores both fixtures exact (champion); Bob only the first, so Bob sits
+      # strictly below Alice in the chasing pack regardless of exact point values.
+      for {p, fx} <- [{alice, f1}, {alice, f2}, {bob, f1}] do
+        {:ok, _} =
+          Predictions.create_prediction(%{
+            player_id: p.id,
+            fixture_id: fx.id,
+            home_goals: fx.home_goals,
+            away_goals: fx.away_goals
+          })
+      end
+
+      %{alice: alice, bob: bob}
+    end
+
+    test "shows no YOU badge for a logged-out visitor", %{conn: conn} do
+      {:ok, _lv, html} = live(conn, ~p"/")
+      assert html =~ "Alice"
+      assert html =~ "Bob"
+      refute html =~ "YOU"
+    end
+
+    test "marks the logged-in player's own row in the chasing pack", %{conn: conn, bob: bob} do
+      {:ok, _lv, html} = live(log_in_player(conn, bob), ~p"/")
+      assert html =~ "YOU"
+    end
+
+    test "marks the logged-in player when they are the champion (hero)", %{
+      conn: conn,
+      alice: alice
+    } do
+      {:ok, _lv, html} = live(log_in_player(conn, alice), ~p"/")
+      assert html =~ "League leader"
+      assert html =~ "YOU"
+    end
+  end
 end

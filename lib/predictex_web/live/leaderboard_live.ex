@@ -71,6 +71,7 @@ defmodule PredictexWeb.LeaderboardLive do
             <div class="min-w-0 flex-1">
               <div class="text-[10px] font-extrabold uppercase tracking-wider text-accent">
                 👑 League leader
+                <span :if={you?(@current_scope, @champion.player_id)} class="text-primary">· YOU</span>
               </div>
               <div
                 class="truncate text-2xl font-black tracking-tight sm:text-3xl"
@@ -102,6 +103,7 @@ defmodule PredictexWeb.LeaderboardLive do
                 fixtures={s.fixtures_total}
                 bonus={s.round_bonus_total}
                 total={s.total}
+                you={you?(@current_scope, s.player_id)}
               />
             </div>
           </div>
@@ -140,6 +142,11 @@ defmodule PredictexWeb.LeaderboardLive do
     </Layouts.app>
     """
   end
+
+  # True when the standings entry belongs to the logged-in player. `current_scope` is
+  # nil for logged-out visitors (Scope.for_player(nil)), so the catch-all keeps this total.
+  defp you?(%{player: %{id: id}}, id), do: true
+  defp you?(_scope, _player_id), do: false
 
   # ranks 2..N, each paired with its real rank number
   defp chasing_pack([]), do: []

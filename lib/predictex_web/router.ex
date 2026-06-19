@@ -58,7 +58,12 @@ defmodule PredictexWeb.Router do
   scope "/", PredictexWeb do
     pipe_through :browser
 
-    live "/", LeaderboardLive, :index
+    # Optional auth: assigns current_scope (nil when logged out) so the public
+    # leaderboard can highlight the logged-in player's own row (predictex-kzz).
+    live_session :public,
+      on_mount: [{PredictexWeb.PlayerAuth, :mount_current_scope}] do
+      live "/", LeaderboardLive, :index
+    end
   end
 
   scope "/", PredictexWeb do
