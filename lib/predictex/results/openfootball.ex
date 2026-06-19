@@ -44,7 +44,8 @@ defmodule Predictex.Results.Openfootball do
       away_goals: away_goals,
       first_scorer_side: first.side,
       first_scorer_player: first.player,
-      first_goal_owngoal: first.owngoal
+      first_goal_owngoal: first.owngoal,
+      goals: goal_events(m)
     }
   end
 
@@ -78,7 +79,44 @@ defmodule Predictex.Results.Openfootball do
     end
   end
 
+  @doc """
+  All goals of a match as `[%{side, type, player, minute}]`, ordered by elapsed minute.
+  Side is the array the goal sits in (own goals included — the beneficiary side). Type is
+  `:penalty` / `:own_goal` / `:regular`. Minute is a display string ("16", "90+2").
+  """
+  @spec goal_events(map()) :: [map()]
+  def goal_events(m) when is_map(m) do
+    events =
+      Enum.map(Map.get(m, "goals1", []) || [], &goal_event(&1, :home)) ++
+        Enum.map(Map.get(m, "goals2", []) || [], &goal_event(&1, :away))
+
+    events
+    |> Enum.sort_by(& &1.__order)
+    |> Enum.map(&Map.delete(&1, :__order))
+  end
+
+  def goal_events(_), do: []
+
   # --- internals ---
+
+  defp goal_event(goal, side) when is_map(goal) do
+    %{
+      side: side,
+      type: goal_type(goal),
+      player: Map.get(goal, "name"),
+      minute: minute_string(Map.get(goal, "minute"), Map.get(goal, "offset")),
+      __order: order(Map.get(goal, "minute"), Map.get(goal, "offset"))
+    }
+  end
+
+  defp goal_type(%{"owngoal" => true}), do: :own_goal
+  defp goal_type(%{"penalty" => true}), do: :penalty
+  defp goal_type(_), do: :regular
+
+  defp minute_string(minute, offset) do
+    {base, off} = order(minute, offset)
+    if off > 0, do: "#{base}+#{off}", else: "#{base}"
+  end
 
   defp event(goal, side) when is_map(goal) do
     %{

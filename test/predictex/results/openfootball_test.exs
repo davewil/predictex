@@ -144,6 +144,27 @@ defmodule Predictex.Results.OpenfootballTest do
     end
   end
 
+  describe "goal_events/1" do
+    test "decodes regular/penalty/own-goal with side, scorer, and stoppage minute" do
+      m = %{
+        "goals1" => [
+          %{"name" => "Salah", "minute" => 16, "penalty" => true},
+          %{"name" => "Aguerd", "minute" => "90+2", "owngoal" => true}
+        ],
+        "goals2" => [%{"name" => "Lukaku", "minute" => 73}]
+      }
+
+      assert [g1, g2, g3] = Openfootball.goal_events(m)
+      assert g1 == %{side: :home, type: :penalty, player: "Salah", minute: "16"}
+      assert g2 == %{side: :away, type: :regular, player: "Lukaku", minute: "73"}
+      assert g3 == %{side: :home, type: :own_goal, player: "Aguerd", minute: "90+2"}
+    end
+
+    test "an empty match yields no goals" do
+      assert Openfootball.goal_events(%{}) == []
+    end
+  end
+
   describe "parse/1" do
     test "parses a document's matches list" do
       doc = %{
