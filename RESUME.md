@@ -17,7 +17,11 @@ the app scores them against real results and ranks a leaderboard.
   **v0.11.2** knockout ET/pens capture window + `is_live` auto-clear sweep (`cvx`/`d17`);
   **v0.11.3** `/predictions` live CTA opens 30 min pre-kickoff → live → post-match recap (`4zu`);
   **v0.11.4** next-match countdown banner on `/predictions` (`vg7`, ungated — low-impact).
-  `:live_buzz` flag is **ON** in prod.
+  **Live buzz is now UNCONDITIONAL** — the `:live_buzz` flag was contracted away (`uhf`): the
+  parallel change is complete (accepted in prod → flag + gates + off-tests removed). ⚠️ **No
+  kill-switch any more** — if the FIFA live feed misbehaves, the lever is revert+redeploy, not a
+  flag flip. Needs a deploy to take effect (not yet tagged). FunWithFlags dep + `/admin/feature-flags`
+  dashboard are retained as the dark-ship mechanism for future flags.
 - **League invite code:** `wcpredict2026`
 - **Prod state:** 12 fixtures synced. **Admin console (`/admin`) + My Predictions
   (`/predictions`) live; results + cohort now auto-sync (Oban).** Admins can enter predictions
@@ -60,10 +64,12 @@ against them produced a tooling backlog, now mostly shipped:
    (relates `i9k`). ⚠️ **VERIFY before 2026-06-28** (carried from `cvx`): confirm the openfootball feed does
    NOT publish `ft` (→ `status: :completed`) mid-match for knockouts — if it does, `clear_stuck_live/1`'s
    status branch flickers (benign) rather than blacks out the buzz. cvx note has the full reasoning.
-2. **Remaining review backlog (P3):** `uhf` (centralize FunWithFlags reset in DataCase/ConnCase → lets 5
-   flag tests go async, faster gate), `r90` (extract shared admin flash/reload helper), `bl8` (Live.Updater
-   rescue: let-it-crash vs justify+test). (`y58` CSP header — DONE: strict hash-based CSP on the :browser
-   pipeline, browser-verified, sobelow Config.CSP retired.)
+2. **Remaining review backlog (P3):** `r90` (extract shared admin flash/reload helper), `bl8`
+   (Live.Updater rescue: let-it-crash vs justify+test). (`y58` CSP — DONE: strict hash-based CSP,
+   browser-verified, sobelow Config.CSP retired. `uhf` — RESOLVED by contracting live_buzz: with the
+   flag removed there's no flag state for tests to manage, so the "centralize reset / async" goal is
+   moot. Filed follow-up for the separate test-suite async-safety review — the flag tests stay
+   `async: false` pending that, since the earlier async attempt surfaced unrelated cross-module races.)
 3. **`predictex-i1s` (P3)** — match replay engine; replay a recorded capture onto a demo fixture. ⚠️ England
    v Croatia has **0 captures** (pre-`rfm`, lost to the manual-arm gap) → not replayable; guard zero-row
    match_ids (documented on i1s). Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.

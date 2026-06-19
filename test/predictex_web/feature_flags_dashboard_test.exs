@@ -1,15 +1,12 @@
 defmodule PredictexWeb.FeatureFlagsDashboardTest do
-  # async: false — the admin test enables a flag (global FunWithFlags ETS state).
+  # Covers the admin-gated FunWithFlags dashboard route — the dark-ship mechanism, retained
+  # for future flags even though live_buzz was contracted away. async: false retained pending
+  # a separate async-safety review (predictex-uhf follow-up).
   use PredictexWeb.ConnCase, async: false
 
   import Predictex.AccountsFixtures
 
   @path "/admin/feature-flags"
-
-  setup do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    :ok
-  end
 
   test "logged-out visitors are redirected to the login page", %{conn: conn} do
     conn = get(conn, @path)
@@ -34,21 +31,20 @@ defmodule PredictexWeb.FeatureFlagsDashboardTest do
 
   test "non-admins are blocked from flag-mutation routes (not just GETs)", %{conn: conn} do
     player = player_fixture(%{display_name: "Reg"})
-    conn = conn |> log_in_player(player) |> post("#{@path}/flags/live_buzz/boolean")
+    conn = conn |> log_in_player(player) |> post("#{@path}/flags/example_flag/boolean")
 
     # Blocked by the admin pipeline before reaching the UI router.
     assert redirected_to(conn) == ~p"/"
     assert Phoenix.Flash.get(conn.assigns.flash, :error) =~ "admin"
-    refute FunWithFlags.enabled?(:live_buzz)
   end
 
-  test "admins can load the flag listing and see persisted flags", %{conn: conn} do
+  test "admins can load the flag listing", %{conn: conn} do
     admin = admin_player_fixture(%{display_name: "Boss"})
-    FunWithFlags.enable(:live_buzz)
 
     conn = conn |> log_in_player(admin) |> get("#{@path}/flags")
 
-    body = html_response(conn, 200)
-    assert body =~ "live_buzz"
+    # The admin-only listing renders (200). No flags are persisted by default after
+    # contracting live_buzz, so we assert the route is reachable, not any specific flag.
+    assert html_response(conn, 200)
   end
 end

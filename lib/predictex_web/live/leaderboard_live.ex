@@ -10,8 +10,6 @@ defmodule PredictexWeb.LeaderboardLive do
   @impl true
   def mount(_params, _session, socket) do
     standings = Standings.leaderboard()
-    live_buzz? = FunWithFlags.enabled?(:live_buzz)
-    live_fixtures = if live_buzz?, do: Tournament.list_live_fixtures(), else: []
 
     {:ok,
      socket
@@ -19,8 +17,7 @@ defmodule PredictexWeb.LeaderboardLive do
      |> assign(:completed, Tournament.completed_fixture_count())
      |> assign(:standings, standings)
      |> assign(:whatsapp_text, whatsapp_text(standings))
-     |> assign(:live_buzz?, live_buzz?)
-     |> assign(:live_fixtures, live_fixtures)}
+     |> assign(:live_fixtures, Tournament.list_live_fixtures())}
   end
 
   @impl true
@@ -49,7 +46,7 @@ defmodule PredictexWeb.LeaderboardLive do
           </button>
         </div>
 
-        <section :if={@live_buzz? and @live_fixtures != []} class="mb-4">
+        <section :if={@live_fixtures != []} class="mb-4">
           <h2 class="font-semibold">Live now</h2>
           <ul>
             <li :for={f <- @live_fixtures}>

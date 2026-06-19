@@ -1,6 +1,6 @@
 defmodule PredictexWeb.MyPredictionsLiveTest do
-  # async: false because the live_buzz flag test mutates global FunWithFlags state (ETS)
-  # and would race with other async tests.
+  # async: false retained pending a separate async-safety review (predictex-uhf follow-up);
+  # live_buzz was contracted away (the live UI is unconditional), so no flag state here.
   use PredictexWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
@@ -91,9 +91,7 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert html =~ "Japan"
   end
 
-  test "shows live score on the card only when the flag is on", %{conn: conn, round: round} do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-
+  test "shows the live score on the card for a live fixture", %{conn: conn, round: round} do
     player = player_fixture(%{display_name: "LiveTester"})
     past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
 
@@ -115,21 +113,13 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
         away_goals: 0
       })
 
-    FunWithFlags.disable(:live_buzz)
-    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
-    refute html =~ "LIVE"
-
-    FunWithFlags.enable(:live_buzz)
     {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
     assert html =~ "LIVE"
     assert html =~ "1-0"
   end
 
-  test "live badge links to the fixture drill-down when live_buzz is on and fixture is live",
+  test "live badge links to the fixture drill-down for a live fixture",
        %{conn: conn, round: round} do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    FunWithFlags.enable(:live_buzz)
-
     player = player_fixture(%{display_name: "CTATester"})
     past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
 
@@ -157,9 +147,6 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
   end
 
   test "no CTA more than 30 minutes before kickoff", %{conn: conn, round: round} do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    FunWithFlags.enable(:live_buzz)
-
     player = player_fixture(%{display_name: "NotLiveTester"})
     future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
 
@@ -172,9 +159,6 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
 
   test "CTA opens 30 min before kickoff with a 'Match preview' label",
        %{conn: conn, round: round} do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    FunWithFlags.enable(:live_buzz)
-
     player = player_fixture(%{display_name: "PreviewTester"})
     soon = DateTime.utc_now() |> DateTime.add(20 * 60, :second) |> DateTime.truncate(:second)
     fx = fixture!(round, %{kickoff_at: soon, is_live: false})
@@ -186,9 +170,6 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
   end
 
   test "CTA stays after full-time as a 'Match recap' link", %{conn: conn, round: round} do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    FunWithFlags.enable(:live_buzz)
-
     player = player_fixture(%{display_name: "RecapTester"})
     past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
     fx = fixture!(round, %{kickoff_at: past, status: :completed, home_goals: 2, away_goals: 1})
@@ -197,19 +178,6 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
 
     assert html =~ ~s(href="/fixtures/#{fx.id}")
     assert html =~ "Match recap"
-  end
-
-  test "no CTA inside the window when live_buzz is off", %{conn: conn, round: round} do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    FunWithFlags.disable(:live_buzz)
-
-    player = player_fixture(%{display_name: "FlagOffTester"})
-    soon = DateTime.utc_now() |> DateTime.add(20 * 60, :second) |> DateTime.truncate(:second)
-    _fx = fixture!(round, %{kickoff_at: soon})
-
-    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
-
-    refute html =~ ~s(href="/fixtures/)
   end
 
   test "shows a 'Next match' countdown banner for the soonest upcoming fixture",

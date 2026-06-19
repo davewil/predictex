@@ -1,6 +1,6 @@
 defmodule PredictexWeb.LeaderboardLiveTest do
-  # async: false because the live_buzz flag test mutates global FunWithFlags state (ETS)
-  # and would race with other async tests.
+  # async: false retained pending a separate async-safety review (predictex-uhf follow-up);
+  # live_buzz was contracted away (live fixtures show unconditionally), so no flag state here.
   use PredictexWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
@@ -8,11 +8,6 @@ defmodule PredictexWeb.LeaderboardLiveTest do
   import Predictex.AccountsFixtures
 
   alias Predictex.{Predictions, Tournament}
-
-  setup do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    :ok
-  end
 
   test "shows an empty state when there are no players", %{conn: conn} do
     {:ok, _lv, html} = live(conn, ~p"/")
@@ -57,11 +52,11 @@ defmodule PredictexWeb.LeaderboardLiveTest do
     # a count of fixtures rather than a points total.
     assert html =~ "30 from fixtures · 20 bonus"
     refute html =~ "30 fixtures ·"
-    # flag is off (setup disables it) — "Live now" card must be absent
+    # no live fixtures here — the "Live now" card must be absent
     refute html =~ "Live now"
   end
 
-  test "shows a Live now card linking to the drill-down when flag on", %{conn: conn} do
+  test "shows a Live now card linking to the drill-down", %{conn: conn} do
     {:ok, round} = Tournament.create_round(%{name: "Group A", stage: :group, ordinal: 1})
 
     {:ok, fx} =
@@ -76,7 +71,6 @@ defmodule PredictexWeb.LeaderboardLiveTest do
         live_away_goals: 0
       })
 
-    FunWithFlags.enable(:live_buzz)
     {:ok, _lv, html} = live(conn, ~p"/")
     assert html =~ "Live now"
     assert html =~ "/fixtures/#{fx.id}"

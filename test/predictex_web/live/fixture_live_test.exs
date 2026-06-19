@@ -1,6 +1,6 @@
 defmodule PredictexWeb.FixtureLiveTest do
-  # async: false because the live_buzz flag test mutates global FunWithFlags state (ETS)
-  # and would race with other async tests.
+  # async: false retained pending a separate async-safety review (predictex-uhf follow-up);
+  # live_buzz was contracted away (the feature is unconditional), so there is no flag state here.
   use PredictexWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
@@ -47,23 +47,7 @@ defmodule PredictexWeb.FixtureLiveTest do
     fx
   end
 
-  setup do
-    on_exit(fn -> FunWithFlags.disable(:live_buzz) end)
-    :ok
-  end
-
-  test "flag off redirects to home", %{conn: conn} do
-    FunWithFlags.disable(:live_buzz)
-    player = player_fixture(%{display_name: "Viewer"})
-    round = round!()
-    fx = live_fixture!(round)
-
-    assert {:error, {:redirect, %{to: "/"}}} =
-             conn |> log_in_player(player) |> live(~p"/fixtures/#{fx.id}")
-  end
-
-  test "flag on, after kickoff: shows everyone's picks and scenario labels", %{conn: conn} do
-    FunWithFlags.enable(:live_buzz)
+  test "after kickoff: shows everyone's picks and scenario labels", %{conn: conn} do
     viewer = player_fixture(%{display_name: "Viewer"})
     other = player_fixture(%{display_name: "Zoe"})
     round = round!()
@@ -83,8 +67,7 @@ defmodule PredictexWeb.FixtureLiveTest do
     assert html =~ "Zoe"
   end
 
-  test "flag on, before kickoff: picks are hidden (anti-copy)", %{conn: conn} do
-    FunWithFlags.enable(:live_buzz)
+  test "before kickoff: picks are hidden (anti-copy)", %{conn: conn} do
     viewer = player_fixture(%{display_name: "Viewer"})
     other = player_fixture(%{display_name: "Zoe"})
     round = round!()
@@ -106,7 +89,6 @@ defmodule PredictexWeb.FixtureLiveTest do
   # handle_info tests — covers lock-flip branch and minute-only branch
 
   test "lock-flip tick reveals picks without a score change", %{conn: conn} do
-    FunWithFlags.enable(:live_buzz)
     viewer = player_fixture(%{display_name: "Viewer"})
     other = player_fixture(%{display_name: "Zoe"})
     round = round!()
@@ -135,7 +117,6 @@ defmodule PredictexWeb.FixtureLiveTest do
   end
 
   test "minute-only tick advances displayed minute without recomputing scenarios", %{conn: conn} do
-    FunWithFlags.enable(:live_buzz)
     viewer = player_fixture(%{display_name: "Viewer"})
     round = round!()
     # Use a live fixture (already locked, score 1-0, minute "45'").
@@ -156,7 +137,6 @@ defmodule PredictexWeb.FixtureLiveTest do
     # Mount on a past-kickoff fixture that is NOT yet live (is_live: false, no live score).
     # The score starts at nil/0, so score_changed? stays false on the transition tick —
     # only the is_live flip triggers load_all. After the update, the LIVE badge renders.
-    FunWithFlags.enable(:live_buzz)
     viewer = player_fixture(%{display_name: "Viewer"})
     round = round!()
     past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
@@ -190,7 +170,6 @@ defmodule PredictexWeb.FixtureLiveTest do
   end
 
   test "score-change tick re-renders updated score", %{conn: conn} do
-    FunWithFlags.enable(:live_buzz)
     viewer = player_fixture(%{display_name: "Viewer"})
     round = round!()
     fx = live_fixture!(round)

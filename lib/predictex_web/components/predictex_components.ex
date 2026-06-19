@@ -152,14 +152,10 @@ defmodule PredictexWeb.PredictexComponents do
   ## Examples
 
       <.fixture_card fx={fx} stage={@active.round.stage} fifa_url={@fifa_url} />
-      <.fixture_card fx={fx} stage={@active.round.stage} fifa_url={@fifa_url} live_buzz?={@live_buzz?} />
-
-  `live_buzz?` defaults to `false` and can be omitted when the feature flag is off.
   """
   attr :fx, :map, required: true
   attr :stage, :atom, required: true
   attr :fifa_url, :string, default: nil
-  attr :live_buzz?, :boolean, default: false
   attr :live_cta?, :boolean, default: false
   attr :live_path, :string, default: nil
   attr :tz, :string, default: "Etc/UTC"
@@ -190,17 +186,17 @@ defmodule PredictexWeb.PredictexComponents do
         <span class={status_color(@fx)}>{status_label(@fx)}</span>
       </div>
 
-      <%!-- live drill-down CTA — flag-gated; opens 30m pre-kickoff, runs through live, --%>
-      <%!-- then stays as a post-match recap (predictex-4zu). Label varies by match state. --%>
+      <%!-- live drill-down CTA — opens 30m pre-kickoff, runs through live, then stays as a --%>
+      <%!-- post-match recap (predictex-4zu). Label varies by match state. --%>
       <.link
-        :if={@live_buzz? and @live_cta? and @live_path}
+        :if={@live_cta? and @live_path}
         navigate={@live_path}
         class={["inline-flex items-center gap-1 font-bold hover:underline", cta_color(@fx)]}
       >
         {cta_label(@fx)} <span aria-hidden="true">›</span>
       </.link>
       <span
-        :if={@live_buzz? and @fx.fixture.is_live and is_nil(@live_path)}
+        :if={@fx.fixture.is_live and is_nil(@live_path)}
         class="font-bold text-error"
       >
         LIVE {@fx.fixture.live_minute} · {@fx.fixture.live_home_goals}-{@fx.fixture.live_away_goals}

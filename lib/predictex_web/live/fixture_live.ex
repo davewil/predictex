@@ -2,7 +2,6 @@ defmodule PredictexWeb.FixtureLive do
   @moduledoc """
   Real-time buzz drill-down for a single live fixture.
 
-  - Flag off (`live_buzz` disabled): redirects to home immediately.
   - Pre-kickoff: shows fixture info; picks are hidden (anti-copy).
   - Post-kickoff (locked): reveals everyone's picks.
   - Live fixture: shows the "what-if" projected standings (with rank movement)
@@ -20,17 +19,13 @@ defmodule PredictexWeb.FixtureLive do
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
-    if FunWithFlags.enabled?(:live_buzz) do
-      fixture = Tournament.get_fixture!(id)
+    fixture = Tournament.get_fixture!(id)
 
-      if connected?(socket) do
-        Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{id}")
-      end
-
-      {:ok, load_all(socket, fixture)}
-    else
-      {:ok, redirect(socket, to: ~p"/")}
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{id}")
     end
+
+    {:ok, load_all(socket, fixture)}
   end
 
   @impl true

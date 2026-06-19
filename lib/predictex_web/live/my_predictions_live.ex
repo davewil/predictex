@@ -22,8 +22,7 @@ defmodule PredictexWeb.MyPredictionsLive do
      |> assign(:active_ordinal, active)
      |> assign(:now, now)
      |> assign(:next_match, Dashboard.next_match(dash, now))
-     |> assign(:fifa_url, Application.get_env(:predictex, :fifa_predictor_url))
-     |> assign(:live_buzz?, FunWithFlags.enabled?(:live_buzz))}
+     |> assign(:fifa_url, Application.get_env(:predictex, :fifa_predictor_url))}
   end
 
   @impl true
@@ -126,7 +125,6 @@ defmodule PredictexWeb.MyPredictionsLive do
             fx={fx}
             stage={@active.round.stage}
             fifa_url={@fifa_url}
-            live_buzz?={@live_buzz?}
             live_cta?={Predictions.cta_window?(fx.fixture, @now)}
             live_path={~p"/fixtures/#{fx.fixture.id}"}
             tz={@tz}
