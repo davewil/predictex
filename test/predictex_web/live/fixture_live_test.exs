@@ -197,11 +197,47 @@ defmodule PredictexWeb.FixtureLiveTest do
 
     {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
 
-    # header score span present
-    assert html =~ "font-score text-4xl font-extrabold"
+    # header score span is present AND shows the correct final score
+    assert html =~ ~r/font-score text-4xl font-extrabold[^>]*>.*?2.*?–.*?1/s
     assert html =~ "Zoe"
     # exact prediction earns 30 pts in group stage
     assert html =~ "+30"
+  end
+
+  test "settled knockout fixture does NOT show the match recap", %{conn: conn} do
+    {:ok, round} =
+      Tournament.create_round(%{name: "Quarter-final", stage: :knockout, ordinal: 4})
+
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    {:ok, fx} =
+      Tournament.create_fixture(%{
+        external_ref: "recap-ko-#{System.unique_integer([:positive])}",
+        team1: "Brazil",
+        team2: "Argentina",
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0,
+        kickoff_at: past,
+        round_id: round.id
+      })
+
+    viewer = player_fixture(%{display_name: "Ana"})
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: viewer.id,
+        fixture_id: fx.id,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    # No header score span (recap? is false for knockout)
+    refute html =~ "font-score text-4xl font-extrabold"
+    # No per-pick points badge (bg-success/15 is unique to the points badge element)
+    refute html =~ "bg-success/15"
   end
 
   test "score-change tick re-renders updated score", %{conn: conn} do

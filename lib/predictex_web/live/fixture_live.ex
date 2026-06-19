@@ -99,9 +99,9 @@ defmodule PredictexWeb.FixtureLive do
               :if={@fixture.is_live or @recap?}
               class="font-score text-4xl font-extrabold tabular-nums sm:text-5xl"
             >
-              {(@fixture.is_live && @fixture.live_home_goals) || @fixture.home_goals}<span class="px-1 text-base-content/30">–</span>{(@fixture.is_live &&
-                                                                                                                                         @fixture.live_away_goals) ||
-                @fixture.away_goals}
+              {if @fixture.is_live, do: @fixture.live_home_goals, else: @fixture.home_goals}<span class="px-1 text-base-content/30">–</span>{if @fixture.is_live,
+                do: @fixture.live_away_goals,
+                else: @fixture.away_goals}
             </span>
             <span :if={not @fixture.is_live and not @recap?} class="px-2 text-base-content/40">v</span>
 
