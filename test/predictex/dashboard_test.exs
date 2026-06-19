@@ -16,6 +16,9 @@ defmodule Predictex.DashboardTest do
       fixtures: fixtures
     }
 
+  defp build_dash(rounds),
+    do: Dashboard.build(rounds, %{}, %{entry: nil, rank: 1, of: 1}, ~U[2026-06-15 12:00:00Z])
+
   test "build assembles per-fixture view and takes points/total/rank from the standings entry" do
     now = ~U[2026-06-15 12:00:00Z]
 
@@ -142,6 +145,70 @@ defmodule Predictex.DashboardTest do
 
     view = Dashboard.build(rounds, %{}, %{entry: nil, rank: 1, of: 1}, now)
     assert Enum.find(view.rounds, & &1.active?).round.ordinal == 2
+  end
+
+  describe "next_tick_delay/2" do
+    test "nil when there are no rounds" do
+      dash = build_dash([])
+      assert Dashboard.next_tick_delay(dash, dt(0)) == nil
+    end
+
+    test "nil when every fixture is completed" do
+      done = %Fixture{
+        id: 1,
+        round_id: 1,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0,
+        kickoff_at: dt(-3600)
+      }
+
+      dash = build_dash([round_with(1, :group, [done])])
+      assert Dashboard.next_tick_delay(dash, dt(0)) == nil
+    end
+
+    test "nil when the only fixtures have no kickoff time" do
+      tbc = %Fixture{id: 1, round_id: 1, status: :scheduled, kickoff_at: nil}
+      dash = build_dash([round_with(1, :group, [tbc])])
+      assert Dashboard.next_tick_delay(dash, dt(0)) == nil
+    end
+
+    test "gap to the preview window when more than 30 min before kickoff" do
+      # kickoff in 1h; the preview opens 30 min before → 1_800_000 ms away
+      fx = %Fixture{id: 1, round_id: 1, status: :scheduled, kickoff_at: dt(3600)}
+      dash = build_dash([round_with(1, :group, [fx])])
+      assert Dashboard.next_tick_delay(dash, dt(0)) == 1_800_000
+    end
+
+    test "gap to kickoff once inside the 30 min preview window" do
+      # kickoff in 10m; preview already open → next event is the lock at kickoff
+      fx = %Fixture{id: 1, round_id: 1, status: :scheduled, kickoff_at: dt(600)}
+      dash = build_dash([round_with(1, :group, [fx])])
+      assert Dashboard.next_tick_delay(dash, dt(0)) == 600_000
+    end
+
+    test "30s while a match is in play (kickoff passed, not completed)" do
+      fx = %Fixture{id: 1, round_id: 1, status: :live, kickoff_at: dt(-60)}
+      dash = build_dash([round_with(1, :group, [fx])])
+      assert Dashboard.next_tick_delay(dash, dt(0)) == 30_000
+    end
+
+    test "takes the soonest threshold across all rounds" do
+      near = %Fixture{id: 1, round_id: 1, status: :scheduled, kickoff_at: dt(2400)}
+      far = %Fixture{id: 2, round_id: 2, status: :scheduled, kickoff_at: dt(7200)}
+      dash = build_dash([round_with(1, :group, [near]), round_with(2, :group, [far])])
+      # near: preview opens in 2400 - 1800 = 600s → 600_000 ms (the minimum)
+      assert Dashboard.next_tick_delay(dash, dt(0)) == 600_000
+    end
+
+    test "floors a sub-second threshold at 1000 ms" do
+      ko = ~U[2026-06-15 12:00:00Z]
+      now = ~U[2026-06-15 11:59:59.500Z]
+      fx = %Fixture{id: 1, round_id: 1, status: :scheduled, kickoff_at: ko}
+      dash = build_dash([round_with(1, :group, [fx])])
+      # preview opened 30 min ago; the lock is 500 ms away → floored
+      assert Dashboard.next_tick_delay(dash, now) == 1_000
+    end
   end
 
   describe "next_match/2" do

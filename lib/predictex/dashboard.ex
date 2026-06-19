@@ -100,6 +100,41 @@ defmodule Predictex.Dashboard do
   defp upcoming?(%{fixture: %{kickoff_at: nil}}, _now), do: false
   defp upcoming?(%{fixture: %{kickoff_at: ko}}, now), do: DateTime.compare(ko, now) == :gt
 
+  @live_poll_ms 30_000
+
+  @doc """
+  Milliseconds until this dashboard next needs a re-render, or `nil` when nothing
+  time-sensitive remains (every fixture completed or without a kickoff).
+
+  Drives the self-paced tick on `/predictions` (predictex live-tick): `30_000` while a
+  match is in play (score refresh), otherwise the exact gap to the next preview-open
+  (`kickoff − cta_lead_seconds`) or kickoff-lock threshold across all rounds, floored at
+  `1_000` ms. Pure — the caller supplies `now`.
+  """
+  def next_tick_delay(dash, now) do
+    dash.rounds
+    |> Enum.flat_map(& &1.fixtures)
+    |> Enum.map(&fixture_delay(&1, now))
+    |> Enum.reject(&is_nil/1)
+    |> case do
+      [] -> nil
+      delays -> max(Enum.min(delays), 1_000)
+    end
+  end
+
+  defp fixture_delay(%{status: :completed}, _now), do: nil
+  defp fixture_delay(%{fixture: %{kickoff_at: nil}}, _now), do: nil
+
+  defp fixture_delay(%{fixture: %{kickoff_at: ko}}, now) do
+    preview_at = DateTime.add(ko, -Predictions.cta_lead_seconds(), :second)
+
+    cond do
+      DateTime.compare(now, ko) != :lt -> @live_poll_ms
+      DateTime.compare(now, preview_at) != :lt -> DateTime.diff(ko, now, :millisecond)
+      true -> DateTime.diff(preview_at, now, :millisecond)
+    end
+  end
+
   defp fixture_view(fixture, predictions_by_fixture, points_by_fixture, now) do
     prediction = Map.get(predictions_by_fixture, fixture.id)
 

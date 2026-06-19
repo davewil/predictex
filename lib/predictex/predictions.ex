@@ -131,6 +131,9 @@ defmodule Predictex.Predictions do
   # The live drill-down (FixtureLive) CTA opens this long before kickoff.
   @cta_lead_seconds 30 * 60
 
+  @doc "Seconds before kickoff that the preview / live drill-down CTA window opens."
+  def cta_lead_seconds, do: @cta_lead_seconds
+
   @doc """
   Whether the live drill-down CTA should be offered for a fixture at `now`.
 
