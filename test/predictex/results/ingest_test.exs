@@ -98,7 +98,7 @@ defmodule Predictex.Results.IngestTest do
     }
 
     doc |> Ingest.plan() |> Ingest.commit()
-    fx = Repo.get_by!(Fixture, external_ref: "2026-06-20 Egypt v Belgium") |> Repo.preload([])
+    fx = Repo.get_by!(Fixture, external_ref: "2026-06-20 Egypt v Belgium")
 
     assert [%{side: :home, type: :penalty, player: "Salah"}, %{side: :away, type: :regular}] =
              fx.goals

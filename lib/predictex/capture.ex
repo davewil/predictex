@@ -9,7 +9,7 @@ defmodule Predictex.Capture do
 
       bin/predictex rpc "Predictex.Capture.summary(\\"400021502\\")"
   """
-  import Ecto.Query, only: [from: 2]
+  import Ecto.Query, only: [from: 2, where: 3, order_by: 3, limit: 2]
 
   alias Predictex.Repo
   alias Predictex.Capture.Snapshot
@@ -26,6 +26,20 @@ defmodule Predictex.Capture do
         where: c.match_id == ^match_id,
         order_by: [asc: c.captured_at]
     )
+  end
+
+  @doc "The body of the most recent `/detail` snapshot for a match, or nil if none."
+  @spec latest_detail_body(String.t()) :: map() | nil
+  def latest_detail_body(match_id) do
+    Snapshot
+    |> where([s], s.match_id == ^match_id and s.endpoint == "detail")
+    |> order_by([s], desc: s.captured_at)
+    |> limit(1)
+    |> Repo.one()
+    |> case do
+      %{body: body} when is_map(body) -> body
+      _ -> nil
+    end
   end
 
   @doc "Read a match's snapshots, print a human summary, and return the analysis map."

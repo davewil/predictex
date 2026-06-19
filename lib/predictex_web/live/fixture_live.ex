@@ -74,18 +74,7 @@ defmodule PredictexWeb.FixtureLive do
   end
 
   defp recap_goals(fixture) do
-    body =
-      if fixture.fifa_match_id do
-        fixture.fifa_match_id
-        |> Capture.list_snapshots()
-        |> Enum.filter(&(&1.endpoint == "detail" and is_map(&1.body)))
-        |> List.last()
-        |> case do
-          nil -> nil
-          snap -> snap.body
-        end
-      end
-
+    body = fixture.fifa_match_id && Capture.latest_detail_body(fixture.fifa_match_id)
     MatchRecap.goals(fixture, body)
   end
 

@@ -27,6 +27,50 @@ defmodule Predictex.CaptureTest do
     end
   end
 
+  describe "latest_detail_body/1" do
+    test "returns the body of the most recent detail snapshot" do
+      {:ok, _} =
+        Capture.record_snapshot(%{
+          captured_at: ~U[2026-06-17 17:00:00Z],
+          endpoint: "detail",
+          url: "u",
+          match_id: "m99",
+          http_status: 200,
+          body: %{"old" => true}
+        })
+
+      {:ok, _} =
+        Capture.record_snapshot(%{
+          captured_at: ~U[2026-06-17 18:00:00Z],
+          endpoint: "detail",
+          url: "u",
+          match_id: "m99",
+          http_status: 200,
+          body: %{"latest" => true}
+        })
+
+      assert %{"latest" => true} = Capture.latest_detail_body("m99")
+    end
+
+    test "returns nil when no detail snapshot exists" do
+      {:ok, _} =
+        Capture.record_snapshot(%{
+          captured_at: ~U[2026-06-17 17:00:00Z],
+          endpoint: "now",
+          url: "u",
+          match_id: "m100",
+          http_status: 200,
+          body: %{"some" => "data"}
+        })
+
+      assert is_nil(Capture.latest_detail_body("m100"))
+    end
+
+    test "returns nil when match has no snapshots at all" do
+      assert is_nil(Capture.latest_detail_body("no-such-match"))
+    end
+  end
+
   test "record_snapshot/1 persists and list_snapshots/1 reads back in time order" do
     {:ok, _} =
       Capture.record_snapshot(%{
