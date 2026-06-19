@@ -117,23 +117,30 @@ defmodule Predictex.Capture do
   end
 
   defp goals_from_last_detail([]), do: []
+  defp goals_from_last_detail(details), do: goal_events(List.last(details).body)
 
-  defp goals_from_last_detail(details) do
-    body = List.last(details).body
+  @doc "Decode a FIFA `/detail` body into unified goal events `[%{side, type, player, minute}]`."
+  @spec goal_events(map()) :: [map()]
+  def goal_events(body) when is_map(body) do
     players = player_map(body)
 
-    for {team, side} <- [{"HomeTeam", "home"}, {"AwayTeam", "away"}],
+    for {team, side} <- [{"HomeTeam", :home}, {"AwayTeam", :away}],
         goal <- get_in(body, [team, "Goals"]) || [] do
       %{
-        minute: goal["Minute"],
         side: side,
-        type: goal_type(goal["Type"]),
-        scorer: Map.get(players, goal["IdPlayer"]) || goal["IdPlayer"],
-        id_team: goal["IdTeam"]
+        type: fifa_goal_type(goal["Type"]),
+        player: Map.get(players, goal["IdPlayer"]) || goal["IdPlayer"],
+        minute: to_string(goal["Minute"])
       }
     end
     |> Enum.sort_by(&minute_key(&1.minute))
   end
+
+  def goal_events(_), do: []
+
+  defp fifa_goal_type(1), do: :penalty
+  defp fifa_goal_type(3), do: :own_goal
+  defp fifa_goal_type(_), do: :regular
 
   defp player_map(body) do
     for team <- ["HomeTeam", "AwayTeam"],
@@ -145,12 +152,6 @@ defmodule Predictex.Capture do
 
   defp loc_name([%{"Description" => d} | _]), do: d
   defp loc_name(_), do: nil
-
-  # Decoded from baseline samples (see fifa-v3-live-api-contract memory).
-  defp goal_type(1), do: "penalty"
-  defp goal_type(2), do: "goal"
-  defp goal_type(3), do: "own_goal"
-  defp goal_type(other), do: "type_#{inspect(other)}"
 
   defp minute_key(s) when is_binary(s) do
     case Regex.run(~r/^\d+/, s) do
@@ -206,7 +207,7 @@ defmodule Predictex.Capture do
 
   defp goals_block(goals) do
     Enum.map_join(goals, "\n", fn g ->
-      "  #{g.minute}  #{g.side}  #{g.type}  #{g.scorer}  (IdTeam #{g.id_team})"
+      "  #{g.minute}  #{g.side}  #{g.type}  #{g.player}"
     end)
   end
 end
