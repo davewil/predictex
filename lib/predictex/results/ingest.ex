@@ -34,6 +34,7 @@ defmodule Predictex.Results.Ingest do
     :first_scorer_side,
     :first_scorer_player,
     :first_goal_owngoal,
+    :goals,
     :round_id,
     :updated_at
   ]
@@ -86,7 +87,8 @@ defmodule Predictex.Results.Ingest do
         away_goals: fixture.away_goals,
         first_scorer_side: fixture.first_scorer_side,
         first_scorer_player: fixture.first_scorer_player,
-        first_goal_owngoal: fixture.first_goal_owngoal
+        first_goal_owngoal: fixture.first_goal_owngoal,
+        goals: fixture.goals
       }
     }
   end

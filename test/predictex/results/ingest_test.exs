@@ -3,6 +3,7 @@ defmodule Predictex.Results.IngestTest do
 
   alias Predictex.Results.Ingest
   alias Predictex.Tournament
+  alias Predictex.Tournament.Fixture
 
   @doc_fixture %{
     "matches" => [
@@ -78,5 +79,39 @@ defmodule Predictex.Results.IngestTest do
     # cohort % was admin-entered and must survive the re-sync
     assert updated.cohort_home_pct == 55
     assert updated.cohort_away_pct == 20
+  end
+
+  test "persists goal events and refreshes them on re-sync" do
+    doc = %{
+      "matches" => [
+        %{
+          "round" => "Matchday 1",
+          "team1" => "Egypt",
+          "team2" => "Belgium",
+          "date" => "2026-06-20",
+          "time" => "18:00",
+          "score" => %{"ft" => [2, 1]},
+          "goals1" => [%{"name" => "Salah", "minute" => 16, "penalty" => true}],
+          "goals2" => [%{"name" => "Lukaku", "minute" => 73}]
+        }
+      ]
+    }
+
+    doc |> Ingest.plan() |> Ingest.commit()
+    fx = Repo.get_by!(Fixture, external_ref: "2026-06-20 Egypt v Belgium") |> Repo.preload([])
+
+    assert [%{side: :home, type: :penalty, player: "Salah"}, %{side: :away, type: :regular}] =
+             fx.goals
+
+    # re-sync with an extra goal → overwritten, not duplicated
+    doc2 =
+      put_in(doc, ["matches", Access.at(0), "goals2"], [
+        %{"name" => "Lukaku", "minute" => 73},
+        %{"name" => "Hazard", "minute" => 88}
+      ])
+
+    doc2 |> Ingest.plan() |> Ingest.commit()
+    fx2 = Repo.get_by!(Fixture, external_ref: "2026-06-20 Egypt v Belgium")
+    assert length(fx2.goals) == 3
   end
 end

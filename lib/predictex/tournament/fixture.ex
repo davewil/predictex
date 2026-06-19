@@ -34,6 +34,13 @@ defmodule Predictex.Tournament.Fixture do
     field :is_live, :boolean, default: false
     field :fifa_match_id, :string
 
+    embeds_many :goals, Goal, on_replace: :delete do
+      field :side, Ecto.Enum, values: [:home, :away]
+      field :type, Ecto.Enum, values: [:penalty, :own_goal, :regular]
+      field :player, :string
+      field :minute, :string
+    end
+
     belongs_to :round, Predictex.Tournament.Round
     has_many :predictions, Predictex.Predictions.Prediction
 
@@ -67,12 +74,19 @@ defmodule Predictex.Tournament.Fixture do
   def changeset(fixture, attrs) do
     fixture
     |> cast(attrs, @castable)
+    |> cast_embed(:goals, with: &goal_changeset/2)
     |> validate_required([:external_ref, :team1, :team2, :status, :round_id])
     |> validate_number(:home_goals, greater_than_or_equal_to: 0)
     |> validate_number(:away_goals, greater_than_or_equal_to: 0)
     |> validate_cohort()
     |> assoc_constraint(:round)
     |> unique_constraint(:external_ref)
+  end
+
+  defp goal_changeset(goal, attrs) do
+    goal
+    |> cast(attrs, [:side, :type, :player, :minute])
+    |> validate_required([:side, :type])
   end
 
   defp validate_cohort(changeset) do
