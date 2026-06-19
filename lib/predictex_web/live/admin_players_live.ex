@@ -3,6 +3,7 @@ defmodule PredictexWeb.AdminPlayersLive do
   use PredictexWeb, :live_view
 
   alias Predictex.Accounts
+  alias PredictexWeb.AdminWriteResult
 
   @impl true
   def mount(_params, _session, socket) do
@@ -13,10 +14,13 @@ defmodule PredictexWeb.AdminPlayersLive do
 
   @impl true
   def handle_event("promote", %{"id" => id}, socket) do
-    case Accounts.set_player_admin(String.to_integer(id), true) do
-      {:ok, _} -> {:noreply, socket |> load_players() |> put_flash(:info, "Promoted to admin.")}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not promote player.")}
-    end
+    AdminWriteResult.handle(
+      socket,
+      Accounts.set_player_admin(String.to_integer(id), true),
+      &load_players/1,
+      "Promoted to admin.",
+      "Could not promote player."
+    )
   end
 
   @impl true

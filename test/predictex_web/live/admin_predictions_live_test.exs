@@ -137,4 +137,29 @@ defmodule PredictexWeb.AdminPredictionsLiveTest do
     assert ko_html =~ "first_scorer_player"
     assert ko_html =~ "1st player"
   end
+
+  test "boosting a blank scoreline flashes the booster-on-blank message and saves nothing", %{
+    conn: conn,
+    round: round,
+    player: player
+  } do
+    f = fixture!(round)
+    {:ok, lv, _html} = live(conn, ~p"/admin/predictions?view=player")
+    load_grid(lv, player, round)
+
+    html =
+      lv
+      |> form("#by-player-form",
+        player_id: player.id,
+        round_id: round.id,
+        rows: %{"#{f.id}" => %{"home_goals" => "", "away_goals" => ""}},
+        booster_fixture_id: "#{f.id}"
+      )
+      |> render_submit()
+
+    # The specific copy from prediction_error/1 — not the generic "Could not save".
+    assert html =~ "enter a score for the boosted fixture"
+    assert html =~ "Nothing was saved."
+    assert Predictions.list_player_predictions(player.id) == []
+  end
 end

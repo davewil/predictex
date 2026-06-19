@@ -9,6 +9,7 @@ defmodule PredictexWeb.AdminFixturesLive do
 
   alias Predictex.Results.Ingest
   alias Predictex.Tournament
+  alias PredictexWeb.AdminWriteResult
   alias PredictexWeb.Flags
 
   @impl true
@@ -61,10 +62,13 @@ defmodule PredictexWeb.AdminFixturesLive do
   defp update_fixture(socket, id, attrs, ok_msg) do
     fixture = Tournament.get_fixture!(id)
 
-    case Tournament.update_fixture(fixture, attrs) do
-      {:ok, _} -> {:noreply, socket |> load_fixtures() |> put_flash(:info, ok_msg)}
-      {:error, _cs} -> {:noreply, put_flash(socket, :error, "Could not save fixture.")}
-    end
+    AdminWriteResult.handle(
+      socket,
+      Tournament.update_fixture(fixture, attrs),
+      &load_fixtures/1,
+      ok_msg,
+      "Could not save fixture."
+    )
   end
 
   defp cohort_set?(f), do: f.cohort_home_pct && f.cohort_draw_pct && f.cohort_away_pct

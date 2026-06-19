@@ -10,6 +10,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
   use PredictexWeb, :live_view
 
   alias Predictex.{Accounts, Predictions, Tournament}
+  alias PredictexWeb.AdminWriteResult
   alias PredictexWeb.Flags
 
   @impl true
@@ -61,26 +62,17 @@ defmodule PredictexWeb.AdminPredictionsLive do
     boost_id = to_int(params["booster_fixture_id"])
     rows = parse_rows(params["rows"] || %{}, boost_id)
 
-    case Predictions.admin_save_round_predictions(player_id, round_id, rows) do
-      {:ok, results} ->
-        fixtures = fixtures_for_round(round_id)
-
-        {:noreply,
-         socket
-         |> assign(:existing, existing_for(player_id, fixtures))
-         |> put_flash(:info, summarize(results))}
-
-      {:error, {:booster_on_blank, _results}} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
-         )}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not save predictions.")}
+    reload = fn socket ->
+      assign(socket, :existing, existing_for(player_id, fixtures_for_round(round_id)))
     end
+
+    AdminWriteResult.handle(
+      socket,
+      Predictions.admin_save_round_predictions(player_id, round_id, rows),
+      reload,
+      &summarize/1,
+      &prediction_error/1
+    )
   end
 
   def handle_event("load_fixture", %{"fixture_id" => fid}, socket) do
@@ -136,6 +128,13 @@ defmodule PredictexWeb.AdminPredictionsLive do
   defp result_kind(:upserted), do: :upserted
   defp result_kind(:skipped), do: :skipped
   defp result_kind({:error, _}), do: :error
+
+  # Booster-on-blank gets its own copy; any other error is a generic save failure.
+  defp prediction_error({:booster_on_blank, _results}),
+    do:
+      "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
+
+  defp prediction_error(_), do: "Could not save predictions."
 
   defp all_fixtures, do: Tournament.list_fixtures() |> Enum.sort_by(& &1.id)
 
