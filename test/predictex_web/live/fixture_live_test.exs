@@ -67,6 +67,72 @@ defmodule PredictexWeb.FixtureLiveTest do
     assert html =~ "Zoe"
   end
 
+  test "after kickoff on a knockout fixture: reveals first-team and first-scorer picks", %{
+    conn: conn
+  } do
+    viewer = player_fixture(%{display_name: "Viewer"})
+    other = player_fixture(%{display_name: "Zoe"})
+    round = round!()
+    fx = live_fixture!(round)
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: other.id,
+        fixture_id: fx.id,
+        home_goals: 2,
+        away_goals: 1,
+        first_scorer_side: :home,
+        first_scorer_player: "Mbappe"
+      })
+
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    # home side maps to team1 (England), same orientation the goals section uses.
+    assert html =~ "First to score: England · Mbappe"
+  end
+
+  test "knockout pick with no first-team entered renders a dash, not the away team", %{conn: conn} do
+    viewer = player_fixture(%{display_name: "Viewer"})
+    other = player_fixture(%{display_name: "Zoe"})
+    round = round!()
+    fx = live_fixture!(round)
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: other.id,
+        fixture_id: fx.id,
+        home_goals: 2,
+        away_goals: 1
+        # no first_scorer_side / first_scorer_player
+      })
+
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    assert html =~ "First to score: — · —"
+    # The nil→team2 idiom trap: a blank first-team must NOT show the away team.
+    refute html =~ "First to score: France"
+  end
+
+  test "group-stage picks reveal omits the first-team/first-scorer line", %{conn: conn} do
+    viewer = player_fixture(%{display_name: "Viewer"})
+    other = player_fixture(%{display_name: "Zoe"})
+    {:ok, round} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+    fx = live_fixture!(round)
+
+    {:ok, _} =
+      Predictions.admin_upsert_prediction(%{
+        player_id: other.id,
+        fixture_id: fx.id,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    assert html =~ "Zoe"
+    refute html =~ "First to score:"
+  end
+
   test "before kickoff: picks are hidden (anti-copy)", %{conn: conn} do
     viewer = player_fixture(%{display_name: "Viewer"})
     other = player_fixture(%{display_name: "Zoe"})

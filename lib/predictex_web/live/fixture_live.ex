@@ -53,6 +53,7 @@ defmodule PredictexWeb.FixtureLive do
     h = fixture.live_home_goals || 0
     a = fixture.live_away_goals || 0
     recap? = fixture.status == :completed and fixture.round.stage == :group
+    knockout? = fixture.round.stage != :group
     picks = if(locked?, do: Predictions.list_fixture_predictions(fixture.id), else: [])
 
     socket
@@ -61,6 +62,7 @@ defmodule PredictexWeb.FixtureLive do
     |> assign(:picks_visible?, locked?)
     |> assign(:picks, picks)
     |> assign(:recap?, recap?)
+    |> assign(:knockout?, knockout?)
     |> assign(:points, if(recap?, do: MatchRecap.points(fixture, picks), else: %{}))
     |> assign(:goals, if(recap?, do: recap_goals(fixture), else: []))
     |> assign(
@@ -194,26 +196,32 @@ defmodule PredictexWeb.FixtureLive do
             <div
               :for={p <- @picks}
               class={[
-                "flex items-center justify-between py-2.5",
+                "py-2.5",
                 p.player_id == @viewer_id && "font-bold text-primary"
               ]}
             >
-              <span class="truncate text-sm">{p.player.display_name}</span>
-              <span class="flex items-center gap-1.5 font-score text-sm font-bold tabular-nums">
-                {p.home_goals}–{p.away_goals}
-                <span
-                  :if={p.booster}
-                  class="rounded bg-accent px-1 py-0.5 text-[9px] text-accent-content"
-                >
-                  ⚡2×
+              <div class="flex items-center justify-between">
+                <span class="truncate text-sm">{p.player.display_name}</span>
+                <span class="flex items-center gap-1.5 font-score text-sm font-bold tabular-nums">
+                  {p.home_goals}–{p.away_goals}
+                  <span
+                    :if={p.booster}
+                    class="rounded bg-accent px-1 py-0.5 text-[9px] text-accent-content"
+                  >
+                    ⚡2×
+                  </span>
+                  <span
+                    :if={@recap?}
+                    class="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-bold text-success"
+                  >
+                    +{Map.get(@points, p.player_id, 0)}
+                  </span>
                 </span>
-                <span
-                  :if={@recap?}
-                  class="rounded bg-success/15 px-1.5 py-0.5 text-[10px] font-bold text-success"
-                >
-                  +{Map.get(@points, p.player_id, 0)}
-                </span>
-              </span>
+              </div>
+              <div :if={@knockout?} class="mt-0.5 text-xs font-normal text-base-content/60">
+                First to score: {first_team(p.first_scorer_side, @fixture)} · {p.first_scorer_player ||
+                  "—"}
+              </div>
             </div>
           </div>
         </section>
@@ -260,4 +268,11 @@ defmodule PredictexWeb.FixtureLive do
     do: Phoenix.HTML.raw(~s(<span class="text-error">▼#{abs(delta)}</span>))
 
   defp movement(_), do: Phoenix.HTML.raw(~s(<span class="text-base-content/25">–</span>))
+
+  # First-team-to-score pick → team name. Explicit clauses: first_scorer_side is
+  # independently nullable, so a `(side == :home && team1) || team2` idiom would
+  # wrongly render team2 for a blank pick.
+  defp first_team(:home, fixture), do: fixture.team1
+  defp first_team(:away, fixture), do: fixture.team2
+  defp first_team(nil, _fixture), do: "—"
 end
