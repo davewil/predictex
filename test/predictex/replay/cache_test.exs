@@ -11,8 +11,14 @@ defmodule Predictex.Replay.CacheTest do
   end
 
   describe "frames/1" do
-    test "returns [] for a match with no captures" do
-      assert Cache.frames("no-such-match-cache-xyz") == []
+    test "returns [] for a match with no captures and caches the empty result" do
+      match_id = "no-such-match-cache-xyz"
+
+      # First call misses, computes [], and caches it.
+      assert Cache.frames(match_id) == []
+
+      # Second call must return [] from the cached-empty arm, not recompute a fresh miss.
+      assert Cache.frames(match_id) == []
     end
 
     test "returns projected frames on a miss and caches them" do
@@ -36,6 +42,7 @@ defmodule Predictex.Replay.CacheTest do
       frames = Cache.frames(match_id)
 
       assert length(frames) == 1
+      assert hd(frames).is_live == true
       assert hd(frames).live_home_goals == 1
       assert hd(frames).live_away_goals == 0
       assert hd(frames).live_minute == "30'"
