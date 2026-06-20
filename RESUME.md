@@ -12,6 +12,8 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
+- **Staged on `main`, NOT yet deployed:** `9p0` (PubSub dashboard updates) — committed `3cde06d`, pushed,
+  CI-green; **pending deploy as `v0.11.10`**, held because a match is in progress (see "Continue here").
 - **Latest deployed tag:** `v0.11.9` (deployed + verified 2026-06-20: Deploy job success, `/health` 200,
   anon `/` 200) — **dashboard live tick** (`doz`, closed): `/predictions` self-paced `:tick` re-pulls
   `Dashboard.for_player` over the websocket (no refresh); pure `Dashboard.next_tick_delay/2` (30s live /
@@ -49,45 +51,47 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-20)
 
-**Two features shipped today (2026-06-20):**
+**▶ IMMEDIATE NEXT — DEPLOY `v0.11.10` (`9p0`) once the in-progress match ends.** `9p0` is committed
+(`3cde06d`), pushed, and CI-green on `main` — held from deploy only because a match was capturing (a
+container recreate drops frames). When there's a gap between matches: `scripts/pre-deploy` → `git tag
+v0.11.10 && git push origin v0.11.10` → verify `/health` 200 + close `9p0`. **No migration** (PubSub +
+LiveView only). ⚠️ Still do NOT deploy mid-capture (`*/5` cron re-arms in ~5 min, but you lose frames).
+
+**Three features done today (2026-06-20):**
+- **`9p0` — PubSub dashboard updates (staged `v0.11.10`, pending deploy).** `/predictions` no longer polls
+  every 30s while a match is live. New `Tournament.subscribe_changes/0` + `broadcast_change/0` own one
+  coarse `"fixtures:changed"` topic, broadcast **after the DB write** by `LiveScore.apply_to_fixture/2`
+  (live) and `Ingest.commit/1` (settle). `MyPredictionsLive` subscribes once + re-pulls; `next_tick_delay/2`
+  dropped the 30s branch (nil past kickoff). Advisor design call: settle-broadcast from ResultSync makes
+  the dashboard **faster** than the poll (DB only learns settle at sync time anyway) — 9p0's own thesis,
+  not scope creep. Scope guard: FixtureLive NOT migrated. TDD (5 units), 404 green, independent review =
+  Ready to deploy (no Critical/Important; applied its async-test hardening + a `clear_live` test). Deferred
+  polish on the issue: minute-only live changes still trigger a full re-pull (same cost as the old poll).
 - **`v0.11.9` — dashboard live tick (`doz`, CLOSED).** `/predictions` self-paced `:tick` re-pulls
-  `Dashboard.for_player` over the websocket; pure `Dashboard.next_tick_delay/2` (30s live / exact gap to
-  next preview-open or kickoff-lock / nil once settled); `Predictions.cta_lead_seconds/0` DRYs the 30-min
-  constant. No migration. (This was a parallel-worktree feature merged onto `main`, then verified + shipped.)
-- **`v0.11.8` — `predictex-p4o` Slice 2 goal breakdown.** Built via subagent-driven-development (Tasks 3–7,
-  each task-reviewed; Task 7's FIFA-minute doubled-apostrophe defect caught + fixed; opus whole-branch
-  review clean). `Openfootball.goal_events/1` + persisted `goals` embed (migration `add_goals_to_fixtures`)
-  → `Capture.goal_events/1` (FIFA) → `MatchRecap.goals/2` (FIFA-if-reconciles, else openfootball) →
-  FixtureLive breakdown, **group-stage settled only**. Plan/spec `docs/superpowers/{plans,specs}/2026-06-19-p4o-match-recap*`.
-  - **Deploy gotcha hit + fixed (`8642b23`):** `.sobelow-skips` fingerprints are **line-keyed**
+  `Dashboard.for_player`; pure `next_tick_delay/2`; `Predictions.cta_lead_seconds/0` DRYs the 30-min
+  constant. (Parallel-worktree feature merged onto `main`, then verified + shipped.)
+- **`v0.11.8` — `predictex-p4o` Slice 2 goal breakdown.** Subagent-driven (Tasks 3–7); `Openfootball.goal_events/1`
+  + persisted `goals` embed (migration) → `Capture.goal_events/1` (FIFA) → `MatchRecap.goals/2`
+  (FIFA-if-reconciles, else openfootball) → FixtureLive breakdown, **group-stage settled only**.
+  - **Sobelow gotcha fixed (`8642b23`):** `.sobelow-skips` fingerprints are **line-keyed**
     (`Sobelow.Finding.fingerprint` includes `vuln_line_no`), so the accepted `File.read!` skip went stale
-    when Slice 2 added a line above `Ingest.sync_from_file/1` — failing `mix sobelow --exit Low` in
-    `scripts/pre-deploy` (and CI's quality job on the pre-fix push). Replaced with an **inline
-    `# sobelow_skip ["Traversal.FileModule"]`** (line-stable); `.sobelow-skips` now empty. See CLAUDE.md.
-    **Lesson: `scripts/pre-deploy` earned its keep** — caught the drift locally before the tag burned a cycle.
-  - **`predictex-p4o` left OPEN** (deploy done; close after eyeballing a real settled group fixture's
-    breakdown in prod once one exists, e.g. via `/fixtures/:id`). Cards remain in `predictex-bdq`.
+    when Slice 2 shifted `Ingest.sync_from_file/1` — failing `scripts/pre-deploy` (and CI). Replaced with an
+    inline `# sobelow_skip ["Traversal.FileModule"]` (line-stable); `.sobelow-skips` now empty. See CLAUDE.md.
+    **`scripts/pre-deploy` earned its keep** — caught the drift locally before the tag burned a cycle.
+  - **`predictex-p4o` left OPEN** — close after eyeballing a real settled group fixture's breakdown in prod.
+    Cards remain in `predictex-bdq`.
 
-**▶ NEXT — `bd ready` (23 ready; `hco` not among them — externally gated until groups resolve):**
-1. **`predictex-9p0` (P3)** — dashboard live updates via `fifa:snapshots` PubSub, drop the 30s poll
-   (the explicit deferred follow-up from `doz`; natural next step on the live-tick thread).
-2. **`predictex-hco` (P2, KO 28 Jun)** — knockout readiness (externally gated: FIFA publishes KO
-   `fifa_match_id`s after groups resolve → backfill via `Fifa.LiveIds.assign`; first-KO live confirm 28 Jun).
-3. **`predictex-uyf` (P4, this session)** — p4o Slice 2 follow-ups: knockout-ET goal filtering in
+**▶ AFTER the v0.11.10 deploy — `bd ready` (23 ready; `hco` externally gated until groups resolve):**
+1. **`predictex-hco` (P2, KO 28 Jun)** — knockout readiness (FIFA publishes KO `fifa_match_id`s after groups
+   resolve → backfill via `Fifa.LiveIds.assign`; first-KO live confirm 28 Jun).
+2. **`predictex-uyf` (P4, this session)** — p4o Slice 2 follow-ups: knockout-ET goal filtering in
    `Openfootball.goal_events/1` (gated on `hco`); own-goal Type-3 FIFA verification + Type-3 `capture_test`.
-4. **Other P3:** `kcx` (projected leaderboard), `bl8` (Live.Updater rescue), `i1s` (replay engine).
-- **⚠️ Do NOT deploy mid-capture** — a container recreate interrupts the running producer chain
-  (loses frames; `*/5` cron re-arms in ~5 min). Tag between matches.
+3. **Other P3:** `kcx` (projected "if your pick lands" leaderboard), `bl8` (Live.Updater rescue),
+   `i1s` (replay engine).
 
-**Workflow rule set this session:** commit autonomously when green; **push and tag/push (deploy) are the
-user's explicit call** — never auto-push, even at session end (commit, report it's local, await "push").
-Authoritative in CLAUDE.md → "Conventions & Patterns → Commit / push / deploy boundary"; bd memory
-`commit-push-deploy-boundary`. Supersedes the auto-generated beads "Session Completion" push steps.
-
-**Also done 2026-06-19:** `hco` knockout-timing assumption **verified safe** (openfootball publishes `ft`
-whole-match post-final-whistle, not mid-ET → `clear_stuck_live/1` won't false-clear `is_live`; bd memory
-`openfootball-knockout-ft-timing`). `r90` shared `AdminWriteResult` helper + `kzz` leaderboard "YOU"
-highlight shipped (v0.11.6).
+**Workflow rule (this session, durable):** commit autonomously when green; **push and tag/push (deploy) are
+the user's explicit call** — never auto-push. Authoritative in CLAUDE.md → "Conventions & Patterns → Commit
+/ push / deploy boundary"; bd memory `commit-push-deploy-boundary`.
 
 ---
 
@@ -113,25 +117,13 @@ against them produced a tooling backlog, now mostly shipped:
   the `mix assets.setup` Tailwind/esbuild download (which failed under the egress-blocked sandbox) succeeds
   on a networked machine — reaching `== pre-deploy OK — safe to tag ==`. Run it before every `git tag vX.Y.Z`.
 
-**NEXT — recommended (`bd ready`):**
-1. **`predictex-p4o` Slice 2** — see the ▶ pickup block at the top of this section.
-2. **`predictex-hco` (P2, deadline 2026-06-28)** — knockout readiness. The `cvx`-assumption **verify is DONE**
-   (openfootball `ft` is whole-match/post-final-whistle → sweep safe; bd memory `openfootball-knockout-ft-timing`).
-   Remaining is externally gated: FIFA publishes the 32 KO `fifa_match_id`s only after the group stage resolves,
-   then backfill via `Fifa.LiveIds.assign` (relates `i9k`); plus the first-KO live confirmation on 2026-06-28.
-3. **Remaining review backlog (P3):** `bl8` (Live.Updater rescue: let-it-crash vs justify+test). (`r90` shared
-   admin flash/reload helper — **DONE**, v0.11.6. `y58` CSP — DONE: strict hash-based CSP,
-   browser-verified, sobelow Config.CSP retired. `uhf` — RESOLVED by contracting live_buzz: with the
-   flag removed there's no flag state for tests to manage, so the "centralize reset / async" goal is
-   moot. Filed follow-up for the separate test-suite async-safety review — the flag tests stay
-   `async: false` pending that, since the earlier async attempt surfaced unrelated cross-module races.)
-3. **`predictex-i1s` (P3)** — match replay engine; replay a recorded capture onto a demo fixture. ⚠️ England
-   v Croatia has **0 captures** (pre-`rfm`, lost to the manual-arm gap) → not replayable; guard zero-row
-   match_ids (documented on i1s). Spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.
+**NEXT work + the pending v0.11.10 deploy:** see the **"⏵ Continue here"** block up top — it's the current
+source of truth. (`i1s` replay engine is still a live P3 — ⚠️ England v Croatia has **0 captures** (pre-`rfm`),
+so guard zero-row match_ids; spec `docs/superpowers/specs/2026-06-17-match-replay-demo-design.md`.)
 
-**DEPLOY:** tag `vX.Y.Z` (additive; no migration so far). **Do NOT deploy mid-capture** — the container
-recreate interrupts the running producer chain (the `*/5` cron re-arms within ~5min, but you lose frames).
-Wait for the in-progress match to finish.
+**DEPLOY mechanics:** `scripts/pre-deploy` → `git tag vX.Y.Z && git push origin vX.Y.Z` (push `main` first).
+**Do NOT deploy mid-capture** — the container recreate interrupts the running producer chain (`*/5` cron
+re-arms within ~5 min, but you lose frames). Wait for the in-progress match to finish.
 
 **Capture architecture (shipped, `rfm`):** `Predictex.LiveScore` (pure body→`live_*`→broadcast decoder,
 also consumed by the replay engine) · `Predictex.Capture` + `Capture.Snapshot` (permanent `fifa_captures`
@@ -146,7 +138,7 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **367 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
+- **404 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
   deps.unlock --check-unused, format --check-formatted, **credo --strict**, test) — run on every Elixir commit
   by lefthook and by CI's Quality job (CI also runs `sobelow`). Single source = the `precommit` alias in
   mix.exs; tuning in `.credo.exs`/`.sobelow-skips`. Details: CLAUDE.md "Build & Test". Never `--no-verify`.
