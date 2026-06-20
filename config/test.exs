@@ -65,3 +65,7 @@ config :predictex, :live_score_fetch_fun, fn _url -> {:ok, 200, %{}} end
 # Capture subscribers (predictex-rfm) must NOT auto-start in test — they'd collide on the
 # registered name with recorder_test's own start_supervised! and react to unrelated broadcasts.
 config :predictex, start_capture_subscribers: false
+
+# Replay cache must NOT auto-start in test — each test starts its own fresh table via
+# start_supervised!(Predictex.Replay.Cache) to avoid cross-test leakage.
+config :predictex, start_replay_cache: false

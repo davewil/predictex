@@ -18,7 +18,7 @@ defmodule Predictex.Application do
         # {Predictex.Worker, arg},
         # Start to serve requests, typically the last entry
         PredictexWeb.Endpoint
-      ] ++ capture_subscribers()
+      ] ++ capture_subscribers() ++ replay_cache()
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options
@@ -37,6 +37,14 @@ defmodule Predictex.Application do
   defp capture_subscribers do
     if Application.get_env(:predictex, :start_capture_subscribers, true) do
       [Predictex.Capture.Recorder, Predictex.Live.Updater]
+    else
+      []
+    end
+  end
+
+  defp replay_cache do
+    if Application.get_env(:predictex, :start_replay_cache, true) do
+      [Predictex.Replay.Cache]
     else
       []
     end
