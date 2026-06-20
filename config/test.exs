@@ -70,9 +70,10 @@ config :predictex, start_capture_subscribers: false
 # start_supervised!(Predictex.Replay.Cache) to avoid cross-test leakage.
 config :predictex, start_replay_cache: false
 
-# FunWithFlags cache OFF in test: with the ETS cache disabled, enabled?/1 reads straight
-# from the Ecto store inside the per-test sandbox transaction, so a flag enabled in a
-# `setup` is auto-rolled-back at test end — no leak, no DB-write teardown needed. (Cache
-# ON would survive the rollback and leak an enabled flag into later tests, whose mounts
-# would then hit the test-gated-out Replay.Cache and crash on the missing ETS table.)
-config :fun_with_flags, :cache, enabled: false
+# NOTE: do NOT override `:fun_with_flags, :cache` here. FunWithFlags marks that key as a
+# compile_env, and CI caches the compiled dep keyed on mix.lock — so a test-only override
+# diverges from the cached compile-time value and fails compile-env validation in CI.
+# Flag-test isolation is handled in-test instead: enable the flag in a `setup` (the DB
+# write rolls back with the sandbox txn) and flush the ETS cache in `on_exit`
+# (FunWithFlags.Store.Cache.flush/0 — pure ETS, no DB → no ownership error) so the enabled
+# state can't leak into later tests.

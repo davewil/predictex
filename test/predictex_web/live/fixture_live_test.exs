@@ -118,11 +118,13 @@ defmodule PredictexWeb.FixtureLiveTest do
   describe "replay mode" do
     setup do
       start_supervised!(Predictex.Replay.Cache)
-      # The FunWithFlags cache is disabled in test (config/test.exs), so this enable writes
-      # only to the sandboxed Ecto store and is rolled back at test end — no on_exit teardown
-      # is needed (and a DB-write teardown would crash: on_exit runs after the sandbox owner
-      # dies). The separate top-level "flag off" test proves the flag does not leak here.
+      # Enable the flag for this block. The DB write rolls back with the sandbox txn; the
+      # ETS cache would otherwise survive the rollback and leak an enabled flag into later
+      # tests (whose mounts would then hit the test-gated-out Replay.Cache and crash). So we
+      # flush the cache in on_exit — pure ETS, no DB write, so it can't raise an ownership
+      # error the way FunWithFlags.disable (a DB write after the sandbox owner dies) would.
       FunWithFlags.enable(:match_replay)
+      on_exit(fn -> FunWithFlags.Store.Cache.flush() end)
       :ok
     end
 
