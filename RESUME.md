@@ -55,22 +55,27 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-20)
 
-**Latest prod tag `v0.11.10` (9p0 + g8m), migration applied.** Two things are **committed but LOCAL
-(unpushed)** this session — awaiting your push/deploy call:
-- **`hco` WS4** (`2be8500`): knockout first-team/first-scorer in the FixtureLive picks reveal.
-- **`i1s` match replay** (`a2c35f7`→`34e1b4c` + docs `20d0d99`): replay a completed fixture's captured
-  buzz timeline as a read-only, in-process, time-compressed playback driving the existing
-  `/fixtures/:id` UI — no DB writes, no fabricated demo fixture (the 2026-06-17 demo-fixture spec was
-  superseded). Pure `Replay.frames/1` + shared immutable ETS `Replay.Cache` + `FixtureLive` replay mode.
-  **Gated behind a `:match_replay` FunWithFlags flag that ships OFF** — after deploy, enable it at
-  `/admin/feature-flags` to turn replay on for all players. `cil` (admin toggle) folded in + closed.
-  Spec/plan: `docs/superpowers/{specs/2026-06-20-match-replay-strategy-design.md,plans/2026-06-20-match-replay.md}`.
-  ⚠️ **Test gotcha:** `config/test.exs` disables the FunWithFlags ETS cache (compile-env for the dep) so
-  flag tests isolate via sandbox rollback — a stale local `_build` needs `mix deps.clean fun_with_flags
-  --build` once; CI builds deps fresh under `MIX_ENV=test` so it's naturally consistent.
+**Latest deployed tag `v0.11.11`** (deployed + verified 2026-06-20: Deploy success, `/health` 200, anon
+`/` 200) — bundles **`hco` WS4** (knockout first-team/first-scorer in the `/fixtures/:id` picks reveal)
+**+ `i1s` match replay**: replay a completed fixture's captured buzz timeline as a read-only, in-process,
+time-compressed playback driving the existing `/fixtures/:id` UI — no DB writes, no fabricated demo
+fixture (the 2026-06-17 demo-fixture spec was superseded). Pure `Replay.frames/1` + shared immutable ETS
+`Replay.Cache` + `FixtureLive` replay mode (`@view_fixture` shadow, recap-off, buzz-recompute-on-score-change,
+stay-on-final-frame). `cil` (admin toggle) folded in + closed.
+Spec/plan: `docs/superpowers/{specs/2026-06-20-match-replay-strategy-design.md,plans/2026-06-20-match-replay.md}`.
+
+> ⚠️ **Replay ships DARK — `:match_replay` FunWithFlags flag is OFF in prod.** Nothing is user-visible until
+> it's enabled at `/admin/feature-flags` (or `rpc 'FunWithFlags.enable(:match_replay)'`). Before enabling,
+> eyeball one real replay on a captured match (Ghana v Panama `400021510` / Uzbekistan v Colombia `400021504`).
+> **`i1s` bead left OPEN** until the flag is on + smoke-checked in prod.
+
+> ⚠️ **FunWithFlags compile-env gotcha (learned the hard way, v0.11.11):** do NOT override
+> `:fun_with_flags, :cache` in `config/test.exs` — it's a `compile_env` and CI caches the compiled dep on
+> `mix.lock`, so a test-only override fails CI's compile-env validation while passing locally (stale local
+> `_build`). Flag tests isolate via an `on_exit` `FunWithFlags.Store.Cache.flush/0` (pure ETS) instead.
 
 (`g8m` prod verification — confirm 32 KO fixtures have `source_num` — is still parked on your SSH approval.)
-Next session picks from the backlog below.
+`hco` WS1 (fifa_match_id backfill) still gated on bracket resolution. Next session picks from the backlog below.
 
 **Features shipped today (2026-06-20):**
 - **`v0.11.10` — `9p0` PubSub dashboard updates (CLOSED) + `g8m` KO fixture identity (open, verify@resolution).**
