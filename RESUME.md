@@ -12,9 +12,13 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Staged on `main`, NOT yet deployed:** `9p0` (PubSub dashboard updates) — committed `3cde06d`, pushed,
-  CI-green; **pending deploy as `v0.11.10`**, held because a match is in progress (see "Continue here").
-- **Latest deployed tag:** `v0.11.9` (deployed + verified 2026-06-20: Deploy job success, `/health` 200,
+- **Latest deployed tag:** `v0.11.10` (deployed + verified 2026-06-20: Deploy success, migration
+  `AddSourceNumToFixtures` applied in prod, `/health` 200, anon `/` 200) — bundles **`9p0`** (closed:
+  `/predictions` live updates via the coarse `Tournament` `"fixtures:changed"` PubSub topic, 30s poll
+  removed) **+ `g8m`** (KO fixtures now key on openfootball's stable `num` so a knockout's teams resolve
+  in place instead of spawning a duplicate — unblocks `hco` WS1; the 15-min ResultSync bootstraps
+  `source_num` onto the 32 KO placeholder rows; full no-dup verification at bracket resolution).
+- **Prior deployed tag:** `v0.11.9` (deployed + verified 2026-06-20: Deploy job success, `/health` 200,
   anon `/` 200) — **dashboard live tick** (`doz`, closed): `/predictions` self-paced `:tick` re-pulls
   `Dashboard.for_player` over the websocket (no refresh); pure `Dashboard.next_tick_delay/2` (30s live /
   exact gap to next preview-open or kickoff-lock / nil once settled); `Predictions.cta_lead_seconds/0`
@@ -51,22 +55,22 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-20)
 
-**▶ IMMEDIATE NEXT — DEPLOY `v0.11.10` (`9p0`) once the in-progress match ends.** `9p0` is committed
-(`3cde06d`), pushed, and CI-green on `main` — held from deploy only because a match was capturing (a
-container recreate drops frames). When there's a gap between matches: `scripts/pre-deploy` → `git tag
-v0.11.10 && git push origin v0.11.10` → verify `/health` 200 + close `9p0`. **No migration** (PubSub +
-LiveView only). ⚠️ Still do NOT deploy mid-capture (`*/5` cron re-arms in ~5 min, but you lose frames).
+**Everything is deployed — no work in flight.** Latest prod tag `v0.11.10` (9p0 + g8m). `main` synced.
+Migration applied. Next session picks from the backlog below.
 
-**Three features done today (2026-06-20):**
-- **`9p0` — PubSub dashboard updates (staged `v0.11.10`, pending deploy).** `/predictions` no longer polls
-  every 30s while a match is live. New `Tournament.subscribe_changes/0` + `broadcast_change/0` own one
-  coarse `"fixtures:changed"` topic, broadcast **after the DB write** by `LiveScore.apply_to_fixture/2`
-  (live) and `Ingest.commit/1` (settle). `MyPredictionsLive` subscribes once + re-pulls; `next_tick_delay/2`
-  dropped the 30s branch (nil past kickoff). Advisor design call: settle-broadcast from ResultSync makes
-  the dashboard **faster** than the poll (DB only learns settle at sync time anyway) — 9p0's own thesis,
-  not scope creep. Scope guard: FixtureLive NOT migrated. TDD (5 units), 404 green, independent review =
-  Ready to deploy (no Critical/Important; applied its async-test hardening + a `clear_live` test). Deferred
-  polish on the issue: minute-only live changes still trigger a full re-pull (same cost as the old poll).
+**Features shipped today (2026-06-20):**
+- **`v0.11.10` — `9p0` PubSub dashboard updates (CLOSED) + `g8m` KO fixture identity (open, verify@resolution).**
+  - `9p0`: `/predictions` no longer polls every 30s. `Tournament.subscribe_changes/0`+`broadcast_change/0`
+    own a coarse `"fixtures:changed"` topic, broadcast post-DB-write by `LiveScore.apply_to_fixture/2` (live)
+    and `Ingest.commit/1` (settle); `MyPredictionsLive` re-pulls on it; `next_tick_delay/2` dropped the 30s
+    branch. TDD + opus review clean. Deferred polish (on issue): minute-only change still triggers a full re-pull.
+  - `g8m`: **the hidden `hco` blocker.** KO fixtures had bracket-placeholder teams (`2A`) and were keyed on
+    `external_ref`; when openfootball resolves teams the ref changes → auto-ResultSync would **insert a
+    duplicate**. Fix: key KO fixtures on openfootball's stable `num` (`fixtures.source_num` + unique index;
+    `Ingest.find_fixture` = num for KO / ref for group + ref-fallback bootstrap; dropped `@replace_on_conflict`,
+    two-writer rule preserved because the changeset-update casts only parsed attrs). TDD + opus review (highest
+    blast-radius change — core ingest + migration) clean. **Unblocks `hco` WS1.** The 15-min ResultSync stamps
+    `source_num` onto the 32 KO placeholders; full no-dup verification comes at bracket resolution.
 - **`v0.11.9` — dashboard live tick (`doz`, CLOSED).** `/predictions` self-paced `:tick` re-pulls
   `Dashboard.for_player`; pure `next_tick_delay/2`; `Predictions.cta_lead_seconds/0` DRYs the 30-min
   constant. (Parallel-worktree feature merged onto `main`, then verified + shipped.)
@@ -81,12 +85,19 @@ LiveView only). ⚠️ Still do NOT deploy mid-capture (`*/5` cron re-arms in ~5
   - **`predictex-p4o` left OPEN** — close after eyeballing a real settled group fixture's breakdown in prod.
     Cards remain in `predictex-bdq`.
 
-**▶ AFTER the v0.11.10 deploy — `bd ready` (23 ready; `hco` externally gated until groups resolve):**
-1. **`predictex-hco` (P2, KO 28 Jun)** — knockout readiness (FIFA publishes KO `fifa_match_id`s after groups
-   resolve → backfill via `Fifa.LiveIds.assign`; first-KO live confirm 28 Jun).
-2. **`predictex-uyf` (P4, this session)** — p4o Slice 2 follow-ups: knockout-ET goal filtering in
-   `Openfootball.goal_events/1` (gated on `hco`); own-goal Type-3 FIFA verification + Type-3 `capture_test`.
-3. **Other P3:** `kcx` (projected "if your pick lands" leaderboard), `bl8` (Live.Updater rescue),
+**▶ NEXT — `bd ready`:**
+1. **`predictex-hco` (P2, KO 28 Jun) — knockout readiness, now largely de-risked.** Scoped this session into
+   4 workstreams: WS2 ET/pens window ✅ (deployed v0.11.2, `@post_min` 210); WS3 ft-timing ✅ (verified, bd
+   memory `openfootball-knockout-ft-timing`); **WS1 fifa_match_id backfill — unblocked by `g8m`** (after the
+   final group match resolves the bracket, fetch `rounds.json` + run `Fifa.LiveIds.assign`, confirm 104/104 —
+   a scheduled one-time op, no probe needed); **WS4 KO first-team/first-scorer in the FixtureLive picks
+   reveal — BUILDABLE NOW** (fields `first_scorer_side`/`first_scorer_player` exist; render for `stage ==
+   :knockout`, reuse the `locked?` gate). WS4 is the remaining code piece; verify WS1/WS2 on the first KO 28 Jun.
+2. **`predictex-g8m` (P2) — verify post-deploy** (needs a prod read): confirm all 32 KO fixtures have
+   `source_num` after a sync cycle. Then it's done bar the resolution-time no-dup confirmation.
+3. **`predictex-uyf` (P4)** — p4o Slice 2 follow-ups: knockout-ET goal filtering in `Openfootball.goal_events/1`
+   (gated on `hco`); own-goal Type-3 FIFA verification + Type-3 `capture_test`.
+4. **Other P3:** `kcx` (projected "if your pick lands" leaderboard), `bl8` (Live.Updater rescue),
    `i1s` (replay engine).
 
 **Workflow rule (this session, durable):** commit autonomously when green; **push and tag/push (deploy) are
@@ -138,7 +149,7 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **404 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
+- **408 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
   deps.unlock --check-unused, format --check-formatted, **credo --strict**, test) — run on every Elixir commit
   by lefthook and by CI's Quality job (CI also runs `sobelow`). Single source = the `precommit` alias in
   mix.exs; tuning in `.credo.exs`/`.sobelow-skips`. Details: CLAUDE.md "Build & Test". Never `--no-verify`.
