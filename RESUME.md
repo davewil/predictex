@@ -55,8 +55,22 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-20)
 
-**Everything is deployed — no work in flight.** Latest prod tag `v0.11.10` (9p0 + g8m). `main` synced.
-Migration applied. Next session picks from the backlog below.
+**Latest prod tag `v0.11.10` (9p0 + g8m), migration applied.** Two things are **committed but LOCAL
+(unpushed)** this session — awaiting your push/deploy call:
+- **`hco` WS4** (`2be8500`): knockout first-team/first-scorer in the FixtureLive picks reveal.
+- **`i1s` match replay** (`a2c35f7`→`34e1b4c` + docs `20d0d99`): replay a completed fixture's captured
+  buzz timeline as a read-only, in-process, time-compressed playback driving the existing
+  `/fixtures/:id` UI — no DB writes, no fabricated demo fixture (the 2026-06-17 demo-fixture spec was
+  superseded). Pure `Replay.frames/1` + shared immutable ETS `Replay.Cache` + `FixtureLive` replay mode.
+  **Gated behind a `:match_replay` FunWithFlags flag that ships OFF** — after deploy, enable it at
+  `/admin/feature-flags` to turn replay on for all players. `cil` (admin toggle) folded in + closed.
+  Spec/plan: `docs/superpowers/{specs/2026-06-20-match-replay-strategy-design.md,plans/2026-06-20-match-replay.md}`.
+  ⚠️ **Test gotcha:** `config/test.exs` disables the FunWithFlags ETS cache (compile-env for the dep) so
+  flag tests isolate via sandbox rollback — a stale local `_build` needs `mix deps.clean fun_with_flags
+  --build` once; CI builds deps fresh under `MIX_ENV=test` so it's naturally consistent.
+
+(`g8m` prod verification — confirm 32 KO fixtures have `source_num` — is still parked on your SSH approval.)
+Next session picks from the backlog below.
 
 **Features shipped today (2026-06-20):**
 - **`v0.11.10` — `9p0` PubSub dashboard updates (CLOSED) + `g8m` KO fixture identity (open, verify@resolution).**
