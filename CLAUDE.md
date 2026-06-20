@@ -62,9 +62,14 @@ mix sobelow --skip --exit Low   # security scan (runs in CI; baseline in .sobelo
 ```
 
 Static analysis: **credo** (`.credo.exs`; alias-order/alias-usage off, nesting max 3 — see
-the comments there) runs in the gate and CI. **sobelow** runs in CI; its accepted baseline
-lives in `.sobelow-skips` (a missing CSP — tracked separately — and a low-confidence
-`File.read!` on a trusted admin path). New findings beyond the baseline fail CI.
+the comments there) runs in the gate and CI. **sobelow** runs in CI (and in `scripts/pre-deploy`);
+new findings fail it. The one accepted finding — a low-confidence `File.read!` on a trusted
+admin/seed path (`Results.Ingest.sync_from_file/1`) — is suppressed with an **inline
+`# sobelow_skip ["Traversal.FileModule"]`** comment at the call site, not a `.sobelow-skips`
+fingerprint. (The fingerprint baseline is line-keyed, so it silently went stale and failed the
+gate whenever an edit shifted the finding's line; the inline skip is bound to the function and
+can't drift. `.sobelow-skips` is now empty.) The earlier CSP finding was fixed in `y58` (strict
+hash-based CSP), not skipped.
 
 ### Before tagging a release: `scripts/pre-deploy`
 

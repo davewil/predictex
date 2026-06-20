@@ -51,6 +51,10 @@ defmodule Predictex.Results.Ingest do
     end
   end
 
+  # `path` is a trusted local/admin file (seeds + ops fixtures), never user input — the
+  # File.read! directory-traversal finding is accepted. Inline skip (replaces the former
+  # .sobelow-skips fingerprint, which drifted whenever an edit above this line moved it).
+  # sobelow_skip ["Traversal.FileModule"]
   def sync_from_file(path), do: path |> File.read!() |> Jason.decode!() |> sync()
 
   def sync(doc) when is_map(doc), do: doc |> plan() |> commit()
