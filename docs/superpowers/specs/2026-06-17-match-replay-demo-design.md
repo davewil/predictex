@@ -1,7 +1,15 @@
 # Match Replay / Buzz Demo — Design
 
+> **⚠️ SUPERSEDED (2026-06-20)** by `2026-06-20-match-replay-strategy-design.md`. This
+> design replayed a captured match by mutating a fabricated demo fixture row + broadcasting
+> to all viewers — a single shared/synchronized demo. It does not scale to per-player replay
+> (N players ⇒ N fabricated rows + topic cross-talk), and it predates the tournament having
+> real completed fixtures with captures + predictions. The v2 design reframes replay as a
+> read-only view-time strategy of `FixtureLive` over real completed fixtures (no DB writes,
+> per-player in-process cursor, shared immutable ETS cache). Kept for history.
+
 **Date:** 2026-06-17
-**Status:** approved (pre-implementation)
+**Status:** superseded (see banner above)
 **Relates to:** predictex-c46 (Live Match Buzz), predictex-70h (FIFA capture spike)
 
 ## Context
