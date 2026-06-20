@@ -12,18 +12,20 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.7` (deployed + verified 2026-06-19: Deploy job ran, `/health` 200,
-  anon `/` 200). Recent: **v0.11.0** auto-start unified live
-  capture (`rfm`);
+- **Latest deployed tag:** `v0.11.8` (deployed + verified 2026-06-20: Deploy job success, migration ran,
+  `/health` 200, anon `/` 200) — match recap **slice 2** (`p4o`): settled group-stage `/fixtures/:id`
+  shows a **goal breakdown** (scorer + pen/OG/regular + side), FIFA-capture goals when they reconcile
+  with the final score else the persisted openfootball `goals` embed (first p4o migration). Ships with
+  a sobelow fix: the trusted `File.read!` finding is now an inline `# sobelow_skip` (line-stable) instead
+  of a drift-prone `.sobelow-skips` fingerprint. Recent: **v0.11.7** match recap **slice 1** (per-pick
+  points); **v0.11.0** auto-start unified live capture (`rfm`);
   **v0.11.1** server-side per-viewer kickoff times (`fb5`) + live-game CTA on `/predictions` (`afm`);
   **v0.11.2** knockout ET/pens capture window + `is_live` auto-clear sweep (`cvx`/`d17`);
   **v0.11.3** `/predictions` live CTA opens 30 min pre-kickoff → live → post-match recap (`4zu`);
   **v0.11.4** next-match countdown banner on `/predictions` (`vg7`, ungated — low-impact);
   **v0.11.5** contracted the `:live_buzz` flag (`uhf`);
   **v0.11.6** public leaderboard highlights the logged-in player's own row (`kzz`) + shared
-  `AdminWriteResult` helper across admin LiveViews (`r90`, no user-visible change);
-  **v0.11.7** match recap **slice 1** (`p4o`): settled group-stage `/fixtures/:id` shows the final
-  score in the header + the leaderboard points each member's pick earned (`MatchRecap.points/2`).
+  `AdminWriteResult` helper across admin LiveViews (`r90`, no user-visible change).
   **Live buzz is now UNCONDITIONAL** — the `:live_buzz` flag was contracted away (`uhf`, deployed
   v0.11.5): the parallel change is complete (accepted in prod → flag + gates + off-tests removed).
   No user-visible change (the flag was already ON). ⚠️ **No kill-switch any more** — if the FIFA
@@ -42,32 +44,33 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
-## ⏵ Continue here (2026-06-19)
+## ⏵ Continue here (2026-06-20)
 
-**▶ NEXT ACTION — DEPLOY `predictex-p4o` Slice 2 as `v0.11.8`.** Slice 2 (goal breakdown) is
-**code-complete and committed LOCALLY** (8 commits `e4e679f..4f5a502`, incl. one unrelated docs
-commit `8970e12`). **391 tests green.** Awaiting the user's explicit **push + tag** (deploy is the
-user's call — never auto-push/tag). To deploy: `git push` then `scripts/pre-deploy` then
-`git tag v0.11.8 && git push origin v0.11.8`.
-- Built via **subagent-driven-development**: Tasks 3–7, each task-reviewed clean; Task 7 had one
-  Important defect (FIFA minute doubled apostrophe `"73''"`) — fixed by normalising at the decoder
-  boundary (`Capture.goal_events/1` strips the trailing `'`) + re-reviewed clean.
-- **Final whole-branch review (opus):** *Ready to deploy — no Critical/Important.* Scoring provably
-  decoupled from the goals embed; both decoders emit one shape; count-based reconciliation fails safe to
-  canonical openfootball; migration additive/no-downtime; `round.stage == :group` guard airtight.
-- **Architecture shipped:** `Openfootball.goal_events/1` + persisted `goals` embed (**migration**
-  `add_goals_to_fixtures`) → `Capture.goal_events/1` (FIFA) → `MatchRecap.goals/2`
-  (FIFA-if-reconciles, else openfootball) → FixtureLive breakdown section. **Group-stage settled only**
-  (KO/ET deferred — openfootball goals include ET, would contradict the regulation header score).
-- **Plan:** `docs/superpowers/plans/2026-06-19-p4o-match-recap.md`. **Spec:**
-  `docs/superpowers/specs/2026-06-19-p4o-match-recap-design.md`. **Ledger:** `.superpowers/sdd/progress.md`.
-- **⚠️ Migration in this release** — first p4o migration; the deploy pipeline runs `Release.migrate`.
-- **⚠️ Do NOT deploy mid-capture** — WC fixtures are being captured (2026-06-19); a container recreate
-  interrupts the running producer chain (loses frames; `*/5` cron re-arms in ~5 min). Tag between matches.
-- **Gate verified green on HEAD `4f5a502`** (391 passed, credo clean) — run directly, not just subagent reports.
-- **Deferred (filed `predictex-uyf`, P4):** knockout-ET goal filtering (gated on `hco`); own-goal
-  Type-3 FIFA verification + a Type-3 `capture_test` assertion on the first real own-goal capture.
-- **After deploy:** then `predictex-hco` (P2, KO 28 Jun) or P3 backlog (`bl8`).
+**`predictex-p4o` Slice 2 (goal breakdown) — DEPLOYED in `v0.11.8` ✅** (2026-06-20: Deploy job success,
+migration ran, `/health` 200, anon `/` 200). Built via subagent-driven-development (Tasks 3–7, each
+task-reviewed; Task 7's FIFA-minute doubled-apostrophe defect caught + fixed; opus whole-branch review
+clean). Architecture: `Openfootball.goal_events/1` + persisted `goals` embed (migration
+`add_goals_to_fixtures`) → `Capture.goal_events/1` (FIFA) → `MatchRecap.goals/2` (FIFA-if-reconciles,
+else openfootball) → FixtureLive breakdown section, **group-stage settled only**. Plan/spec in
+`docs/superpowers/{plans,specs}/2026-06-19-p4o-match-recap*`; ledger `.superpowers/sdd/progress.md`.
+- **Deploy gotcha hit + fixed (`8642b23`):** `.sobelow-skips` fingerprints are **line-keyed**
+  (`Sobelow.Finding.fingerprint` includes `vuln_line_no`), so the accepted `File.read!` skip went stale
+  when Slice 2 added a line above `Ingest.sync_from_file/1` — failing `mix sobelow --exit Low` in
+  `scripts/pre-deploy` (and CI's quality job on the pre-fix push). Replaced with an **inline
+  `# sobelow_skip ["Traversal.FileModule"]`** (line-stable); `.sobelow-skips` now empty. See CLAUDE.md.
+  **Lesson: `scripts/pre-deploy` earned its keep** — caught the sobelow drift locally before the tag.
+- **`predictex-p4o` left OPEN** (deploy done; close after eyeballing a real settled group fixture's
+  breakdown in prod once one exists, e.g. via `/fixtures/:id`). Cards remain in `predictex-bdq`.
+
+**▶ NEXT — `bd ready`:**
+1. **`predictex-hco` (P2, KO 28 Jun)** — knockout readiness (externally gated: FIFA publishes KO
+   `fifa_match_id`s after groups resolve → backfill via `Fifa.LiveIds.assign`; first-KO live confirm 28 Jun).
+2. **`predictex-uyf` (P4, filed this session)** — p4o Slice 2 follow-ups: knockout-ET goal filtering in
+   `Openfootball.goal_events/1` (gated on `hco`); own-goal Type-3 FIFA verification + a Type-3
+   `capture_test` assertion on the first real own-goal capture; minor comment polish.
+3. **P3 backlog:** `bl8` (Live.Updater rescue: let-it-crash vs justify+test).
+- **⚠️ Do NOT deploy mid-capture** — a container recreate interrupts the running producer chain
+  (loses frames; `*/5` cron re-arms in ~5 min). Tag between matches.
 
 **Workflow rule set this session:** commit autonomously when green; **push and tag/push (deploy) are the
 user's explicit call** — never auto-push, even at session end (commit, report it's local, await "push").
