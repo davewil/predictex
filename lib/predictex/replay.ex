@@ -9,6 +9,14 @@ defmodule Predictex.Replay do
 
   alias Predictex.{Capture, LiveScore}
 
+  @typedoc "A single score-frame produced by replaying a captured `/detail` snapshot."
+  @type frame :: %{
+          is_live: boolean(),
+          live_home_goals: integer() | nil,
+          live_away_goals: integer() | nil,
+          live_minute: String.t() | nil
+        }
+
   @seed %{live_home_goals: 0, live_away_goals: 0}
 
   @doc """
@@ -17,14 +25,7 @@ defmodule Predictex.Replay do
   Each frame is `%{is_live, live_home_goals, live_away_goals, live_minute}`.
   Returns `[]` when the match has no detail captures.
   """
-  @spec frames(String.t()) :: [
-          %{
-            is_live: boolean(),
-            live_home_goals: integer() | nil,
-            live_away_goals: integer() | nil,
-            live_minute: String.t() | nil
-          }
-        ]
+  @spec frames(String.t()) :: [frame()]
   def frames(match_id) do
     details =
       match_id

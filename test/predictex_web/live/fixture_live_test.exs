@@ -154,6 +154,8 @@ defmodule PredictexWeb.FixtureLiveTest do
       assert html =~ "LIVE"
       assert html =~ "10&#39;"
       refute html =~ "Goals"
+      # Replay buzz renders: scenarios and headlines are computed for the score change.
+      assert html =~ "What if"
 
       # Tick to the terminal frame (4 frames → 3 ticks after the initial advance).
       send(lv.pid, :replay_tick)
