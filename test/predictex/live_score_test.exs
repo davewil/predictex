@@ -81,16 +81,32 @@ defmodule Predictex.LiveScoreTest do
     Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{f.id}")
     attrs = %{is_live: true, live_home_goals: 1, live_away_goals: 0, live_minute: "10'"}
 
+    # The per-fixture {:live_update} and the coarse :fixtures_changed (predictex-9p0) share the
+    # same `changed?` gate, so this per-fixture refute also proves neither fired. (We avoid a
+    # `refute_received :fixtures_changed` here: that topic is global, so a concurrent async test's
+    # legitimate broadcast could land in this mailbox and flake the refute.)
     assert :ok = LiveScore.apply_to_fixture(f, attrs)
     refute_received {:live_update, _id}
+  end
+
+  test "apply_to_fixture/2 also emits the coarse fixtures-changed signal on change (predictex-9p0)" do
+    f = fixture(%{status: :scheduled})
+    Tournament.subscribe_changes()
+    attrs = %{is_live: true, live_home_goals: 1, live_away_goals: 0, live_minute: "10'"}
+
+    assert :ok = LiveScore.apply_to_fixture(f, attrs)
+    assert_received :fixtures_changed
   end
 
   test "clear_live/1 clears is_live, keeps the last score, and broadcasts" do
     f = fixture(%{is_live: true, live_home_goals: 2, live_away_goals: 1, live_minute: "90'"})
     Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{f.id}")
+    Tournament.subscribe_changes()
 
     assert :ok = LiveScore.clear_live(f)
     assert_received {:live_update, _id}
+    # clear_live/1 delegates to apply_to_fixture/2, so it also drives the dashboard feed (9p0).
+    assert_received :fixtures_changed
 
     reloaded = Tournament.get_fixture!(f.id)
 

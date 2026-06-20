@@ -259,4 +259,32 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert rendered =~ "LIVE"
     assert rendered =~ "2-1"
   end
+
+  test "a fixtures-changed broadcast re-pulls and re-renders the dashboard, no poll (predictex-9p0)",
+       %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "Subscriber"})
+    past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+
+    # already kicked off (so the clock-tick is idle — only PubSub can move this dashboard)
+    fx = fixture!(round, %{team1: "Spain", team2: "Japan", kickoff_at: past, status: :scheduled})
+
+    {:ok, lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    refute html =~ "LIVE"
+
+    fx
+    |> Ecto.Changeset.change(%{
+      status: :live,
+      is_live: true,
+      live_home_goals: 2,
+      live_away_goals: 1,
+      live_minute: "67'"
+    })
+    |> Predictex.Repo.update!()
+
+    Tournament.broadcast_change()
+    rendered = render(lv)
+
+    assert rendered =~ "LIVE"
+    assert rendered =~ "2-1"
+  end
 end

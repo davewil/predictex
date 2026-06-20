@@ -114,4 +114,11 @@ defmodule Predictex.Results.IngestTest do
     fx2 = Repo.get_by!(Fixture, external_ref: "2026-06-20 Egypt v Belgium")
     assert length(fx2.goals) == 3
   end
+
+  test "commit/1 broadcasts a coarse fixture-change so live dashboards re-pull on settle (predictex-9p0)" do
+    Tournament.subscribe_changes()
+    @doc_fixture |> Ingest.plan() |> Ingest.commit()
+    # assert_received: the broadcast is synchronous, so no async timeout window (predictex-9p0).
+    assert_received :fixtures_changed
+  end
 end

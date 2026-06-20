@@ -187,10 +187,10 @@ defmodule Predictex.DashboardTest do
       assert Dashboard.next_tick_delay(dash, dt(0)) == 600_000
     end
 
-    test "30s while a match is in play (kickoff passed, not completed)" do
+    test "nil once kickoff has passed — live scores and the settle arrive via PubSub, not the clock (predictex-9p0)" do
       fx = %Fixture{id: 1, round_id: 1, status: :live, kickoff_at: dt(-60)}
       dash = build_dash([round_with(1, :group, [fx])])
-      assert Dashboard.next_tick_delay(dash, dt(0)) == 30_000
+      assert Dashboard.next_tick_delay(dash, dt(0)) == nil
     end
 
     test "takes the soonest threshold across all rounds" do

@@ -11,6 +11,22 @@ defmodule Predictex.Tournament do
   alias Predictex.Repo
   alias Predictex.Tournament.{Fixture, Round}
 
+  # --- fixture-change pub/sub (predictex-9p0) ---
+  #
+  # One coarse "a fixture changed, re-pull" signal, broadcast AFTER the DB write by both
+  # producers of fixture state: `LiveScore.apply_to_fixture/2` (live scores, FIFA) and
+  # `Results.Ingest.commit/1` (settle + results, openfootball). `MyPredictionsLive` subscribes
+  # once and re-pulls its dashboard. The drill-down `FixtureLive` keeps its per-fixture
+  # `"fixture:#{id}"` topic — this is the dashboard's "anything changed" feed.
+  @changes_topic "fixtures:changed"
+
+  @doc "Subscribe the calling process to coarse fixture-change notifications."
+  def subscribe_changes, do: Phoenix.PubSub.subscribe(Predictex.PubSub, @changes_topic)
+
+  @doc "Broadcast a coarse `:fixtures_changed` to all subscribers (call after a DB write)."
+  def broadcast_change,
+    do: Phoenix.PubSub.broadcast(Predictex.PubSub, @changes_topic, :fixtures_changed)
+
   # --- rounds ---
 
   def list_rounds, do: Repo.all(from r in Round, order_by: r.ordinal)

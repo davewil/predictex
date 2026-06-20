@@ -29,13 +29,17 @@ defmodule Predictex.LiveScore do
 
     case Tournament.update_fixture(fixture, attrs) do
       {:ok, _} ->
-        if changed?,
-          do:
-            Phoenix.PubSub.broadcast(
-              Predictex.PubSub,
-              "fixture:#{fixture.id}",
-              {:live_update, fixture.id}
-            )
+        if changed? do
+          # Per-fixture feed for the FixtureLive drill-down …
+          Phoenix.PubSub.broadcast(
+            Predictex.PubSub,
+            "fixture:#{fixture.id}",
+            {:live_update, fixture.id}
+          )
+
+          # … and the coarse "a fixture changed" feed the dashboard re-pulls on (predictex-9p0).
+          Tournament.broadcast_change()
+        end
 
         :ok
 

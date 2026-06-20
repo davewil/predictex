@@ -100,16 +100,15 @@ defmodule Predictex.Dashboard do
   defp upcoming?(%{fixture: %{kickoff_at: nil}}, _now), do: false
   defp upcoming?(%{fixture: %{kickoff_at: ko}}, now), do: DateTime.compare(ko, now) == :gt
 
-  @live_poll_ms 30_000
-
   @doc """
-  Milliseconds until this dashboard next needs a re-render, or `nil` when nothing
-  time-sensitive remains (every fixture completed or without a kickoff).
+  Milliseconds until this dashboard next needs a clock-driven re-render, or `nil` when no
+  time threshold remains (every fixture completed, without a kickoff, or already kicked off).
 
-  Drives the self-paced tick on `/predictions` (predictex live-tick): `30_000` while a
-  match is in play (score refresh), otherwise the exact gap to the next preview-open
-  (`kickoff − cta_lead_seconds`) or kickoff-lock threshold across all rounds, floored at
-  `1_000` ms. Pure — the caller supplies `now`.
+  Drives the self-paced tick on `/predictions` (predictex live-tick): the exact gap to the
+  next preview-open (`kickoff − cta_lead_seconds`) or kickoff-lock threshold across all
+  rounds, floored at `1_000` ms. Once kickoff passes there is no clock work left — live
+  scores and the settle arrive over PubSub (`Tournament.subscribe_changes/0`, predictex-9p0),
+  not by polling. Pure — the caller supplies `now`.
   """
   def next_tick_delay(dash, now) do
     dash.rounds
@@ -129,7 +128,7 @@ defmodule Predictex.Dashboard do
     preview_at = DateTime.add(ko, -Predictions.cta_lead_seconds(), :second)
 
     cond do
-      DateTime.compare(now, ko) != :lt -> @live_poll_ms
+      DateTime.compare(now, ko) != :lt -> nil
       DateTime.compare(now, preview_at) != :lt -> DateTime.diff(ko, now, :millisecond)
       true -> DateTime.diff(preview_at, now, :millisecond)
     end

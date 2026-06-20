@@ -105,6 +105,11 @@ defmodule Predictex.Results.Ingest do
 
     results = Enum.map(fixtures, &upsert_fixture(&1, round_ids))
 
+    # Coarse "fixtures changed" signal so live dashboards re-pull the settle/result without
+    # polling (predictex-9p0). One broadcast per sync run — the subscriber's re-pull is
+    # idempotent, so per-fixture transition diffing would be wasted work.
+    if fixtures != [], do: Tournament.broadcast_change()
+
     %{
       rounds: map_size(round_ids),
       fixtures_ok: Enum.count(results, &match?({:ok, _}, &1)),

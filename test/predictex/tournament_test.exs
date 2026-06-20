@@ -90,4 +90,14 @@ defmodule Predictex.TournamentTest do
       assert Map.has_key?(errors_on(cs), :cohort_home_pct)
     end
   end
+
+  describe "fixture-change pub/sub (predictex-9p0)" do
+    test "broadcast_change/0 notifies a subscriber of subscribe_changes/0" do
+      assert :ok = Tournament.subscribe_changes()
+      assert :ok = Tournament.broadcast_change()
+      # assert_received (not assert_receive): broadcast is synchronous on the local node, so the
+      # message is already in the mailbox — no timeout window for a concurrent async test to race.
+      assert_received :fixtures_changed
+    end
+  end
 end

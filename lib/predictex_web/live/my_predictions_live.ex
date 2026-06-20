@@ -6,7 +6,7 @@ defmodule PredictexWeb.MyPredictionsLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Dashboard, Predictions}
+  alias Predictex.{Dashboard, Predictions, Tournament}
   alias PredictexWeb.Flags
 
   @impl true
@@ -15,7 +15,12 @@ defmodule PredictexWeb.MyPredictionsLive do
     dash = Dashboard.for_player(socket.assigns.current_scope.player, now)
     active = Enum.find_value(dash.rounds, fn r -> r.active? && r.round.ordinal end)
 
-    if connected?(socket), do: schedule_next_tick(dash, now)
+    if connected?(socket) do
+      # Live scores + the settle arrive over PubSub (predictex-9p0); the clock tick now only
+      # handles the −30 min preview / kickoff-lock thresholds.
+      Tournament.subscribe_changes()
+      schedule_next_tick(dash, now)
+    end
 
     {:ok,
      socket
@@ -33,16 +38,25 @@ defmodule PredictexWeb.MyPredictionsLive do
   end
 
   @impl true
+  # Clock-driven: re-pull, then sleep to the next preview/kickoff threshold (nil once past).
   def handle_info(:tick, socket) do
+    socket = refresh(socket)
+    schedule_next_tick(socket.assigns.dash, socket.assigns.now)
+    {:noreply, socket}
+  end
+
+  # Event-driven (predictex-9p0): a fixture changed (live score or settle) — re-pull only.
+  # No reschedule: the clock tick is a separate, self-perpetuating chain.
+  def handle_info(:fixtures_changed, socket), do: {:noreply, refresh(socket)}
+
+  defp refresh(socket) do
     now = DateTime.utc_now()
     dash = Dashboard.for_player(socket.assigns.current_scope.player, now)
-    schedule_next_tick(dash, now)
 
-    {:noreply,
-     socket
-     |> assign(:now, now)
-     |> assign(:dash, dash)
-     |> assign(:next_match, Dashboard.next_match(dash, now))}
+    socket
+    |> assign(:now, now)
+    |> assign(:dash, dash)
+    |> assign(:next_match, Dashboard.next_match(dash, now))
   end
 
   defp schedule_next_tick(dash, now) do
