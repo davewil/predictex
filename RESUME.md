@@ -12,13 +12,16 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.8` (deployed + verified 2026-06-20: Deploy job success, migration ran,
-  `/health` 200, anon `/` 200) — match recap **slice 2** (`p4o`): settled group-stage `/fixtures/:id`
-  shows a **goal breakdown** (scorer + pen/OG/regular + side), FIFA-capture goals when they reconcile
-  with the final score else the persisted openfootball `goals` embed (first p4o migration). Ships with
-  a sobelow fix: the trusted `File.read!` finding is now an inline `# sobelow_skip` (line-stable) instead
-  of a drift-prone `.sobelow-skips` fingerprint. Recent: **v0.11.7** match recap **slice 1** (per-pick
-  points); **v0.11.0** auto-start unified live capture (`rfm`);
+- **Latest deployed tag:** `v0.11.9` (deployed + verified 2026-06-20: Deploy job success, `/health` 200,
+  anon `/` 200) — **dashboard live tick** (`doz`, closed): `/predictions` self-paced `:tick` re-pulls
+  `Dashboard.for_player` over the websocket (no refresh); pure `Dashboard.next_tick_delay/2` (30s live /
+  exact gap to next preview-open or kickoff-lock / nil once settled); `Predictions.cta_lead_seconds/0`
+  DRYs the 30-min constant. No migration (additive LiveView). Recent: **v0.11.8** match recap **slice 2**
+  (`p4o`): settled group-stage `/fixtures/:id` **goal breakdown** (scorer + pen/OG/regular + side),
+  FIFA-capture goals when they reconcile with the final score else the persisted openfootball `goals`
+  embed (first p4o migration) + a sobelow fix (trusted `File.read!` now an inline `# sobelow_skip`,
+  line-stable, vs a drift-prone `.sobelow-skips` fingerprint); **v0.11.7** match recap **slice 1**
+  (per-pick points); **v0.11.0** auto-start unified live capture (`rfm`);
   **v0.11.1** server-side per-viewer kickoff times (`fb5`) + live-game CTA on `/predictions` (`afm`);
   **v0.11.2** knockout ET/pens capture window + `is_live` auto-clear sweep (`cvx`/`d17`);
   **v0.11.3** `/predictions` live CTA opens 30 min pre-kickoff → live → post-match recap (`4zu`);
@@ -46,29 +49,33 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-20)
 
-**`predictex-p4o` Slice 2 (goal breakdown) — DEPLOYED in `v0.11.8` ✅** (2026-06-20: Deploy job success,
-migration ran, `/health` 200, anon `/` 200). Built via subagent-driven-development (Tasks 3–7, each
-task-reviewed; Task 7's FIFA-minute doubled-apostrophe defect caught + fixed; opus whole-branch review
-clean). Architecture: `Openfootball.goal_events/1` + persisted `goals` embed (migration
-`add_goals_to_fixtures`) → `Capture.goal_events/1` (FIFA) → `MatchRecap.goals/2` (FIFA-if-reconciles,
-else openfootball) → FixtureLive breakdown section, **group-stage settled only**. Plan/spec in
-`docs/superpowers/{plans,specs}/2026-06-19-p4o-match-recap*`; ledger `.superpowers/sdd/progress.md`.
-- **Deploy gotcha hit + fixed (`8642b23`):** `.sobelow-skips` fingerprints are **line-keyed**
-  (`Sobelow.Finding.fingerprint` includes `vuln_line_no`), so the accepted `File.read!` skip went stale
-  when Slice 2 added a line above `Ingest.sync_from_file/1` — failing `mix sobelow --exit Low` in
-  `scripts/pre-deploy` (and CI's quality job on the pre-fix push). Replaced with an **inline
-  `# sobelow_skip ["Traversal.FileModule"]`** (line-stable); `.sobelow-skips` now empty. See CLAUDE.md.
-  **Lesson: `scripts/pre-deploy` earned its keep** — caught the sobelow drift locally before the tag.
-- **`predictex-p4o` left OPEN** (deploy done; close after eyeballing a real settled group fixture's
-  breakdown in prod once one exists, e.g. via `/fixtures/:id`). Cards remain in `predictex-bdq`.
+**Two features shipped today (2026-06-20):**
+- **`v0.11.9` — dashboard live tick (`doz`, CLOSED).** `/predictions` self-paced `:tick` re-pulls
+  `Dashboard.for_player` over the websocket; pure `Dashboard.next_tick_delay/2` (30s live / exact gap to
+  next preview-open or kickoff-lock / nil once settled); `Predictions.cta_lead_seconds/0` DRYs the 30-min
+  constant. No migration. (This was a parallel-worktree feature merged onto `main`, then verified + shipped.)
+- **`v0.11.8` — `predictex-p4o` Slice 2 goal breakdown.** Built via subagent-driven-development (Tasks 3–7,
+  each task-reviewed; Task 7's FIFA-minute doubled-apostrophe defect caught + fixed; opus whole-branch
+  review clean). `Openfootball.goal_events/1` + persisted `goals` embed (migration `add_goals_to_fixtures`)
+  → `Capture.goal_events/1` (FIFA) → `MatchRecap.goals/2` (FIFA-if-reconciles, else openfootball) →
+  FixtureLive breakdown, **group-stage settled only**. Plan/spec `docs/superpowers/{plans,specs}/2026-06-19-p4o-match-recap*`.
+  - **Deploy gotcha hit + fixed (`8642b23`):** `.sobelow-skips` fingerprints are **line-keyed**
+    (`Sobelow.Finding.fingerprint` includes `vuln_line_no`), so the accepted `File.read!` skip went stale
+    when Slice 2 added a line above `Ingest.sync_from_file/1` — failing `mix sobelow --exit Low` in
+    `scripts/pre-deploy` (and CI's quality job on the pre-fix push). Replaced with an **inline
+    `# sobelow_skip ["Traversal.FileModule"]`** (line-stable); `.sobelow-skips` now empty. See CLAUDE.md.
+    **Lesson: `scripts/pre-deploy` earned its keep** — caught the drift locally before the tag burned a cycle.
+  - **`predictex-p4o` left OPEN** (deploy done; close after eyeballing a real settled group fixture's
+    breakdown in prod once one exists, e.g. via `/fixtures/:id`). Cards remain in `predictex-bdq`.
 
-**▶ NEXT — `bd ready`:**
-1. **`predictex-hco` (P2, KO 28 Jun)** — knockout readiness (externally gated: FIFA publishes KO
+**▶ NEXT — `bd ready` (23 ready; `hco` not among them — externally gated until groups resolve):**
+1. **`predictex-9p0` (P3)** — dashboard live updates via `fifa:snapshots` PubSub, drop the 30s poll
+   (the explicit deferred follow-up from `doz`; natural next step on the live-tick thread).
+2. **`predictex-hco` (P2, KO 28 Jun)** — knockout readiness (externally gated: FIFA publishes KO
    `fifa_match_id`s after groups resolve → backfill via `Fifa.LiveIds.assign`; first-KO live confirm 28 Jun).
-2. **`predictex-uyf` (P4, filed this session)** — p4o Slice 2 follow-ups: knockout-ET goal filtering in
-   `Openfootball.goal_events/1` (gated on `hco`); own-goal Type-3 FIFA verification + a Type-3
-   `capture_test` assertion on the first real own-goal capture; minor comment polish.
-3. **P3 backlog:** `bl8` (Live.Updater rescue: let-it-crash vs justify+test).
+3. **`predictex-uyf` (P4, this session)** — p4o Slice 2 follow-ups: knockout-ET goal filtering in
+   `Openfootball.goal_events/1` (gated on `hco`); own-goal Type-3 FIFA verification + Type-3 `capture_test`.
+4. **Other P3:** `kcx` (projected leaderboard), `bl8` (Live.Updater rescue), `i1s` (replay engine).
 - **⚠️ Do NOT deploy mid-capture** — a container recreate interrupts the running producer chain
   (loses frames; `*/5` cron re-arms in ~5 min). Tag between matches.
 
