@@ -14,8 +14,10 @@ defmodule PredictexWeb.FixtureLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap, Capture}
+  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap, Capture, Replay}
   alias PredictexWeb.Flags
+
+  @replay_interval_ms 1000
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
@@ -28,7 +30,14 @@ defmodule PredictexWeb.FixtureLive do
     {:ok, load_all(socket, fixture)}
   end
 
+  # A replay owns the view; a stray live-update (a producer never writes a completed
+  # fixture, but be defensive) must not disturb the playback.
   @impl true
+  def handle_info({:live_update, _id}, %{assigns: %{replay: replay}} = socket)
+      when not is_nil(replay) do
+    {:noreply, socket}
+  end
+
   def handle_info({:live_update, _id}, socket) do
     old = socket.assigns.fixture
     new = Tournament.get_fixture!(old.id, :round)
@@ -40,9 +49,127 @@ defmodule PredictexWeb.FixtureLive do
         old.is_live != new.is_live or
         socket.assigns.picks_visible? != now_locked?
 
-    socket = if recompute?, do: load_all(socket, new), else: assign(socket, :fixture, new)
+    socket =
+      if recompute? do
+        load_all(socket, new)
+      else
+        # Minute-only branch: keep @view_fixture in step with @fixture (normal mode
+        # they are the same struct, and the header reads the clock from @view_fixture).
+        socket |> assign(:fixture, new) |> assign(:view_fixture, new)
+      end
 
     {:noreply, socket}
+  end
+
+  # Replay tick: advance to the next frame (no-op if replay was stopped meanwhile).
+  def handle_info(:replay_tick, socket) do
+    {:noreply, advance(socket)}
+  end
+
+  @impl true
+  def handle_event("start_replay", _params, socket) do
+    frames = Replay.Cache.frames(socket.assigns.fixture.fifa_match_id)
+
+    replay = %{
+      frames: frames,
+      index: 0,
+      interval_ms: @replay_interval_ms,
+      h: nil,
+      a: nil,
+      timer: nil
+    }
+
+    {:noreply, advance(assign(socket, :replay, replay))}
+  end
+
+  def handle_event("stop_replay", _params, socket) do
+    {:noreply, stop_replay(socket)}
+  end
+
+  def handle_event("restart_replay", _params, socket) do
+    socket = stop_replay(socket)
+    frames = Replay.Cache.frames(socket.assigns.fixture.fifa_match_id)
+
+    replay = %{
+      frames: frames,
+      index: 0,
+      interval_ms: @replay_interval_ms,
+      h: nil,
+      a: nil,
+      timer: nil
+    }
+
+    {:noreply, advance(assign(socket, :replay, replay))}
+  end
+
+  # Apply the frame at the cursor, then schedule the next tick — except at the terminal
+  # frame, where we stop scheduling but stay displayed (timer: nil, @replay non-nil).
+  # No-op for a stray tick after Stop.
+  defp advance(%{assigns: %{replay: nil}} = socket), do: socket
+
+  defp advance(%{assigns: %{replay: replay}} = socket) do
+    frame = Enum.at(replay.frames, replay.index)
+    socket = apply_frame(socket, frame)
+    last_index = length(replay.frames) - 1
+
+    if replay.index >= last_index do
+      # Terminal frame: stay displayed, stop scheduling.
+      update(socket, :replay, fn r -> %{r | timer: nil} end)
+    else
+      timer = Process.send_after(self(), :replay_tick, replay.interval_ms)
+      update(socket, :replay, fn r -> %{r | index: r.index + 1, timer: timer} end)
+    end
+  end
+
+  # Build the in-memory live shadow, force the recap off (Gap A), and recompute the
+  # buzz only when the score changed (Gap B#1). Never persists @view_fixture.
+  defp apply_frame(socket, frame) do
+    fixture = socket.assigns.fixture
+    replay = socket.assigns.replay
+    viewer_id = socket.assigns.viewer_id
+
+    view_fixture =
+      struct(fixture, %{
+        is_live: true,
+        live_home_goals: frame.live_home_goals,
+        live_away_goals: frame.live_away_goals,
+        live_minute: frame.live_minute
+      })
+
+    socket =
+      socket
+      |> assign(:view_fixture, view_fixture)
+      # Gap A: the fixture is :completed, so recap is gated on status; force it off so
+      # the final score / Goals / per-pick +points don't spoil the replay.
+      |> assign(:recap?, false)
+      |> assign(:goals, [])
+      |> assign(:points, %{})
+
+    if score_changed_from_last?(replay, frame) do
+      h = frame.live_home_goals
+      a = frame.live_away_goals
+
+      socket
+      |> assign(:scenarios, Buzz.scenarios_with_deltas(fixture.id, h, a))
+      |> assign(:headlines, Buzz.headlines(fixture.id, h, a, viewer_id))
+      |> assign(:replay, %{replay | h: h, a: a})
+    else
+      # Minute-only frame (Gap B#1): no re-rank, just the refreshed shadow.
+      socket
+    end
+  end
+
+  defp score_changed_from_last?(replay, frame) do
+    replay.h != frame.live_home_goals or replay.a != frame.live_away_goals
+  end
+
+  # Cancel any pending tick and restore the real (recap/static) view.
+  defp stop_replay(socket) do
+    if replay = socket.assigns.replay do
+      if replay.timer, do: Process.cancel_timer(replay.timer)
+    end
+
+    load_all(socket, socket.assigns.fixture)
   end
 
   # Compute all assigns from scratch (mount + any material state change).
@@ -58,6 +185,9 @@ defmodule PredictexWeb.FixtureLive do
 
     socket
     |> assign(:fixture, fixture)
+    |> assign(:view_fixture, fixture)
+    |> assign(:replay, nil)
+    |> assign(:replay_available?, replay_available?(fixture))
     |> assign(:viewer_id, viewer_id)
     |> assign(:picks_visible?, locked?)
     |> assign(:picks, picks)
@@ -73,6 +203,14 @@ defmodule PredictexWeb.FixtureLive do
       :headlines,
       if(fixture.is_live, do: Buzz.headlines(fixture.id, h, a, viewer_id), else: [])
     )
+  end
+
+  # Replay is offered only for a completed fixture with a captured timeline, and only
+  # when the flag is on. The `and` chain short-circuits, so the cache is touched ONLY
+  # when the flag is enabled — keeping unrelated tests off the (test-gated-out) cache path.
+  defp replay_available?(fixture) do
+    FunWithFlags.enabled?(:match_replay) and fixture.status == :completed and
+      not is_nil(fixture.fifa_match_id) and Replay.Cache.frames(fixture.fifa_match_id) != []
   end
 
   defp recap_goals(fixture) do
@@ -108,14 +246,21 @@ defmodule PredictexWeb.FixtureLive do
             </span>
 
             <span
-              :if={@fixture.is_live or @recap?}
+              :if={@view_fixture.is_live or @recap?}
               class="font-score text-4xl font-extrabold tabular-nums sm:text-5xl"
             >
-              {if @fixture.is_live, do: @fixture.live_home_goals, else: @fixture.home_goals}<span class="px-1 text-base-content/30">–</span>{if @fixture.is_live,
-                do: @fixture.live_away_goals,
-                else: @fixture.away_goals}
+              {if @view_fixture.is_live,
+                do: @view_fixture.live_home_goals,
+                else: @view_fixture.home_goals}<span class="px-1 text-base-content/30">–</span>{if @view_fixture.is_live,
+                do: @view_fixture.live_away_goals,
+                else: @view_fixture.away_goals}
             </span>
-            <span :if={not @fixture.is_live and not @recap?} class="px-2 text-base-content/40">v</span>
+            <span
+              :if={not @view_fixture.is_live and not @recap?}
+              class="px-2 text-base-content/40"
+            >
+              v
+            </span>
 
             <span class="flex-1 truncate text-left" title={@fixture.team2}>
               <span class="text-xl">{Flags.flag(@fixture.team2)}</span> {@fixture.team2}
@@ -123,18 +268,38 @@ defmodule PredictexWeb.FixtureLive do
           </div>
 
           <span
-            :if={@fixture.is_live}
+            :if={@view_fixture.is_live}
             class="inline-flex items-center gap-1.5 rounded-selector bg-error/15 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-error animate-pdx-glow"
           >
             <span class="size-1.5 rounded-full bg-error"></span>
-            LIVE{if @fixture.live_minute, do: " #{@fixture.live_minute}"}
+            LIVE{if @view_fixture.live_minute, do: " #{@view_fixture.live_minute}"}
           </span>
           <p
-            :if={not @fixture.is_live}
+            :if={not @view_fixture.is_live}
             class="text-xs font-semibold uppercase tracking-wider text-base-content/50"
           >
             <.local_time at={@fixture.kickoff_at} id={"kickoff-#{@fixture.id}"} tz={@tz} />
           </p>
+
+          <%!-- Replay controls (predictex-i1s) — read-only in-process playback --%>
+          <div :if={@replay_available?} class="pt-1">
+            <button
+              :if={@replay == nil}
+              type="button"
+              phx-click="start_replay"
+              class="btn btn-sm btn-outline btn-accent"
+            >
+              ▶ Replay this match
+            </button>
+            <div :if={@replay != nil} class="flex items-center justify-center gap-2">
+              <button type="button" phx-click="restart_replay" class="btn btn-sm btn-ghost">
+                ↻ Restart
+              </button>
+              <button type="button" phx-click="stop_replay" class="btn btn-sm btn-outline btn-error">
+                ■ Stop
+              </button>
+            </div>
+          </div>
         </div>
 
         <%!-- The buzz: shareable movement headlines --%>

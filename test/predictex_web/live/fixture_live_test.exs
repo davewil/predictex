@@ -47,6 +47,173 @@ defmodule PredictexWeb.FixtureLiveTest do
     fx
   end
 
+  # A settled GROUP fixture (so recap? is true → Gap A has teeth) with a fifa_match_id.
+  defp settled_group_fixture!(opts) do
+    {:ok, round} =
+      Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    {:ok, fx} =
+      Tournament.create_fixture(%{
+        external_ref: "replay-#{System.unique_integer([:positive])}",
+        team1: "Egypt",
+        team2: "Belgium",
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1,
+        kickoff_at: past,
+        round_id: round.id,
+        fifa_match_id: Keyword.get(opts, :fifa_match_id)
+      })
+
+    fx
+  end
+
+  # Records the brief's capture timeline (10' 0-0, 30' 1-0, 80' 2-1, 85' 2-1 — the
+  # last a minute-only frame that doesn't change the score) for `match_id`.
+  defp record_timeline!(match_id) do
+    timeline = [
+      {"10'", 0, 0},
+      {"30'", 1, 0},
+      {"80'", 2, 1},
+      {"85'", 2, 1}
+    ]
+
+    base = DateTime.utc_now() |> DateTime.truncate(:second)
+
+    timeline
+    |> Enum.with_index()
+    |> Enum.each(fn {{minute, h, a}, i} ->
+      {:ok, _} =
+        Capture.record_snapshot(%{
+          captured_at: DateTime.add(base, i, :second),
+          endpoint: "detail",
+          url: "https://api.fifa.com/#{match_id}/detail",
+          match_id: match_id,
+          http_status: 200,
+          body: %{
+            "MatchStatus" => 3,
+            "MatchTime" => minute,
+            "HomeTeam" => %{"Score" => h},
+            "AwayTeam" => %{"Score" => a}
+          }
+        })
+    end)
+  end
+
+  # Flag off everywhere except the replay describe; proves no leak onto the cache path.
+  test "replay control is hidden when the flag is off", %{conn: conn} do
+    assert FunWithFlags.enabled?(:match_replay) == false
+
+    fx = settled_group_fixture!(fifa_match_id: "replay-flagoff")
+    record_timeline!(fx.fifa_match_id)
+    viewer = player_fixture(%{display_name: "Zoe"})
+
+    {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+    refute html =~ "Replay this match"
+  end
+
+  describe "replay mode" do
+    setup do
+      start_supervised!(Predictex.Replay.Cache)
+      # The FunWithFlags cache is disabled in test (config/test.exs), so this enable writes
+      # only to the sandboxed Ecto store and is rolled back at test end — no on_exit teardown
+      # is needed (and a DB-write teardown would crash: on_exit runs after the sandbox owner
+      # dies). The separate top-level "flag off" test proves the flag does not leak here.
+      FunWithFlags.enable(:match_replay)
+      :ok
+    end
+
+    test "flag isolation smoke: flag is enabled inside the describe" do
+      assert FunWithFlags.enabled?(:match_replay) == true
+    end
+
+    test "replay shows live buzz and hides the recap (Gap A)", %{conn: conn} do
+      fx = settled_group_fixture!(fifa_match_id: "replay-gapa")
+      record_timeline!(fx.fifa_match_id)
+      viewer = player_fixture(%{display_name: "Zoe"})
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: viewer.id,
+          fixture_id: fx.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      {:ok, lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+      # Pre-replay: the recap is showing and the control is offered.
+      assert html =~ "Goals"
+      assert html =~ "Replay this match"
+
+      # Start → frame 0 (10' 0-0): LIVE, frame-0 minute, and NO recap "Goals".
+      html = render_click(lv, "start_replay")
+      assert html =~ "LIVE"
+      assert html =~ "10&#39;"
+      refute html =~ "Goals"
+
+      # Tick to the terminal frame (4 frames → 3 ticks after the initial advance).
+      send(lv.pid, :replay_tick)
+      send(lv.pid, :replay_tick)
+      html = render(send(lv.pid, :replay_tick) && lv)
+
+      # Terminal-stay: final frame (85') remains displayed; controls show Restart/Stop.
+      assert html =~ "85&#39;"
+      assert html =~ "Restart"
+      assert html =~ "Stop"
+    end
+
+    test "minute-only frame advances the minute without changing the score (Gap B#1)", %{
+      conn: conn
+    } do
+      fx = settled_group_fixture!(fifa_match_id: "replay-gapb")
+      record_timeline!(fx.fifa_match_id)
+      viewer = player_fixture(%{display_name: "Zoe"})
+
+      {:ok, lv, _html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+      render_click(lv, "start_replay")
+      # Advance through 30' 1-0, 80' 2-1, then 85' 2-1 (minute-only).
+      send(lv.pid, :replay_tick)
+      send(lv.pid, :replay_tick)
+      html = render(send(lv.pid, :replay_tick) && lv)
+
+      # The 85' minute is shown, and the score is still 2-1 (no recompute branch).
+      assert html =~ "85&#39;"
+      assert html =~ ~r/2.*?–.*?1/s
+    end
+
+    test "replay performs no DB write to the fixture", %{conn: conn} do
+      fx = settled_group_fixture!(fifa_match_id: "replay-nowrite")
+      record_timeline!(fx.fifa_match_id)
+      viewer = player_fixture(%{display_name: "Zoe"})
+
+      {:ok, lv, _html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+      render_click(lv, "start_replay")
+      send(lv.pid, :replay_tick)
+
+      reloaded = Tournament.get_fixture!(fx.id, :round)
+      assert reloaded.status == :completed
+      assert reloaded.is_live == false
+      assert reloaded.live_home_goals == nil
+      assert {reloaded.home_goals, reloaded.away_goals} == {2, 1}
+    end
+
+    test "no replay control for a completed fixture without a capture timeline", %{conn: conn} do
+      fx = settled_group_fixture!(fifa_match_id: "replay-notimeline")
+      # No record_timeline! — fifa_match_id present but zero captures.
+      viewer = player_fixture(%{display_name: "Zoe"})
+
+      {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+      refute html =~ "Replay this match"
+    end
+  end
+
   test "after kickoff: shows everyone's picks and scenario labels", %{conn: conn} do
     viewer = player_fixture(%{display_name: "Viewer"})
     other = player_fixture(%{display_name: "Zoe"})

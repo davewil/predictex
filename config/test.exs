@@ -69,3 +69,10 @@ config :predictex, start_capture_subscribers: false
 # Replay cache must NOT auto-start in test — each test starts its own fresh table via
 # start_supervised!(Predictex.Replay.Cache) to avoid cross-test leakage.
 config :predictex, start_replay_cache: false
+
+# FunWithFlags cache OFF in test: with the ETS cache disabled, enabled?/1 reads straight
+# from the Ecto store inside the per-test sandbox transaction, so a flag enabled in a
+# `setup` is auto-rolled-back at test end — no leak, no DB-write teardown needed. (Cache
+# ON would survive the rollback and leak an enabled flag into later tests, whose mounts
+# would then hit the test-gated-out Replay.Cache and crash on the missing ETS table.)
+config :fun_with_flags, :cache, enabled: false
