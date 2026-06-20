@@ -31,6 +31,10 @@ defmodule Predictex.Results.Openfootball do
 
     %{
       external_ref: ref(Map.get(m, "date"), team1, team2),
+      # openfootball's stable match number — present + unique on knockout matches (73-104),
+      # absent on group matches. The stable identity that lets KO team-resolution update a
+      # fixture in place instead of changing external_ref and inserting a duplicate (g8m).
+      source_num: Map.get(m, "num"),
       round: round,
       stage: stage_for(round),
       team1: team1,

@@ -33,6 +33,9 @@ defmodule Predictex.Tournament.Fixture do
     field :live_minute, :string
     field :is_live, :boolean, default: false
     field :fifa_match_id, :string
+    # Stable openfootball match number (knockout only) — the identity the ingest keys on so a
+    # KO fixture's teams resolve in place rather than spawning a duplicate (predictex-g8m).
+    field :source_num, :integer
 
     embeds_many :goals, Goal, on_replace: :delete do
       field :side, Ecto.Enum, values: [:home, :away]
@@ -49,6 +52,7 @@ defmodule Predictex.Tournament.Fixture do
 
   @castable [
     :external_ref,
+    :source_num,
     :team1,
     :team2,
     :group,
@@ -81,6 +85,7 @@ defmodule Predictex.Tournament.Fixture do
     |> validate_cohort()
     |> assoc_constraint(:round)
     |> unique_constraint(:external_ref)
+    |> unique_constraint(:source_num)
   end
 
   defp goal_changeset(goal, attrs) do

@@ -7,11 +7,13 @@ defmodule Predictex.Results.Ingest do
     * **Gather** — `sync_from_url/1` / `sync_from_file/1` read the JSON (the only I/O).
     * **Decide** — `plan/1` is pure: parse the feed, map fixtures to FIFA rounds, and
       build the round + fixture attribute maps.
-    * **Act** — `commit/1` upserts rounds (by ordinal) and fixtures (by `external_ref`).
+    * **Act** — `commit/1` upserts rounds (by ordinal) and fixtures (knockout fixtures by their
+      stable openfootball `source_num`, group fixtures by `external_ref` — see `find_fixture/1`).
 
-  Re-running is safe: fixtures are matched on `external_ref` and only result fields
-  are replaced on conflict — **admin-entered cohort %s and a round's open state are
-  preserved**.
+  Re-running is safe and idempotent. The update casts only the parsed result fields, which never
+  include `cohort_*_pct`, so **admin-entered cohort %s and a round's open state are preserved**.
+  Keying knockout fixtures on `source_num` lets their teams resolve in place when the bracket
+  settles, instead of the changed `external_ref` spawning a duplicate fixture (predictex-g8m).
   """
 
   alias Predictex.Repo
@@ -21,23 +23,6 @@ defmodule Predictex.Results.Ingest do
   alias Predictex.Tournament.{Fixture, Round}
 
   @default_url "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
-
-  # Replaced on re-sync. Deliberately excludes cohort_*_pct (admin data) and inserted_at.
-  @replace_on_conflict [
-    :team1,
-    :team2,
-    :group,
-    :kickoff_at,
-    :status,
-    :home_goals,
-    :away_goals,
-    :first_scorer_side,
-    :first_scorer_player,
-    :first_goal_owngoal,
-    :goals,
-    :round_id,
-    :updated_at
-  ]
 
   # --- Gather ---
 
@@ -82,6 +67,7 @@ defmodule Predictex.Results.Ingest do
       ordinal: fixture.game_round.ordinal,
       attrs: %{
         external_ref: fixture.external_ref,
+        source_num: fixture.source_num,
         team1: fixture.team1,
         team2: fixture.team2,
         group: fixture.group,
@@ -131,8 +117,25 @@ defmodule Predictex.Results.Ingest do
   defp upsert_fixture(%{ordinal: ordinal, attrs: attrs}, round_ids) do
     attrs = Map.put(attrs, :round_id, Map.get(round_ids, ordinal))
 
-    %Fixture{}
-    |> Fixture.changeset(attrs)
-    |> Repo.insert(on_conflict: {:replace, @replace_on_conflict}, conflict_target: :external_ref)
+    # Find-then-write rather than an atomic DB upsert: the identity is dual (source_num for KO,
+    # external_ref for group) so there's no single conflict_target. The unique indexes on both
+    # columns are the backstop — a concurrent double-insert returns {:error, changeset} (counted
+    # in fixtures_error), never a duplicate row. In practice the 15-min ResultSync is single-flight.
+    case find_fixture(attrs) do
+      nil -> %Fixture{} |> Fixture.changeset(attrs) |> Repo.insert()
+      %Fixture{} = existing -> existing |> Fixture.changeset(attrs) |> Repo.update()
+    end
   end
+
+  # Fixture identity (predictex-g8m): knockout fixtures by their stable openfootball `source_num`
+  # — so when the bracket resolves and the teams (hence external_ref) change, the SAME row is
+  # updated rather than a duplicate inserted. Group fixtures, and the first sync that still has to
+  # stamp source_num onto a placeholder KO row, fall through to external_ref. A changeset-driven
+  # update only casts the parsed attrs (which never include `cohort_*_pct`), so admin-entered
+  # cohort %s survive a re-sync untouched — the property the old @replace_on_conflict list guarded.
+  defp find_fixture(%{source_num: num, external_ref: ref}) when is_integer(num) do
+    Tournament.get_fixture_by_source_num(num) || Tournament.get_fixture_by_ref(ref)
+  end
+
+  defp find_fixture(%{external_ref: ref}), do: Tournament.get_fixture_by_ref(ref)
 end

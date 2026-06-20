@@ -49,6 +49,30 @@ defmodule Predictex.Results.OpenfootballTest do
       assert f.external_ref == "2026-06-11 Mexico v South Africa"
     end
 
+    test "carries openfootball match `num` as source_num — KO has it, group does not (predictex-g8m)" do
+      ko =
+        Openfootball.parse_match(%{
+          "round" => "Round of 32",
+          "num" => 73,
+          "date" => "2026-06-28",
+          "team1" => "2A",
+          "team2" => "2B"
+        })
+
+      assert ko.source_num == 73
+      assert ko.stage == :knockout
+
+      grp =
+        Openfootball.parse_match(%{
+          "round" => "Matchday 1",
+          "date" => "2026-06-11",
+          "team1" => "Mexico",
+          "team2" => "South Africa"
+        })
+
+      assert grp.source_num == nil
+    end
+
     test "no FT score => scheduled with nil goals" do
       f =
         Openfootball.parse_match(%{

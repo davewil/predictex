@@ -77,6 +77,9 @@ defmodule Predictex.Tournament do
 
   def get_fixture_by_ref(external_ref), do: Repo.get_by(Fixture, external_ref: external_ref)
 
+  @doc "Look up a fixture by its stable openfootball match number (knockout only; predictex-g8m)."
+  def get_fixture_by_source_num(num), do: Repo.get_by(Fixture, source_num: num)
+
   def create_fixture(attrs) do
     %Fixture{} |> Fixture.changeset(attrs) |> Repo.insert()
   end
