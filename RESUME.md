@@ -123,8 +123,9 @@ bracket resolution. Next session picks from the backlog below.
 
 **▶ NEXT — start here next session:**
 
-1. **`predictex-kcx` (P3) — "if your pick lands" projected leaderboard. ✅ BUILT + reviewed + DEPLOYED
-   (v0.11.12, 2026-06-21). Remaining: real-browser eyeball, then `bd close`.** Shipped surface:
+1. ~~**`predictex-kcx`** — "if your pick lands" projected leaderboard.~~ ✅ **CLOSED 2026-06-22**
+   (built + reviewed + deployed v0.11.12; eyeballed in prod pre-kickoff + live — own row/headline pre-kickoff,
+   full board after lock). Shipped surface (for reference):
    `Predictions.get_player_fixture_prediction/2` (anti-copy focused getter) · `Buzz.pick_projection/4` +
    extracted `enrich_rows/2` (shared with `scenarios_with_deltas/3`, one `leaderboard/0` pull, no new math) ·
    `FixtureLive` `@pick_projection` assign + `#pick-projection` render section. Anti-copy resolved via a
