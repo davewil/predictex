@@ -17,8 +17,6 @@ defmodule PredictexWeb.FixtureLive do
   alias Predictex.{Tournament, Predictions, Buzz, MatchRecap, Capture, Replay}
   alias PredictexWeb.Flags
 
-  @replay_interval_ms 1000
-
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     fixture = Tournament.get_fixture!(id, :round)
@@ -73,7 +71,6 @@ defmodule PredictexWeb.FixtureLive do
     replay = %{
       frames: frames,
       index: 0,
-      interval_ms: @replay_interval_ms,
       h: nil,
       a: nil,
       timer: nil
@@ -93,7 +90,6 @@ defmodule PredictexWeb.FixtureLive do
     replay = %{
       frames: frames,
       index: 0,
-      interval_ms: @replay_interval_ms,
       h: nil,
       a: nil,
       timer: nil
@@ -109,6 +105,8 @@ defmodule PredictexWeb.FixtureLive do
 
   defp advance(%{assigns: %{replay: replay}} = socket) do
     frame = Enum.at(replay.frames, replay.index)
+    # Decide the dwell before applying the frame, while replay.h/a still hold the prior score.
+    scored? = score_changed_from_last?(replay, frame)
     socket = apply_frame(socket, frame)
     last_index = length(replay.frames) - 1
 
@@ -116,7 +114,7 @@ defmodule PredictexWeb.FixtureLive do
       # Terminal frame: stay displayed, stop scheduling.
       update(socket, :replay, fn r -> %{r | timer: nil} end)
     else
-      timer = Process.send_after(self(), :replay_tick, replay.interval_ms)
+      timer = Process.send_after(self(), :replay_tick, Replay.tick_delay_ms(scored?))
       update(socket, :replay, fn r -> %{r | index: r.index + 1, timer: timer} end)
     end
   end

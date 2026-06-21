@@ -19,6 +19,22 @@ defmodule Predictex.Replay do
 
   @seed %{live_home_goals: 0, live_away_goals: 0}
 
+  # Replay pacing: blow through minute-only filler frames quickly, but dwell on a frame that
+  # changes the score so the score climb and the "What if…" buzz move are readable. A flat
+  # 1s/frame made a ~150-frame match crawl for minutes through near-static filler.
+  @fast_ms 250
+  @score_ms 1400
+
+  @doc """
+  Milliseconds to dwell on the current frame before advancing to the next.
+
+  Lingers on a frame that just changed the score so the buzz is readable; rushes through
+  minute-only filler frames.
+  """
+  @spec tick_delay_ms(boolean()) :: pos_integer()
+  def tick_delay_ms(true), do: @score_ms
+  def tick_delay_ms(false), do: @fast_ms
+
   @doc """
   Returns ordered score-frames for `match_id`, one per captured `/detail` snapshot.
 

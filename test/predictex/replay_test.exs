@@ -104,4 +104,15 @@ defmodule Predictex.ReplayTest do
       assert frame2.live_minute == "61'"
     end
   end
+
+  describe "tick_delay_ms/1 (adaptive pacing)" do
+    test "lingers on a score change so the buzz is readable" do
+      assert Replay.tick_delay_ms(true) > Replay.tick_delay_ms(false)
+    end
+
+    test "both delays are positive" do
+      assert Replay.tick_delay_ms(true) > 0
+      assert Replay.tick_delay_ms(false) > 0
+    end
+  end
 end
