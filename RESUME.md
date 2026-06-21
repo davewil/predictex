@@ -75,8 +75,9 @@ Spec/plan: `docs/superpowers/{specs/2026-06-20-match-replay-strategy-design.md,p
 > `mix.lock`, so a test-only override fails CI's compile-env validation while passing locally (stale local
 > `_build`). Flag tests isolate via an `on_exit` `FunWithFlags.Store.Cache.flush/0` (pure ETS) instead.
 
-(`g8m` prod verification — confirm 32 KO fixtures have `source_num` — is still parked on your SSH approval.)
-`hco` WS1 (fifa_match_id backfill) still gated on bracket resolution. Next session picks from the backlog below.
+**`g8m` post-deploy VERIFIED** (2026-06-21 prod read: all 32 KO fixtures have `source_num` — `{32, 32}`);
+final no-dup confirmation still awaits bracket resolution. `hco` WS1 (fifa_match_id backfill) still gated on
+bracket resolution. Next session picks from the backlog below.
 
 **Features shipped today (2026-06-20):**
 - **`v0.11.10` — `9p0` PubSub dashboard updates (CLOSED) + `g8m` KO fixture identity (open, verify@resolution).**
