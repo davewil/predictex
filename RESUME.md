@@ -148,11 +148,14 @@ bracket resolution. Next session picks from the backlog below.
      pre-kickoff card exposes only the viewer's own pick, never others').
    </details>
 
-2. **`predictex-i1s` (open) — eyeball smoke-check.** Replay is deployed + flag ON in prod; do one real
-   replay in a browser (Ghana v Panama `400021510` / Uzbekistan v Colombia `400021504`), confirm the score/
-   minute climb + "What if…" buzz move, then close. (CI can't vouch for LiveView buzz rendering.)
+2. **`predictex-i1s` (open) — replay sped up; needs deploy + re-eyeball.** Eyeballed 2026-06-21: worked but
+   played too slowly. **Fixed (committed local `51df240`, UNPUSHED):** adaptive pacing — pure
+   `Replay.tick_delay_ms/1` lingers 1400ms on score-change frames (buzz readable) and rushes 250ms through
+   minute-only filler (was a flat 1s/frame). Prod still runs the old pace until deployed. After deploy,
+   re-eyeball one real replay (Ghana v Panama `400021510` / Uzbekistan v Colombia `400021504`) and close.
 
-3. **`predictex-p4o` (open) — eyeball a real settled group fixture's goal breakdown in prod, then close.**
+3. ~~**`predictex-p4o`** — eyeball goal breakdown.~~ ✅ **CLOSED 2026-06-21** (eyeballed in prod: settled
+   group-stage goal breakdown renders correctly).
 
 4. **`predictex-hco` (P2) — WS1 fifa_match_id backfill, gated on bracket resolution** (after the final group
    match: fetch `rounds.json` + run `Fifa.LiveIds.assign`, confirm 104/104). WS2/WS3 ✅; `g8m` verified
