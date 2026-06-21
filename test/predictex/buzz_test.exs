@@ -112,4 +112,49 @@ defmodule Predictex.BuzzTest do
     # Bob's name (the overtaken player) should appear in Ana's line
     assert Enum.any?(lines, &String.contains?(&1, bob.display_name))
   end
+
+  describe "pick_projection/4 (kcx — 'if your pick lands')" do
+    test "projects the board as if the fixture finished the given scoreline", %{
+      fx: fx,
+      ana: ana,
+      bob: bob
+    } do
+      # Ana's pick (1-0) lands: she earns her exact prediction (30 pts) → #1, Bob #2.
+      %{rows: rows} = Buzz.pick_projection(fx.id, 1, 0, ana.id)
+
+      ana_row = Enum.find(rows, &(&1.player_id == ana.id))
+      bob_row = Enum.find(rows, &(&1.player_id == bob.id))
+
+      assert ana_row.total == 30
+      assert ana_row.rank == 1
+      assert bob_row.rank == 2
+
+      # Cross-check against the underlying projection — no duplicated scoring math.
+      [top | _] = Predictex.Standings.project(fx.id, 1, 0)
+      assert top.player_id == ana.id and top.total == 30
+    end
+
+    test "viewer row carries rank, prev_rank and delta vs current standings", %{
+      fx: fx,
+      ana: ana
+    } do
+      # Base: Bob #1 (10), Ana #2 (0). Ana's 1-0 lands → Ana #1: delta prev(2) - rank(1) = +1.
+      %{viewer: viewer} = Buzz.pick_projection(fx.id, 1, 0, ana.id)
+
+      assert viewer.player_id == ana.id
+      assert viewer.rank == 1
+      assert viewer.prev_rank == 2
+      assert viewer.delta == 1
+    end
+
+    test "calls Standings.leaderboard/0 once (shared index), returns rows + viewer shape", %{
+      fx: fx,
+      ana: ana
+    } do
+      result = Buzz.pick_projection(fx.id, 1, 0, ana.id)
+      assert %{rows: rows, viewer: viewer} = result
+      assert is_list(rows)
+      assert viewer.player_id == ana.id
+    end
+  end
 end

@@ -189,6 +189,7 @@ defmodule PredictexWeb.FixtureLive do
     |> assign(:replay, nil)
     |> assign(:replay_available?, replay_available?(fixture))
     |> assign(:viewer_id, viewer_id)
+    |> assign(:pick_projection, pick_projection(fixture, viewer_id))
     |> assign(:picks_visible?, locked?)
     |> assign(:picks, picks)
     |> assign(:recap?, recap?)
@@ -211,6 +212,23 @@ defmodule PredictexWeb.FixtureLive do
   defp replay_available?(fixture) do
     FunWithFlags.enabled?(:match_replay) and fixture.status == :completed and
       not is_nil(fixture.fifa_match_id) and Replay.Cache.frames(fixture.fifa_match_id) != []
+  end
+
+  # "If your pick lands" (kcx): project the leaderboard on the viewer's OWN scoreline pick,
+  # shown pre-kickoff and during play but never once the fixture is settled (so it cannot
+  # collide with replay, which only runs on completed fixtures). The getter fetches only the
+  # viewer's own pick — the anti-copy input boundary; the render withholds the per-player board
+  # until kickoff (the output boundary).
+  defp pick_projection(fixture, viewer_id) do
+    with true <- fixture.status != :completed,
+         pick when not is_nil(pick) <-
+           Predictions.get_player_fixture_prediction(viewer_id, fixture.id) do
+      fixture.id
+      |> Buzz.pick_projection(pick.home_goals, pick.away_goals, viewer_id)
+      |> Map.merge(%{home: pick.home_goals, away: pick.away_goals})
+    else
+      _ -> nil
+    end
   end
 
   defp recap_goals(fixture) do
@@ -343,6 +361,53 @@ defmodule PredictexWeb.FixtureLive do
                 <span class="shrink-0 font-score text-sm font-bold tabular-nums">{row.total}</span>
               </li>
             </ul>
+          </div>
+        </section>
+
+        <%!-- "If your pick lands" — projects the board on the viewer's own pick (kcx).
+             Pre-kickoff: headline only (your rank is an aggregate → no per-player leak).
+             After kickoff: the full board (picks are public by then). --%>
+        <section :if={@pick_projection} id="pick-projection" class="space-y-3">
+          <h2 class="px-1 text-sm font-extrabold uppercase tracking-wider text-primary">
+            If your pick lands
+          </h2>
+          <div class="space-y-2 rounded-box bg-base-100 p-4 shadow">
+            <p class="text-sm font-bold text-base-content/90">
+              <span class="text-lg">{Flags.flag(@fixture.team1)}</span>
+              {@fixture.team1}
+              <span class="font-score tabular-nums">
+                {@pick_projection.home}–{@pick_projection.away}
+              </span>
+              <span :if={@pick_projection.viewer} class="text-primary">
+                → you'd be #{@pick_projection.viewer.rank} {movement(@pick_projection.viewer.delta)}
+              </span>
+            </p>
+
+            <ul :if={@picks_visible?} class="space-y-1">
+              <li
+                :for={row <- Enum.take(@pick_projection.rows, 8)}
+                class={[
+                  "flex items-center gap-2.5 rounded-field px-2.5 py-1.5",
+                  row.player_id == @viewer_id && "bg-primary/10"
+                ]}
+              >
+                <span class="w-5 shrink-0 text-center font-score text-xs text-base-content/50">
+                  {row.rank}
+                </span>
+                <span class="w-8 shrink-0 text-center text-xs font-bold">{movement(row.delta)}</span>
+                <span class={[
+                  "min-w-0 flex-1 truncate text-sm",
+                  (row.player_id == @viewer_id && "font-bold text-primary") || "text-base-content/90"
+                ]}>
+                  {row.name}<span :if={row.player_id == @viewer_id} class="text-primary/70"> (you)</span>
+                </span>
+                <span class="shrink-0 font-score text-sm font-bold tabular-nums">{row.total}</span>
+              </li>
+            </ul>
+
+            <p :if={@knockout?} class="text-xs italic text-base-content/50">
+              Scoreline only — excludes the first-scorer bonus.
+            </p>
           </div>
         </section>
 

@@ -41,22 +41,39 @@ defmodule Predictex.Buzz do
     current = rank_index(Standings.leaderboard())
 
     for %{key: key, label: label, leaderboard: lb} <- scenarios(fixture_id, home, away) do
-      rows =
-        lb
-        |> Enum.with_index(1)
-        |> Enum.map(fn {entry, rank} ->
-          prev_rank = get_in(current, [entry.player_id, :rank])
-
-          delta =
-            if not is_nil(prev_rank) and not is_nil(rank),
-              do: prev_rank - rank,
-              else: nil
-
-          Map.merge(entry, %{rank: rank, prev_rank: prev_rank, delta: delta})
-        end)
-
-      %{key: key, label: label, rows: rows}
+      %{key: key, label: label, rows: enrich_rows(lb, current)}
     end
+  end
+
+  @doc """
+  "If your pick lands" projection (kcx): project the board assuming `fixture_id` finished
+  `home`-`away` (the viewer's own scoreline pick), enriched with rank movement vs the current
+  standings.
+
+  Returns `%{rows: [%{player_id, name, total, rank, prev_rank, delta}], viewer: row | nil}`,
+  where `viewer` is the row for `viewer_id` (pulled out for the pre-kickoff headline, where the
+  per-player board is withheld for anti-copy). `Standings.leaderboard/0` is called exactly once.
+  """
+  def pick_projection(fixture_id, home, away, viewer_id) do
+    current = rank_index(Standings.leaderboard())
+    rows = enrich_rows(Standings.project(fixture_id, home, away), current)
+    %{rows: rows, viewer: Enum.find(rows, &(&1.player_id == viewer_id))}
+  end
+
+  # Enrich a projected leaderboard with rank / prev_rank / delta vs the current `rank_index`.
+  defp enrich_rows(leaderboard, current) do
+    leaderboard
+    |> Enum.with_index(1)
+    |> Enum.map(fn {entry, rank} ->
+      prev_rank = get_in(current, [entry.player_id, :rank])
+
+      delta =
+        if not is_nil(prev_rank) and not is_nil(rank),
+          do: prev_rank - rank,
+          else: nil
+
+      Map.merge(entry, %{rank: rank, prev_rank: prev_rank, delta: delta})
+    end)
   end
 
   @doc """

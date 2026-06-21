@@ -124,6 +124,19 @@ defmodule Predictex.Predictions do
     |> Repo.all()
   end
 
+  @doc """
+  One player's own prediction for one fixture (or `nil`).
+
+  The anti-copy input boundary for the "If your pick lands" card (kcx): it fetches ONLY the
+  viewing member's own pick, never the full `list_fixture_predictions/1`, so it is safe to read
+  pre-kickoff while everyone else's picks are still hidden.
+  """
+  def get_player_fixture_prediction(player_id, fixture_id) do
+    Repo.one(
+      from p in Prediction, where: p.player_id == ^player_id and p.fixture_id == ^fixture_id
+    )
+  end
+
   @doc "A fixture is locked for predictions once kickoff has passed."
   def locked?(%Fixture{kickoff_at: nil}, _now), do: false
   def locked?(%Fixture{kickoff_at: kickoff}, now), do: DateTime.compare(now, kickoff) != :lt

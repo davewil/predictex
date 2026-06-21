@@ -561,4 +561,125 @@ defmodule PredictexWeb.FixtureLiveTest do
     assert html =~ "73&#39;"
     refute html =~ "73&#39;&#39;"
   end
+
+  describe "'If your pick lands' projection (kcx)" do
+    test "pre-kickoff with own pick: shows the viewer's projection, withholds others' rows", %{
+      conn: conn
+    } do
+      viewer = player_fixture(%{display_name: "Viewer"})
+      other = player_fixture(%{display_name: "Zoe"})
+      {:ok, round} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+      fx = future_fixture!(round)
+
+      {:ok, _} =
+        Predictions.create_prediction(%{
+          player_id: viewer.id,
+          fixture_id: fx.id,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      {:ok, _} =
+        Predictions.create_prediction(%{
+          player_id: other.id,
+          fixture_id: fx.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      {:ok, lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+      card = lv |> element("#pick-projection") |> render()
+      assert card =~ "If your pick lands"
+      assert card =~ "you&#39;d be"
+      # Anti-copy: pre-kickoff the per-player board is withheld — no other player's name.
+      refute card =~ "Zoe"
+      # And picks stay hidden everywhere pre-kickoff.
+      refute html =~ "Zoe"
+    end
+
+    test "after kickoff with own pick: shows the full projected board", %{conn: conn} do
+      viewer = player_fixture(%{display_name: "Viewer"})
+      other = player_fixture(%{display_name: "Zoe"})
+      {:ok, round} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+      fx = live_fixture!(round)
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: viewer.id,
+          fixture_id: fx.id,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: other.id,
+          fixture_id: fx.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      {:ok, lv, _html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+      card = lv |> element("#pick-projection") |> render()
+      assert card =~ "If your pick lands"
+      # Picks are public post-kickoff → the full board includes other players.
+      assert card =~ "Zoe"
+    end
+
+    test "no pick: the card is absent", %{conn: conn} do
+      viewer = player_fixture(%{display_name: "Viewer"})
+      other = player_fixture(%{display_name: "Zoe"})
+      round = round!()
+      fx = live_fixture!(round)
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: other.id,
+          fixture_id: fx.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+      refute html =~ "If your pick lands"
+    end
+
+    test "completed fixture: the card is absent even with a pick", %{conn: conn} do
+      viewer = player_fixture(%{display_name: "Viewer"})
+      fx = settled_group_fixture!([])
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: viewer.id,
+          fixture_id: fx.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      {:ok, _lv, html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+      refute html =~ "If your pick lands"
+    end
+
+    test "knockout fixture: shows the scoreline-only caveat", %{conn: conn} do
+      viewer = player_fixture(%{display_name: "Viewer"})
+      round = round!()
+      fx = live_fixture!(round)
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: viewer.id,
+          fixture_id: fx.id,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      {:ok, lv, _html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+
+      card = lv |> element("#pick-projection") |> render()
+      assert card =~ "If your pick lands"
+      assert card =~ "Scoreline only"
+    end
+  end
 end

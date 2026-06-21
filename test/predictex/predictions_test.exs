@@ -207,4 +207,49 @@ defmodule Predictex.PredictionsTest do
       refute Predictions.cta_window?(%Fixture{kickoff_at: nil}, DateTime.utc_now())
     end
   end
+
+  describe "get_player_fixture_prediction/2 (anti-copy focused getter)" do
+    test "returns the player's own prediction for the fixture", %{round: round, player: player} do
+      f = fixture!(round)
+
+      {:ok, pred} =
+        Predictions.create_prediction(%{
+          player_id: player.id,
+          fixture_id: f.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      got = Predictions.get_player_fixture_prediction(player.id, f.id)
+      assert got.id == pred.id
+      assert got.home_goals == 2
+      assert got.away_goals == 1
+    end
+
+    test "returns nil when the player has no pick for the fixture", %{
+      round: round,
+      player: player
+    } do
+      f = fixture!(round)
+      assert Predictions.get_player_fixture_prediction(player.id, f.id) == nil
+    end
+
+    test "does not return another player's pick for the same fixture", %{
+      round: round,
+      player: player
+    } do
+      other = player_fixture(%{display_name: "Other", email: "other@b.c"})
+      f = fixture!(round)
+
+      {:ok, _} =
+        Predictions.create_prediction(%{
+          player_id: other.id,
+          fixture_id: f.id,
+          home_goals: 0,
+          away_goals: 0
+        })
+
+      assert Predictions.get_player_fixture_prediction(player.id, f.id) == nil
+    end
+  end
 end
