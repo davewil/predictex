@@ -108,10 +108,25 @@ bracket resolution. Next session picks from the backlog below.
 
 **▶ NEXT — start here next session:**
 
-1. **`predictex-kcx` (P3) — "if your pick lands" projected leaderboard. ⭐ DESIGN AGREED 2026-06-21 — ready to
-   spec → plan → build (brainstorm already done; go straight to writing the spec).** Add an "If your pick
-   lands" card to `/fixtures/:id` that projects the leaderboard assuming the *viewing member's own scoreline
-   pick* for this fixture is the final result. Agreed decisions:
+1. **`predictex-kcx` (P3) — "if your pick lands" projected leaderboard. ✅ BUILT 2026-06-21 — code-complete +
+   reviewed + gate green, COMMITTED LOCAL `747d6f1` (UNPUSHED). Remaining: real-browser eyeball, then push +
+   (separately) deploy on the user's call.** Shipped surface:
+   `Predictions.get_player_fixture_prediction/2` (anti-copy focused getter) · `Buzz.pick_projection/4` +
+   extracted `enrich_rows/2` (shared with `scenarios_with_deltas/3`, one `leaderboard/0` pull, no new math) ·
+   `FixtureLive` `@pick_projection` assign + `#pick-projection` render section. Anti-copy resolved via a
+   **render gate** (the projected board re-scores every player vs your scoreline, so per-player deltas would
+   leak picks pre-kickoff): **pre-kickoff → viewer's own row + headline only** (aggregate rank, no leak);
+   **post-kickoff → full top-8 board** (`:if={@picks_visible?}`, picks already public). v1 = scoreline-only
+   (knockout undercounts first-scorer bonus → caveat shown; group stage exact). Unconditional, read-only.
+   Spec/plan: `docs/superpowers/{specs/2026-06-21-kcx-pick-projection-design.md,plans/2026-06-21-kcx-pick-projection.md}`.
+   **Eyeball before close:** a pre-kickoff fixture where you have a pick → card shows only your row + "you'd
+   be #N ▲Δ", no other names; after kickoff → full board with your row highlighted. Then `bd close
+   predictex-kcx`.
+
+   <details><summary>Original agreed design (2026-06-21) — for reference</summary>
+
+   Add an "If your pick lands" card to `/fixtures/:id` that projects the leaderboard assuming the *viewing
+   member's own scoreline pick* for this fixture is the final result. Agreed decisions:
    - **Visibility:** whenever the viewer HAS a pick AND `fixture.status != :completed` (pre-kickoff **and**
      during play; never on a settled fixture — so it never collides with `i1s` replay, which only runs on
      completed fixtures).
@@ -131,7 +146,7 @@ bracket resolution. Next session picks from the backlog below.
    - **Tests:** pure helper (pick → projected board + delta); LiveView (card shows pre-kickoff with the
      viewer's own pick + correct rank delta; hidden when no pick; hidden when settled; anti-copy: the
      pre-kickoff card exposes only the viewer's own pick, never others').
-   - Next step: write `docs/superpowers/specs/2026-06-21-kcx-pick-projection-design.md`, then plan, then build.
+   </details>
 
 2. **`predictex-i1s` (open) — eyeball smoke-check.** Replay is deployed + flag ON in prod; do one real
    replay in a browser (Ghana v Panama `400021510` / Uzbekistan v Colombia `400021504`), confirm the score/
