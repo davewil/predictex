@@ -53,10 +53,20 @@ the app scores them against real results and ranks a leaderboard.
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
 
-## ⏵ Continue here (2026-06-20)
+## ⏵ Continue here (2026-06-21)
 
-**Latest deployed tag `v0.11.11`** (deployed + verified 2026-06-20: Deploy success, `/health` 200, anon
-`/` 200) — bundles **`hco` WS4** (knockout first-team/first-scorer in the `/fixtures/:id` picks reveal)
+**Latest deployed tag `v0.11.12`** (deployed + verified 2026-06-21: Deploy success, `/health` 200, anon
+`/` 200) — bundles **`kcx`** ("If your pick lands" projected leaderboard on `/fixtures/:id`: per-viewer
+what-if on the member's OWN scoreline pick; pre-kickoff shows only the viewer's own row/headline, full
+board after kickoff — anti-copy render gate; v1 scoreline-only w/ knockout caveat; unconditional, read-only)
+**+ `i1s` adaptive replay pacing** (`Replay.tick_delay_ms/1`: 1400ms dwell on score-change frames, 250ms
+rush through minute-only filler — was a flat 1s/frame that crawled). No migration (both additive).
+Reviewed clean (kcx: code-reviewer, no material issues). Spec/plan:
+`docs/superpowers/{specs/2026-06-21-kcx-pick-projection-design.md,plans/2026-06-21-kcx-pick-projection.md}`.
+**Eyeball-then-close:** `kcx` (pre-kickoff fixture w/ a pick → only your row "you'd be #N ▲Δ", no other
+names; after kickoff → full board) and `i1s` (one real replay at the new pace: `400021510` / `400021504`).
+
+**Prior deployed tag `v0.11.11`** (deployed + verified 2026-06-20) — bundles **`hco` WS4** (knockout first-team/first-scorer in the `/fixtures/:id` picks reveal)
 **+ `i1s` match replay**: replay a completed fixture's captured buzz timeline as a read-only, in-process,
 time-compressed playback driving the existing `/fixtures/:id` UI — no DB writes, no fabricated demo
 fixture (the 2026-06-17 demo-fixture spec was superseded). Pure `Replay.frames/1` + shared immutable ETS
@@ -74,6 +84,11 @@ Spec/plan: `docs/superpowers/{specs/2026-06-20-match-replay-strategy-design.md,p
 > `:fun_with_flags, :cache` in `config/test.exs` — it's a `compile_env` and CI caches the compiled dep on
 > `mix.lock`, so a test-only override fails CI's compile-env validation while passing locally (stale local
 > `_build`). Flag tests isolate via an `on_exit` `FunWithFlags.Store.Cache.flush/0` (pure ETS) instead.
+
+> 🚫 **DEPLOY FREEZE from 17:00 (2026-06-21) — Spain match.** No `git tag vX.Y.Z` during the live-match
+> window (a container recreate drops in-progress capture frames). v0.11.12 landed ~16:52 BST, before
+> kickoff. Plain `main` pushes are fine (Quality job only, no recreate); only tags deploy. Resume deploys
+> after the match finishes and capture clears.
 
 **`g8m` post-deploy VERIFIED** (2026-06-21 prod read: all 32 KO fixtures have `source_num` — `{32, 32}`);
 final no-dup confirmation still awaits bracket resolution. `hco` WS1 (fifa_match_id backfill) still gated on
@@ -108,9 +123,8 @@ bracket resolution. Next session picks from the backlog below.
 
 **▶ NEXT — start here next session:**
 
-1. **`predictex-kcx` (P3) — "if your pick lands" projected leaderboard. ✅ BUILT 2026-06-21 — code-complete +
-   reviewed + gate green, COMMITTED LOCAL `747d6f1` (UNPUSHED). Remaining: real-browser eyeball, then push +
-   (separately) deploy on the user's call.** Shipped surface:
+1. **`predictex-kcx` (P3) — "if your pick lands" projected leaderboard. ✅ BUILT + reviewed + DEPLOYED
+   (v0.11.12, 2026-06-21). Remaining: real-browser eyeball, then `bd close`.** Shipped surface:
    `Predictions.get_player_fixture_prediction/2` (anti-copy focused getter) · `Buzz.pick_projection/4` +
    extracted `enrich_rows/2` (shared with `scenarios_with_deltas/3`, one `leaderboard/0` pull, no new math) ·
    `FixtureLive` `@pick_projection` assign + `#pick-projection` render section. Anti-copy resolved via a
@@ -148,11 +162,11 @@ bracket resolution. Next session picks from the backlog below.
      pre-kickoff card exposes only the viewer's own pick, never others').
    </details>
 
-2. **`predictex-i1s` (open) — replay sped up; needs deploy + re-eyeball.** Eyeballed 2026-06-21: worked but
-   played too slowly. **Fixed (committed local `51df240`, UNPUSHED):** adaptive pacing — pure
-   `Replay.tick_delay_ms/1` lingers 1400ms on score-change frames (buzz readable) and rushes 250ms through
-   minute-only filler (was a flat 1s/frame). Prod still runs the old pace until deployed. After deploy,
-   re-eyeball one real replay (Ghana v Panama `400021510` / Uzbekistan v Colombia `400021504`) and close.
+2. **`predictex-i1s` (open) — replay sped up + DEPLOYED (v0.11.12); re-eyeball then close.** Eyeballed
+   2026-06-21: worked but too slow. Fixed with adaptive pacing (pure `Replay.tick_delay_ms/1`: 1400ms dwell
+   on score-change frames so the buzz is readable, 250ms rush through minute-only filler — was a flat
+   1s/frame). Now live in prod. Re-eyeball one real replay at the new pace (Ghana v Panama `400021510` /
+   Uzbekistan v Colombia `400021504`) and close. (Tune knobs: the two constants in `lib/predictex/replay.ex`.)
 
 3. ~~**`predictex-p4o`** — eyeball goal breakdown.~~ ✅ **CLOSED 2026-06-21** (eyeballed in prod: settled
    group-stage goal breakdown renders correctly).
