@@ -64,10 +64,11 @@ fixture (the 2026-06-17 demo-fixture spec was superseded). Pure `Replay.frames/1
 stay-on-final-frame). `cil` (admin toggle) folded in + closed.
 Spec/plan: `docs/superpowers/{specs/2026-06-20-match-replay-strategy-design.md,plans/2026-06-20-match-replay.md}`.
 
-> ⚠️ **Replay ships DARK — `:match_replay` FunWithFlags flag is OFF in prod.** Nothing is user-visible until
-> it's enabled at `/admin/feature-flags` (or `rpc 'FunWithFlags.enable(:match_replay)'`). Before enabling,
-> eyeball one real replay on a captured match (Ghana v Panama `400021510` / Uzbekistan v Colombia `400021504`).
-> **`i1s` bead left OPEN** until the flag is on + smoke-checked in prod.
+> ✅ **`:match_replay` flag is now ON in prod** (enabled 2026-06-21 via `rpc FunWithFlags.enable`; verified
+> `enabled?` → true). Replay is live for all players. **`i1s` bead still OPEN pending a manual eyeball
+> smoke-check** of one real replay (Ghana v Panama `400021510` / Uzbekistan v Colombia `400021504`) — the one
+> thing CI can't vouch for. Kill switch if the buzz misbehaves: `rpc 'FunWithFlags.disable(:match_replay)'`
+> (no redeploy needed — that's the point of the dark-ship flag).
 
 > ⚠️ **FunWithFlags compile-env gotcha (learned the hard way, v0.11.11):** do NOT override
 > `:fun_with_flags, :cache` in `config/test.exs` — it's a `compile_env` and CI caches the compiled dep on
