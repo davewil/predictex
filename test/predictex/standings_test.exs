@@ -191,4 +191,62 @@ defmodule Predictex.StandingsTest do
       assert row.total == 0
     end
   end
+
+  describe "snapshot/0 + rank/1 + project/4 (single Gather edge → pure ranking)" do
+    test "rank(snapshot()) matches leaderboard/0", %{f1: f1, f2: f2} do
+      dave = player_fixture(%{display_name: "Dave"})
+      predict!(dave, f1, 1, 0)
+      predict!(dave, f2, 0, 2)
+
+      assert Standings.rank(Standings.snapshot()) == Standings.leaderboard()
+    end
+
+    test "snapshot/0 carries players (with predictions) and fixtures (with round)", %{f1: f1} do
+      dave = player_fixture(%{display_name: "Dave"})
+      predict!(dave, f1, 1, 0)
+
+      assert %Standings.Snapshot{players: players, fixtures: fixtures} = Standings.snapshot()
+      assert Enum.any?(players, fn p -> p.id == dave.id and is_list(p.predictions) end)
+      assert Enum.any?(fixtures, fn f -> f.id == f1.id and match?(%{stage: _}, f.round) end)
+    end
+
+    test "project/4 swaps one fixture to completed and re-ranks — pure, no DB" do
+      # Hand-built snapshot, no Repo: a scheduled fixture and two players with different picks.
+      round = %Predictex.Tournament.Round{id: 1, ordinal: 1, stage: :group}
+
+      fixture = %Predictex.Tournament.Fixture{
+        id: 100,
+        status: :scheduled,
+        home_goals: nil,
+        away_goals: nil,
+        round: round
+      }
+
+      exact = %Predictex.Accounts.Player{
+        id: 1,
+        display_name: "Exact",
+        predictions: [
+          %Predictex.Predictions.Prediction{fixture_id: 100, home_goals: 2, away_goals: 1}
+        ]
+      }
+
+      off = %Predictex.Accounts.Player{
+        id: 2,
+        display_name: "Off",
+        predictions: [
+          %Predictex.Predictions.Prediction{fixture_id: 100, home_goals: 0, away_goals: 0}
+        ]
+      }
+
+      snapshot = %Standings.Snapshot{players: [exact, off], fixtures: [fixture]}
+
+      # Nothing completed yet → everyone sits at 0.
+      assert Enum.all?(Standings.rank(snapshot), &(&1.total == 0))
+
+      # Project the fixture to 2-1 → the exact predictor leads with a positive total.
+      assert [leader | _] = Standings.project(snapshot, 100, 2, 1)
+      assert leader.player_id == exact.id
+      assert leader.total > 0
+    end
+  end
 end

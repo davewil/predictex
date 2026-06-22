@@ -59,3 +59,23 @@ _Avoid_: outcome, actual.
 The ranked standings. Two boards exist: the cumulative board (all rounds) and the re-based
 **knockout** board (knockout rounds only, from zero).
 _Avoid_: table, ranking (use for the act of ranking, not the board itself).
+
+## Standings & live buzz
+
+**Ranking snapshot**:
+The loaded inputs for ranking — every player (with predictions) and every fixture (with its
+round) — captured once as `%Standings.Snapshot{}` at a single instant. The pure Gather edge:
+`rank`/`project` and all **buzz** projections run over a snapshot without touching the DB, so
+one live event loads once instead of per-projection.
+_Avoid_: cache, state, dataset.
+
+**Buzz**:
+The live "what-if" projections for an in-play **fixture**: re-rank the **leaderboard** under a
+few next-goal **scenarios** and turn the movement into shareable headlines. Pure over a
+**ranking snapshot**; persists nothing.
+_Avoid_: feed, ticker, notifications.
+
+**Scenario**:
+One hypothetical next-goal outcome for a live **fixture** (ends now / home scores next / away
+scores next), each yielding a projected **leaderboard**.
+_Avoid_: case, what-if (in prose only).

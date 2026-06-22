@@ -14,7 +14,7 @@ defmodule PredictexWeb.FixtureLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap, Capture, Replay}
+  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap, Capture, Replay, Standings}
   alias PredictexWeb.Flags
 
   @impl true
@@ -146,10 +146,11 @@ defmodule PredictexWeb.FixtureLive do
     if score_changed_from_last?(replay, frame) do
       h = frame.live_home_goals
       a = frame.live_away_goals
+      snapshot = Standings.snapshot()
 
       socket
-      |> assign(:scenarios, Buzz.scenarios_with_deltas(fixture.id, h, a))
-      |> assign(:headlines, Buzz.headlines(fixture.id, h, a, viewer_id))
+      |> assign(:scenarios, Buzz.scenarios_with_deltas(snapshot, fixture.id, h, a))
+      |> assign(:headlines, Buzz.headlines(snapshot, fixture.id, h, a, viewer_id))
       |> assign(:replay, %{replay | h: h, a: a})
     else
       # Minute-only frame (Gap B#1): no re-rank, just the refreshed shadow.
@@ -181,27 +182,41 @@ defmodule PredictexWeb.FixtureLive do
     knockout? = fixture.round.stage != :group
     picks = if(locked?, do: Predictions.list_fixture_predictions(fixture.id), else: [])
 
+    # One ranking snapshot per event, shared by every projection (pick projection + scenarios +
+    # headlines). Loaded only when a projection could be shown — a settled fixture needs none.
+    snapshot = ranking_snapshot(fixture)
+
     socket
     |> assign(:fixture, fixture)
     |> assign(:view_fixture, fixture)
     |> assign(:replay, nil)
     |> assign(:replay_available?, replay_available?(fixture))
     |> assign(:viewer_id, viewer_id)
-    |> assign(:pick_projection, pick_projection(fixture, viewer_id))
+    |> assign(:pick_projection, pick_projection(snapshot, fixture, viewer_id))
     |> assign(:picks_visible?, locked?)
     |> assign(:picks, picks)
     |> assign(:recap?, recap?)
     |> assign(:knockout?, knockout?)
     |> assign(:points, if(recap?, do: MatchRecap.points(fixture, picks), else: %{}))
     |> assign(:goals, if(recap?, do: recap_goals(fixture), else: []))
-    |> assign(
-      :scenarios,
-      if(fixture.is_live, do: Buzz.scenarios_with_deltas(fixture.id, h, a), else: [])
-    )
-    |> assign(
-      :headlines,
-      if(fixture.is_live, do: Buzz.headlines(fixture.id, h, a, viewer_id), else: [])
-    )
+    |> put_live_buzz(snapshot, fixture, h, a, viewer_id)
+  end
+
+  # A ranking snapshot is needed only when a projection could be shown: a live fixture, or an
+  # open (not-yet-settled) fixture the viewer may have a pick on. A settled fixture needs none.
+  defp ranking_snapshot(%{is_live: true}), do: Standings.snapshot()
+  defp ranking_snapshot(%{status: :completed}), do: nil
+  defp ranking_snapshot(_fixture), do: Standings.snapshot()
+
+  # Live-only buzz assigns, over the shared snapshot; empty for a non-live fixture.
+  defp put_live_buzz(socket, snapshot, %{is_live: true} = fixture, h, a, viewer_id) do
+    socket
+    |> assign(:scenarios, Buzz.scenarios_with_deltas(snapshot, fixture.id, h, a))
+    |> assign(:headlines, Buzz.headlines(snapshot, fixture.id, h, a, viewer_id))
+  end
+
+  defp put_live_buzz(socket, _snapshot, _fixture, _h, _a, _viewer_id) do
+    socket |> assign(:scenarios, []) |> assign(:headlines, [])
   end
 
   # Replay is offered only for a completed fixture with a captured timeline, and only
@@ -217,12 +232,12 @@ defmodule PredictexWeb.FixtureLive do
   # collide with replay, which only runs on completed fixtures). The getter fetches only the
   # viewer's own pick — the anti-copy input boundary; the render withholds the per-player board
   # until kickoff (the output boundary).
-  defp pick_projection(fixture, viewer_id) do
+  defp pick_projection(snapshot, fixture, viewer_id) do
     with true <- fixture.status != :completed,
          pick when not is_nil(pick) <-
            Predictions.get_player_fixture_prediction(viewer_id, fixture.id) do
-      fixture.id
-      |> Buzz.pick_projection(pick.home_goals, pick.away_goals, viewer_id)
+      snapshot
+      |> Buzz.pick_projection(fixture.id, pick.home_goals, pick.away_goals, viewer_id)
       |> Map.merge(%{home: pick.home_goals, away: pick.away_goals})
     else
       _ -> nil

@@ -4,7 +4,7 @@ defmodule Predictex.StandingsProjectTest do
 
   import Predictex.AccountsFixtures
 
-  test "project/3 ranks as if the live fixture finished, without persisting" do
+  test "project/4 ranks as if the live fixture finished, without persisting" do
     {:ok, r} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})
 
     {:ok, fx} =
@@ -33,7 +33,7 @@ defmodule Predictex.StandingsProjectTest do
     assert Enum.find(Standings.leaderboard(), &(&1.player_id == p.id)).total == 0
 
     # Projected at 1-0: Ana's correct outcome + exact score now scores.
-    projected = Standings.project(fx.id, 1, 0)
+    projected = Standings.project(Standings.snapshot(), fx.id, 1, 0)
     assert Enum.find(projected, &(&1.player_id == p.id)).total > 0
 
     # Not persisted.

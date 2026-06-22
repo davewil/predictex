@@ -1,105 +1,88 @@
 defmodule Predictex.BuzzTest do
-  use Predictex.DataCase, async: true
-  alias Predictex.{Buzz, Tournament, Predictions}
+  # Pure tests: Buzz runs over a hand-built `Standings.Snapshot` and never touches the DB,
+  # so there is no DataCase / Repo here. The zero-DB setup is itself the proof that Buzz no
+  # longer loads per projection. Full wiring (snapshot load → Buzz → render) is covered by
+  # the DB-backed FixtureLive integration tests.
+  use ExUnit.Case, async: true
 
-  import Predictex.AccountsFixtures
+  alias Predictex.Buzz
+  alias Predictex.Standings
+  alias Predictex.Standings.Snapshot
+  alias Predictex.Accounts.Player
+  alias Predictex.Predictions.Prediction
+  alias Predictex.Tournament.{Fixture, Round}
+
+  @fx_id 10
+  @completed_id 20
 
   setup do
-    # One round containing both the live fixture and a completed fixture.
-    # Bob predicts the completed fixture: outcome correct (3-1 vs actual 1-0 → home win)
-    # but goals wrong → 10 pts base. Ana predicts the live fixture (1-0) which is not
-    # yet completed → 0 pts base. At base: Bob 10 pts (correct outcome on the completed
-    # fixture), Ana 0 pts (her prediction is on the live, not-yet-completed fixture).
-    # In home_next (1-0 projection), Ana earns her exact prediction (30 pts) and
-    # overtakes Bob → "you climb" line is produced by narratives/4.
-    {:ok, r} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})
+    # One group round with a live fixture (@fx_id) and a completed fixture (@completed_id).
+    # Bob predicts the completed fixture 3-1 vs actual 1-0: correct outcome, wrong goals → 10
+    # base pts. Ana predicts the live fixture 1-0 (not yet completed) → 0 base pts. Each predicted
+    # only one of the round's two fixtures, so neither earns a round bonus in any projection.
+    # Base ranks: Bob #1 (10), Ana #2 (0). Project the live fixture to 1-0 (home_next / Ana's
+    # pick) → Ana earns her exact 30 and overtakes Bob.
+    round = %Round{id: 1, ordinal: 1, stage: :group}
 
-    {:ok, fx} =
-      Tournament.create_fixture(%{
-        external_ref: "x",
-        team1: "Portugal",
-        team2: "Congo DR",
-        round_id: r.id,
-        kickoff_at: ~U[2026-06-17 17:00:00Z],
-        status: :live,
-        live_home_goals: 0,
-        live_away_goals: 0
-      })
+    fx = %Fixture{id: @fx_id, status: :live, home_goals: nil, away_goals: nil, round: round}
 
-    # Completed fixture in the same round — Bob predicts wrong outcome (0-1 vs actual 1-0).
-    {:ok, completed_fx} =
-      Tournament.create_fixture(%{
-        external_ref: "y",
-        team1: "Spain",
-        team2: "Brazil",
-        round_id: r.id,
-        status: :completed,
-        home_goals: 1,
-        away_goals: 0
-      })
+    completed_fx = %Fixture{
+      id: @completed_id,
+      status: :completed,
+      home_goals: 1,
+      away_goals: 0,
+      round: round
+    }
 
-    ana = player_fixture(%{display_name: "Ana", email: "a@b.c"})
-    bob = player_fixture(%{display_name: "Bob"})
+    ana = %Player{
+      id: 1,
+      display_name: "Ana",
+      predictions: [%Prediction{fixture_id: @fx_id, home_goals: 1, away_goals: 0}]
+    }
 
-    # Ana predicts the live fixture (admin path bypasses kickoff lockout)
-    {:ok, _} =
-      Predictions.admin_upsert_prediction(%{
-        player_id: ana.id,
-        fixture_id: fx.id,
-        home_goals: 1,
-        away_goals: 0
-      })
+    bob = %Player{
+      id: 2,
+      display_name: "Bob",
+      predictions: [%Prediction{fixture_id: @completed_id, home_goals: 3, away_goals: 1}]
+    }
 
-    # Bob predicts 3-1 on actual 1-0: outcome correct (+10), goals wrong → 10 pts base.
-    # Round not complete (live fixture present) → no round bonus. Bob at 10, Ana at 0
-    # at base. In home_next projection Ana earns exact (30) > Bob (10) → rank flip.
-    {:ok, _} =
-      Predictions.create_prediction(%{
-        player_id: bob.id,
-        fixture_id: completed_fx.id,
-        home_goals: 3,
-        away_goals: 1
-      })
+    snapshot = %Snapshot{players: [ana, bob], fixtures: [fx, completed_fx]}
 
-    %{fx: fx, ana: ana, bob: bob}
+    %{snapshot: snapshot, ana: ana, bob: bob}
   end
 
-  test "scenarios/3 returns the three what-if leaderboards", %{fx: fx} do
-    keys = Buzz.scenarios(fx.id, 0, 0) |> Enum.map(& &1.key)
+  test "scenarios/4 returns the three what-if leaderboards", %{snapshot: snap} do
+    keys = Buzz.scenarios(snap, @fx_id, 0, 0) |> Enum.map(& &1.key)
     assert keys == [:end_now, :home_next, :away_next]
   end
 
-  test "narratives mention the viewer with 'you' framing", %{fx: fx, ana: ana} do
-    # Base: Bob 10 pts (completed fixture, correct outcome), Ana 0 pts (live fixture,
-    # not yet completed). In home_next (1-0), Ana's exact prediction scores 30 pts → she
-    # climbs above Bob. narratives/4 should emit at least one "you" line for Ana.
-    lines = Buzz.narratives(fx.id, 0, 0, ana.id)
+  test "narratives mention the viewer with 'you' framing", %{snapshot: snap, ana: ana} do
+    lines = Buzz.narratives(snap, @fx_id, 0, 0, ana.id)
     assert Enum.any?(lines, &String.contains?(&1, "you"))
   end
 
-  test "scenarios_with_deltas/3 rows carry rank, prev_rank and delta", %{fx: fx, ana: ana} do
-    # Base: Bob #1 (10 pts), Ana #2 (0 pts). In :home_next (1-0) Ana earns 30 pts → #1,
-    # Bob drops to #2. Ana's delta should be prev_rank(2) - rank(1) = +1 (climbed).
-    result = Buzz.scenarios_with_deltas(fx.id, 0, 0)
-
+  test "scenarios_with_deltas/4 rows carry rank, prev_rank and delta", %{
+    snapshot: snap,
+    ana: ana
+  } do
+    # Base: Bob #1 (10), Ana #2 (0). In :home_next (1-0) Ana earns 30 → #1, Bob #2.
+    # Ana's delta = prev_rank(2) - rank(1) = +1.
+    result = Buzz.scenarios_with_deltas(snap, @fx_id, 0, 0)
     home_next = Enum.find(result, &(&1.key == :home_next))
     assert home_next != nil
 
     ana_row = Enum.find(home_next.rows, &(&1.player_id == ana.id))
-    assert ana_row != nil
     assert ana_row.rank == 1
     assert ana_row.prev_rank == 2
     assert ana_row.delta == 1
   end
 
-  test "headlines/4 includes a movement line and renders 'you' for the viewer", %{
-    fx: fx,
+  test "headlines/5 includes a movement line and renders 'you' for the viewer", %{
+    snapshot: snap,
     ana: ana,
     bob: bob
   } do
-    # In :home_next (1-0), Ana climbs from #2 to #1, overtaking Bob.
-    # As the viewer, Ana should see a "you overtake" line.
-    lines = Buzz.headlines(fx.id, 0, 0, ana.id)
+    lines = Buzz.headlines(snap, @fx_id, 0, 0, ana.id)
 
     assert lines != []
     assert Enum.any?(lines, &String.contains?(&1, "you"))
@@ -109,18 +92,16 @@ defmodule Predictex.BuzzTest do
              &(String.contains?(&1, "overtake") or String.contains?(&1, "moves up to #"))
            )
 
-    # Bob's name (the overtaken player) should appear in Ana's line
     assert Enum.any?(lines, &String.contains?(&1, bob.display_name))
   end
 
-  describe "pick_projection/4 (kcx — 'if your pick lands')" do
+  describe "pick_projection/5 (kcx — 'if your pick lands')" do
     test "projects the board as if the fixture finished the given scoreline", %{
-      fx: fx,
+      snapshot: snap,
       ana: ana,
       bob: bob
     } do
-      # Ana's pick (1-0) lands: she earns her exact prediction (30 pts) → #1, Bob #2.
-      %{rows: rows} = Buzz.pick_projection(fx.id, 1, 0, ana.id)
+      %{rows: rows} = Buzz.pick_projection(snap, @fx_id, 1, 0, ana.id)
 
       ana_row = Enum.find(rows, &(&1.player_id == ana.id))
       bob_row = Enum.find(rows, &(&1.player_id == bob.id))
@@ -130,16 +111,15 @@ defmodule Predictex.BuzzTest do
       assert bob_row.rank == 2
 
       # Cross-check against the underlying projection — no duplicated scoring math.
-      [top | _] = Predictex.Standings.project(fx.id, 1, 0)
+      [top | _] = Standings.project(snap, @fx_id, 1, 0)
       assert top.player_id == ana.id and top.total == 30
     end
 
     test "viewer row carries rank, prev_rank and delta vs current standings", %{
-      fx: fx,
+      snapshot: snap,
       ana: ana
     } do
-      # Base: Bob #1 (10), Ana #2 (0). Ana's 1-0 lands → Ana #1: delta prev(2) - rank(1) = +1.
-      %{viewer: viewer} = Buzz.pick_projection(fx.id, 1, 0, ana.id)
+      %{viewer: viewer} = Buzz.pick_projection(snap, @fx_id, 1, 0, ana.id)
 
       assert viewer.player_id == ana.id
       assert viewer.rank == 1
@@ -147,12 +127,8 @@ defmodule Predictex.BuzzTest do
       assert viewer.delta == 1
     end
 
-    test "calls Standings.leaderboard/0 once (shared index), returns rows + viewer shape", %{
-      fx: fx,
-      ana: ana
-    } do
-      result = Buzz.pick_projection(fx.id, 1, 0, ana.id)
-      assert %{rows: rows, viewer: viewer} = result
+    test "returns the rows + viewer shape", %{snapshot: snap, ana: ana} do
+      assert %{rows: rows, viewer: viewer} = Buzz.pick_projection(snap, @fx_id, 1, 0, ana.id)
       assert is_list(rows)
       assert viewer.player_id == ana.id
     end

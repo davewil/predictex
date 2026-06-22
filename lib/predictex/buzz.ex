@@ -1,46 +1,50 @@
 defmodule Predictex.Buzz do
   @moduledoc """
   Live "what-if" buzz: project a live fixture under a few next-goal scenarios and turn the
-  rank changes into shareable narratives. Pure over `Standings`; persists nothing.
+  rank changes into shareable narratives.
+
+  Pure over a `Predictex.Standings.Snapshot`: the caller loads one snapshot per live event and
+  passes it to every function here, so the board is loaded once (not per projection) and every
+  scenario in that event sees a single consistent instant. Persists nothing.
   """
   alias Predictex.Standings
 
-  @doc "The three scenario leaderboards for the current live score."
-  def scenarios(fixture_id, home, away) do
+  @doc "The three scenario leaderboards for the current live score, over `snapshot`."
+  def scenarios(snapshot, fixture_id, home, away) do
     [
       %{
         key: :end_now,
         label: "if it ends #{home}-#{away}",
-        leaderboard: Standings.project(fixture_id, home, away)
+        leaderboard: Standings.project(snapshot, fixture_id, home, away)
       },
       %{
         key: :home_next,
         label: "if home scores next",
-        leaderboard: Standings.project(fixture_id, home + 1, away)
+        leaderboard: Standings.project(snapshot, fixture_id, home + 1, away)
       },
       %{
         key: :away_next,
         label: "if away scores next",
-        leaderboard: Standings.project(fixture_id, home, away + 1)
+        leaderboard: Standings.project(snapshot, fixture_id, home, away + 1)
       }
     ]
   end
 
   @doc """
-  Like `scenarios/3` but each row is enriched with rank movement vs the current standings.
+  Like `scenarios/4` but each row is enriched with rank movement vs the current standings.
 
   Returns `[%{key, label, rows: [%{player_id, name, total, rank, prev_rank, delta}]}]`.
 
   - `rank`      — 1-based position in that scenario's projected leaderboard.
-  - `prev_rank` — player's 1-based rank in the current `Standings.leaderboard/0` (nil if absent).
+  - `prev_rank` — player's 1-based rank in the snapshot's current ranking (nil if absent).
   - `delta`     — `prev_rank - rank` when both present (positive = climbed), else nil.
 
-  `Standings.leaderboard/0` is called exactly once.
+  The current ranking is computed once from `snapshot`.
   """
-  def scenarios_with_deltas(fixture_id, home, away) do
-    current = rank_index(Standings.leaderboard())
+  def scenarios_with_deltas(snapshot, fixture_id, home, away) do
+    current = rank_index(Standings.rank(snapshot))
 
-    for %{key: key, label: label, leaderboard: lb} <- scenarios(fixture_id, home, away) do
+    for %{key: key, label: label, leaderboard: lb} <- scenarios(snapshot, fixture_id, home, away) do
       %{key: key, label: label, rows: enrich_rows(lb, current)}
     end
   end
@@ -52,11 +56,11 @@ defmodule Predictex.Buzz do
 
   Returns `%{rows: [%{player_id, name, total, rank, prev_rank, delta}], viewer: row | nil}`,
   where `viewer` is the row for `viewer_id` (pulled out for the pre-kickoff headline, where the
-  per-player board is withheld for anti-copy). `Standings.leaderboard/0` is called exactly once.
+  per-player board is withheld for anti-copy). The current ranking is computed once from `snapshot`.
   """
-  def pick_projection(fixture_id, home, away, viewer_id) do
-    current = rank_index(Standings.leaderboard())
-    rows = enrich_rows(Standings.project(fixture_id, home, away), current)
+  def pick_projection(snapshot, fixture_id, home, away, viewer_id) do
+    current = rank_index(Standings.rank(snapshot))
+    rows = enrich_rows(Standings.project(snapshot, fixture_id, home, away), current)
     %{rows: rows, viewer: Enum.find(rows, &(&1.player_id == viewer_id))}
   end
 
@@ -83,17 +87,16 @@ defmodule Predictex.Buzz do
   Viewer (`viewer_id`) is referred to as "you". Only climbers (delta > 0) get lines.
   Returns `[]` when nothing moves in any scenario.
   """
-  def headlines(fixture_id, home, away, viewer_id) do
-    ranked_by_id = rank_index(Standings.leaderboard())
-
-    scenarios_with_deltas(fixture_id, home, away)
+  def headlines(snapshot, fixture_id, home, away, viewer_id) do
+    snapshot
+    |> scenarios_with_deltas(fixture_id, home, away)
     |> Enum.flat_map(fn %{label: label, rows: rows} ->
       rows_by_rank = Map.new(rows, &{&1.rank, &1})
 
       rows
       |> Enum.filter(&((&1.delta || 0) > 0))
       |> Enum.map(fn row ->
-        {row.delta, headline_line(label, row, rows_by_rank, ranked_by_id, viewer_id)}
+        {row.delta, headline_line(label, row, rows_by_rank, viewer_id)}
       end)
     end)
     |> Enum.uniq_by(fn {_delta, line} -> line end)
@@ -111,10 +114,10 @@ defmodule Predictex.Buzz do
   standings — if the viewer has no rank to diff from, no narrative line can be
   produced.
   """
-  def narratives(fixture_id, home, away, viewer_id) do
-    current = rank_index(Standings.leaderboard())
+  def narratives(snapshot, fixture_id, home, away, viewer_id) do
+    current = rank_index(Standings.rank(snapshot))
 
-    for %{label: label, leaderboard: lb} <- scenarios(fixture_id, home, away),
+    for %{label: label, leaderboard: lb} <- scenarios(snapshot, fixture_id, home, away),
         line = viewer_line(label, current, rank_index(lb), viewer_id),
         not is_nil(line) do
       line
@@ -141,7 +144,7 @@ defmodule Predictex.Buzz do
   # Produces a single headline line for a climber row.
   # If the climber is the viewer, names the player they overtook ("you overtake <name> to #N").
   # Otherwise emits "<name> moves up to #N".
-  defp headline_line(label, row, rows_by_rank, _ranked_by_id, viewer_id) do
+  defp headline_line(label, row, rows_by_rank, viewer_id) do
     if row.player_id == viewer_id do
       # Find the player now directly below the viewer in the projected board
       overtaken = rows_by_rank[row.rank + 1]

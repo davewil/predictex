@@ -20,13 +20,24 @@ defmodule Predictex.Standings do
   alias Predictex.Repo
   alias Predictex.Scoring
   alias Predictex.Accounts.Player
+  alias Predictex.Standings.Snapshot
   alias Predictex.Tournament.Fixture
 
-  @doc "Ranked standings for the whole league, sorted by total (desc), ties by name."
-  def leaderboard do
+  @doc """
+  The single Gather edge: load every player (with predictions) and fixture (with round) once,
+  as a `Standings.Snapshot`. The pure `rank/1` and `project/4` (and all `Buzz` projections) run
+  over it without re-querying — so one live event loads once instead of per-projection.
+  """
+  def snapshot do
     {players, fixtures} = load_ranking_inputs()
-    rank(players, fixtures)
+    %Snapshot{players: players, fixtures: fixtures}
   end
+
+  @doc "Ranked standings for the whole league, sorted by total (desc), ties by name."
+  def leaderboard, do: rank(snapshot())
+
+  @doc "Pure ranking over a `Standings.Snapshot`."
+  def rank(%Snapshot{players: players, fixtures: fixtures}), do: rank(players, fixtures)
 
   @doc """
   Pure ranking over already-loaded players and fixtures.
@@ -52,19 +63,17 @@ defmodule Predictex.Standings do
   booster, risky/cohort and per-round bonus all apply within the knockout stage.
   """
   def knockout_leaderboard do
-    {players, fixtures} = load_ranking_inputs()
+    %Snapshot{players: players, fixtures: fixtures} = snapshot()
     knockout = Enum.filter(fixtures, &(&1.round.stage == :knockout))
     rank(players, knockout)
   end
 
   @doc """
-  Projected leaderboard as if `fixture_id` finished `home`-`away`. Swaps that one fixture
-  to `:completed` in memory and reuses the pure `rank/2`, so booster, risky/cohort, and
-  round bonus are all honoured. Persists nothing.
+  Projected leaderboard over a `Standings.Snapshot`, as if `fixture_id` finished `home`-`away`.
+  Swaps that one fixture to `:completed` in memory and reuses the pure `rank/2`, so booster,
+  risky/cohort, and round bonus are all honoured. Pure — no `Repo`, persists nothing.
   """
-  def project(fixture_id, home, away) do
-    {players, fixtures} = load_ranking_inputs()
-
+  def project(%Snapshot{players: players, fixtures: fixtures}, fixture_id, home, away) do
     projected =
       Enum.map(fixtures, fn f ->
         if f.id == fixture_id,
