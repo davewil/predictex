@@ -153,6 +153,7 @@ defmodule Predictex.StandingsTest do
           away_goals: 1
         })
 
+      # Dave (module setup) has group-stage-only predictions, so Alice is the only knockout scorer.
       [row] = Standings.knockout_leaderboard()
       assert row.player_id == alice.id
       # Knockout board excludes the group fixture entirely: only the KO pick counts.
@@ -184,7 +185,9 @@ defmodule Predictex.StandingsTest do
           away_goals: 0
         })
 
+      # Dave (module setup) has group-stage-only predictions, so Bob is the only knockout scorer.
       [row] = Standings.knockout_leaderboard()
+      assert row.player_id == bob.id
       assert row.total == 0
     end
   end
