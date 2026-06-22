@@ -163,11 +163,9 @@ bracket resolution. Next session picks from the backlog below.
      pre-kickoff card exposes only the viewer's own pick, never others').
    </details>
 
-2. **`predictex-i1s` (open) — replay sped up + DEPLOYED (v0.11.12); re-eyeball then close.** Eyeballed
-   2026-06-21: worked but too slow. Fixed with adaptive pacing (pure `Replay.tick_delay_ms/1`: 1400ms dwell
-   on score-change frames so the buzz is readable, 250ms rush through minute-only filler — was a flat
-   1s/frame). Now live in prod. Re-eyeball one real replay at the new pace (Ghana v Panama `400021510` /
-   Uzbekistan v Colombia `400021504`) and close. (Tune knobs: the two constants in `lib/predictex/replay.ex`.)
+2. ~~**`predictex-i1s`** — match replay engine + adaptive pacing.~~ ✅ **CLOSED 2026-06-22** (engine shipped
+   v0.11.11; adaptive pacing v0.11.12 — `Replay.tick_delay_ms/1`: 1400ms dwell on score-change frames, 250ms
+   rush through filler; accepted in prod). Tune knobs if needed: the two constants in `lib/predictex/replay.ex`.
 
 3. ~~**`predictex-p4o`** — eyeball goal breakdown.~~ ✅ **CLOSED 2026-06-21** (eyeballed in prod: settled
    group-stage goal breakdown renders correctly).
