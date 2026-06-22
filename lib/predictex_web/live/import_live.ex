@@ -120,21 +120,24 @@ defmodule PredictexWeb.ImportLive do
 
     socket.assigns.matched
     |> Import.to_write_rows()
-    |> Enum.reduce(%{imported: 0, errors: 0}, fn {round_id, rows}, acc ->
-      case Predictions.admin_save_round_predictions(player_id, round_id, rows) do
-        {:ok, results} ->
-          imported = Enum.count(results, fn {_id, r} -> r == :upserted end)
+    |> Enum.reduce(%{imported: 0, errors: 0}, &save_import_round(player_id, &1, &2))
+  end
 
-          %{
-            acc
-            | imported: acc.imported + imported,
-              errors: acc.errors + (Enum.count(results) - imported)
-          }
+  # Import is the third producer of pick rows: it crosses the same shared invariant owner
+  # (`Predictions.validate_pick_rows/1`) before persisting.
+  defp save_import_round(player_id, {round_id, rows}, acc) do
+    with {:ok, rows} <- Predictions.validate_pick_rows(rows),
+         {:ok, results} <- Predictions.admin_save_round_predictions(player_id, round_id, rows) do
+      imported = Enum.count(results, fn {_id, r} -> r == :upserted end)
 
-        {:error, _} ->
-          %{acc | errors: acc.errors + length(rows)}
-      end
-    end)
+      %{
+        acc
+        | imported: acc.imported + imported,
+          errors: acc.errors + (Enum.count(results) - imported)
+      }
+    else
+      {:error, _} -> %{acc | errors: acc.errors + length(rows)}
+    end
   end
 
   defp advance(socket, total) do

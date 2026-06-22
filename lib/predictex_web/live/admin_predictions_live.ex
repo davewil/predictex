@@ -59,20 +59,25 @@ defmodule PredictexWeb.AdminPredictionsLive do
   def handle_event("save_player_round", params, socket) do
     player_id = to_int(params["player_id"])
     round_id = to_int(params["round_id"])
-    boost_id = to_int(params["booster_fixture_id"])
-    rows = parse_rows(params["rows"] || %{}, boost_id)
 
     reload = fn socket ->
       assign(socket, :existing, existing_for(player_id, fixtures_for_round(round_id)))
     end
 
-    AdminWriteResult.handle(
-      socket,
-      Predictions.admin_save_round_predictions(player_id, round_id, rows),
-      reload,
-      &summarize/1,
-      &prediction_error/1
-    )
+    # Parse + validate at the shared prediction-intake boundary (pure); persist on success.
+    case Predictions.parse_pick_rows(params["rows"] || %{}, params["booster_fixture_id"]) do
+      {:ok, rows} ->
+        AdminWriteResult.handle(
+          socket,
+          Predictions.admin_save_round_predictions(player_id, round_id, rows),
+          reload,
+          &summarize/1,
+          &prediction_error/1
+        )
+
+      {:error, :booster_on_blank} ->
+        {:noreply, put_flash(socket, :error, prediction_error(:booster_on_blank))}
+    end
   end
 
   def handle_event("load_fixture", %{"fixture_id" => fid}, socket) do
@@ -86,23 +91,6 @@ defmodule PredictexWeb.AdminPredictionsLive do
      |> assign(:selected_fixture_id, fixture_id)
      |> assign(:fixture_preds, preds)
      |> assign(:missing_players, missing)}
-  end
-
-  # --- parsing (anti-corruption boundary) ---
-
-  defp parse_rows(rows, boost_id) do
-    Enum.map(rows, fn {fid, attrs} ->
-      fixture_id = to_int(fid)
-
-      %{
-        fixture_id: fixture_id,
-        home_goals: to_int_or_nil(attrs["home_goals"]),
-        away_goals: to_int_or_nil(attrs["away_goals"]),
-        first_scorer_side: side_or_nil(attrs["first_scorer_side"]),
-        first_scorer_player: blank_to_nil(attrs["first_scorer_player"]),
-        booster: fixture_id == boost_id
-      }
-    end)
   end
 
   defp fixtures_for_round(round_id) do
@@ -134,6 +122,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
     do:
       "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
 
+  defp prediction_error(:booster_on_blank), do: prediction_error({:booster_on_blank, %{}})
   defp prediction_error(_), do: "Could not save predictions."
 
   defp all_fixtures, do: Tournament.list_fixtures() |> Enum.sort_by(& &1.id)
@@ -150,21 +139,6 @@ defmodule PredictexWeb.AdminPredictionsLive do
   defp to_int(""), do: nil
   defp to_int(i) when is_integer(i), do: i
   defp to_int(s) when is_binary(s), do: String.to_integer(s)
-  defp to_int_or_nil(s) when s in ["", nil], do: nil
-
-  defp to_int_or_nil(s) when is_binary(s) do
-    case Integer.parse(s) do
-      {n, ""} -> n
-      _ -> nil
-    end
-  end
-
-  defp blank_to_nil(""), do: nil
-  defp blank_to_nil(nil), do: nil
-  defp blank_to_nil(s), do: s
-  defp side_or_nil("home"), do: :home
-  defp side_or_nil("away"), do: :away
-  defp side_or_nil(_), do: nil
 
   defp existing_val(existing, fixture_id, field) do
     case Map.get(existing, fixture_id) do

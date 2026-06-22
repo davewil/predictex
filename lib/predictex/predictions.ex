@@ -214,6 +214,38 @@ defmodule Predictex.Predictions do
   def cta_window?(%Fixture{kickoff_at: kickoff}, now),
     do: DateTime.compare(now, DateTime.add(kickoff, -@cta_lead_seconds, :second)) != :lt
 
+  @doc """
+  Pure prediction-intake boundary: parse raw form params (the `picks` map plus the selected
+  `booster_fixture_id`) into validated pick rows.
+
+  Returns `{:ok, [row]}`, each row
+  `%{fixture_id, home_goals, away_goals, first_scorer_side, first_scorer_player, booster}`,
+  or `{:error, :booster_on_blank}` when a booster sits on a blank scoreline. Blank-goal rows
+  are KEPT (the persistence layer decides to `:skip` them); a non-integer fixture key is
+  skipped rather than crashing. Pure — no `Repo`. The form LiveViews cross here; the invariant
+  itself is owned by `validate_pick_rows/1`.
+  """
+  def parse_pick_rows(picks, booster_id_param) when is_map(picks) do
+    boost_id = parse_int(booster_id_param)
+
+    picks
+    |> Enum.flat_map(&parse_row(&1, boost_id))
+    |> validate_pick_rows()
+  end
+
+  @doc """
+  Pure owner of the prediction-intake invariant: a booster requires a scoreline.
+
+  Returns `{:ok, rows}` unchanged, or `{:error, :booster_on_blank}` if any row carries a
+  booster on a blank (nil/nil) scoreline. Shared by `parse_pick_rows/2` (the form boundary)
+  and FIFA import, so every producer of pick rows is held to the same invariant.
+  """
+  def validate_pick_rows(rows) when is_list(rows) do
+    if Enum.any?(rows, &booster_on_blank?/1),
+      do: {:error, :booster_on_blank},
+      else: {:ok, rows}
+  end
+
   # --- internals ---
 
   defp fetch_fixture(attrs) do
@@ -270,4 +302,46 @@ defmodule Predictex.Predictions do
       {:error, cs} -> {:error, cs}
     end
   end
+
+  # --- pure pick-row parsing (the prediction-intake boundary) ---
+
+  defp parse_row({fid, attrs}, boost_id) do
+    case parse_int(fid) do
+      nil -> []
+      fixture_id -> [build_row(fixture_id, attrs, boost_id)]
+    end
+  end
+
+  defp build_row(fixture_id, attrs, boost_id) do
+    %{
+      fixture_id: fixture_id,
+      home_goals: parse_int(attrs["home_goals"]),
+      away_goals: parse_int(attrs["away_goals"]),
+      first_scorer_side: parse_side(attrs["first_scorer_side"]),
+      first_scorer_player: blank_to_nil(attrs["first_scorer_player"]),
+      booster: fixture_id == boost_id
+    }
+  end
+
+  defp booster_on_blank?(%{booster: true, home_goals: nil, away_goals: nil}), do: true
+  defp booster_on_blank?(_), do: false
+
+  defp parse_int(nil), do: nil
+  defp parse_int(""), do: nil
+  defp parse_int(i) when is_integer(i), do: i
+
+  defp parse_int(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
+
+  defp parse_side("home"), do: :home
+  defp parse_side("away"), do: :away
+  defp parse_side(_), do: nil
+
+  defp blank_to_nil(""), do: nil
+  defp blank_to_nil(nil), do: nil
+  defp blank_to_nil(s), do: s
 end

@@ -342,4 +342,84 @@ defmodule Predictex.PredictionsTest do
       assert Predictions.get_player_fixture_prediction(player.id, f.id) == nil
     end
   end
+
+  describe "parse_pick_rows/2 (pure prediction-intake boundary)" do
+    test "parses raw string params into typed pick rows" do
+      picks = %{
+        "10" => %{
+          "home_goals" => "2",
+          "away_goals" => "1",
+          "first_scorer_side" => "home",
+          "first_scorer_player" => "Messi"
+        },
+        "11" => %{
+          "home_goals" => "0",
+          "away_goals" => "0",
+          "first_scorer_side" => "away",
+          "first_scorer_player" => ""
+        }
+      }
+
+      assert {:ok, rows} = Predictions.parse_pick_rows(picks, "10")
+      by_id = Map.new(rows, &{&1.fixture_id, &1})
+
+      assert by_id[10] == %{
+               fixture_id: 10,
+               home_goals: 2,
+               away_goals: 1,
+               first_scorer_side: :home,
+               first_scorer_player: "Messi",
+               booster: true
+             }
+
+      assert by_id[11] == %{
+               fixture_id: 11,
+               home_goals: 0,
+               away_goals: 0,
+               first_scorer_side: :away,
+               first_scorer_player: nil,
+               booster: false
+             }
+    end
+
+    test "keeps blank-goal rows (the persistence layer decides to skip them)" do
+      picks = %{"10" => %{"home_goals" => "", "away_goals" => ""}}
+
+      assert {:ok, [row]} = Predictions.parse_pick_rows(picks, nil)
+      assert row.fixture_id == 10
+      assert row.home_goals == nil and row.away_goals == nil
+      assert row.booster == false
+    end
+
+    test "rejects a booster on a blank scoreline (booster-on-blank invariant)" do
+      picks = %{"10" => %{"home_goals" => "", "away_goals" => ""}}
+      assert {:error, :booster_on_blank} = Predictions.parse_pick_rows(picks, "10")
+    end
+
+    test "skips a forged non-integer fixture key instead of crashing" do
+      picks = %{
+        "not-an-int" => %{"home_goals" => "1", "away_goals" => "0"},
+        "10" => %{"home_goals" => "2", "away_goals" => "2"}
+      }
+
+      assert {:ok, rows} = Predictions.parse_pick_rows(picks, nil)
+      assert Enum.map(rows, & &1.fixture_id) == [10]
+    end
+  end
+
+  describe "validate_pick_rows/1 (pure invariant owner)" do
+    test "ok when no booster sits on a blank row" do
+      rows = [
+        %{fixture_id: 1, home_goals: 1, away_goals: 0, booster: true},
+        %{fixture_id: 2, home_goals: nil, away_goals: nil, booster: false}
+      ]
+
+      assert {:ok, ^rows} = Predictions.validate_pick_rows(rows)
+    end
+
+    test "error when a booster sits on a blank row" do
+      rows = [%{fixture_id: 1, home_goals: nil, away_goals: nil, booster: true}]
+      assert {:error, :booster_on_blank} = Predictions.validate_pick_rows(rows)
+    end
+  end
 end
