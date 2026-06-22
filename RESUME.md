@@ -58,33 +58,25 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-23)
 
-### ★ NEXT SESSION — start with architecture-deepening candidate #1 (collapse the two ranking implementations)
+### ★ NEXT SESSION — architecture review COMPLETE (#4, #3, #1 all done); next is the Knockout Game or backlog
 
-From an architecture review (the `improve-codebase-architecture` skill), candidates **#4 and #3 are DONE +
-pushed** (block below). **#1 is the next to take** — same flow: drop into the grilling loop, lock the design
-decisions, then strict TDD → commit-local.
+All three architecture-deepening candidates from the `improve-codebase-architecture` review are done (#4 + #3
+pushed; **#1 committed-local @ `4ea177f`, NOT pushed** — block below). The deadline-driven **Knockout Game**
+(Phase 1 pushed, not deployed; R32 ≈ 28 Jun) is the live feature thread; `bd ready` for the rest. Follow-up
+from #1: `predictex-0ft` (P4) — memoize the base ranking inside the snapshot so in-memory `project` stops
+re-ranking.
 
-- **The friction:** `Predictex.Standings` (DB-backed, joins predictions↔fixtures by FK) and
-  `Predictex.Leaderboard` (pure/no-DB CLI aggregator, joins by a normalised team-name `match_key`) BOTH
-  reimplement the full scoring loop — group by round ordinal, completeness vs round fixture count,
-  `Scoring.round_total/2`, sum `fixtures_total + round_bonus_total`, sort by `{-total, name}`. The join is the
-  ONLY real difference; everything else is duplicated, so a scoring-rule change must be made twice and divergence
-  is silent.
-- **Deletion test:** delete `Leaderboard` → the no-DB ranking reappears (the CLI `mix predictex.leaderboard`
-  needs it) but as a full reimplementation, not a thin adapter — earns its keep; the duplication is the friction.
-- **Deepening sketch:** extract the pure ranking core (today `Standings.rank/2` + private
-  `score_player`/`bonus_by_round`/`round_meta`) into a shared pure module both call (e.g. `Predictex.Ranking`, no
-  Repo/Ecto). Each module keeps only its join (FK vs `match_key`) and feeds the core already-joined inputs +
-  round_meta. **Grill this tension:** a NEW pure module vs reusing `Standings.rank/2` — the latter couples the
-  DB-free CLI tool to the DB-aware `Standings`, so a separate pure core is probably right.
-- **Scope:** `Leaderboard` powers ONLY `mix predictex.leaderboard` (a dev/ops CLI), so the silent-divergence
-  blast radius is the CLI board, not the members' board — the review rated #1 **Strong** for the
-  locality/duplication win but was honest about the CLI-only scope.
-- **Vocabulary:** `CONTEXT.md` (NEW, repo root) is now the domain glossary — pick row, prediction-intake
-  boundary, ranking snapshot, buzz, scenario + core terms. Add ranking terms there as #1 crystallises.
-
-### ★ ARCHITECTURE REVIEW — candidates #4 + #3 DONE & PUSHED (origin/main = `277142c`)
-Both via the `improve-codebase-architecture` grilling loop → strict TDD → commit-local → pushed. 456 tests green.
+### ★ ARCHITECTURE REVIEW — candidates #4 + #3 + #1 ALL DONE (#4/#3 pushed @ `277142c`; #1 committed-local @ `4ea177f`)
+All via the `improve-codebase-architecture` grilling loop → strict TDD → commit-local. 467 tests green.
+- **#1 — one shared pure ranking core (`4ea177f`, committed-local, NOT pushed).** New pure `Predictex.Ranking`
+  (zero Repo/Ecto) owns the fold both boards duplicated — group by round ordinal, Round Bonus completeness vs
+  round fixture count, `Scoring.round_total/2`, sum `fixtures_total + round_bonus_total`, sort `{-total, name}`.
+  `Standings.rank/2` (FK join) and `Leaderboard.build/3` (team-name join) now keep ONLY their join, build
+  already-scored entries, and hand them + the fixture universe (`[%{ordinal, completed?}]`) to the core. Core
+  requires `:name` + `:scored`, echoes the rest (Standings carries `:player_id`); completeness rule lives in the
+  seam. `Standings.rank/2` byte-identical in/out (Buzz/Dashboard/project unchanged); `Leaderboard.build/3` gains
+  an invisible `:bonus_by_round` (no consumer/whole-map assert). +11 direct `Ranking` tests on trivial
+  `%{ordinal, result}` maps (no scoreable fixtures). CONTEXT.md gains the "ranking core" term.
 - **#4 — one pure prediction-intake boundary (`47fc15c`).** `Predictions.parse_pick_rows/2` +
   `validate_pick_rows/1` (pure) own raw-params→pick-row parsing AND the booster-on-blank invariant; the member +
   admin LiveViews and FIFA import all cross it. Deleted three duplicated per-view parsers + the member's inline
@@ -197,8 +189,8 @@ bracket resolution. Next session picks from the backlog below.
   - **`predictex-p4o` left OPEN** — close after eyeballing a real settled group fixture's breakdown in prod.
     Cards remain in `predictex-bdq`.
 
-**▶ NEXT — start here next session:** architecture-deepening **candidate #1** (collapse the two ranking
-implementations) — see the top of "⏵ Continue here". The **Knockout Game** remains the deadline-driven feature
+**▶ NEXT — start here next session:** architecture review is COMPLETE (#4/#3/#1 all done — #1 committed-local
+@ `4ea177f`, not pushed; see top of "⏵ Continue here"). The **Knockout Game** is the deadline-driven feature
 (Phase 1 pushed, not deployed; R32 ≈ 28 Jun). Backlog below.
 
 **Recently CLOSED (2026-06-22):** `kcx` ("If your pick lands" projected leaderboard, v0.11.12 — eyeballed
