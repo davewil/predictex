@@ -253,6 +253,49 @@ defmodule Predictex.PredictionsTest do
       # The locked fixture keeps its booster — the member can't move it.
       assert Predictions.get_player_fixture_prediction(player.id, locked.id).booster == true
     end
+
+    # --- write-auth seam: out-of-round fixture rejection (fix for server-side trust boundary) ---
+
+    test "a fixture from a different round is rejected as :unknown and never written", %{
+      round: round,
+      player: player
+    } do
+      # Create a second round with its own fixture — foreign to `round`.
+      {:ok, other_round} =
+        Tournament.create_round(%{name: "Other Round", stage: :group, ordinal: 2})
+
+      foreign_fixture = fixture!(other_round)
+
+      rows = [%{fixture_id: foreign_fixture.id, home_goals: 2, away_goals: 1, booster: false}]
+
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert results[foreign_fixture.id] == :unknown
+      assert Predictions.get_player_fixture_prediction(player.id, foreign_fixture.id) == nil
+    end
+
+    test "a non-existent fixture_id is rejected as :unknown and never written", %{
+      round: round,
+      player: player
+    } do
+      nonexistent_id = 999_999_999
+
+      rows = [%{fixture_id: nonexistent_id, home_goals: 2, away_goals: 1, booster: false}]
+
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert results[nonexistent_id] == :unknown
+      assert Predictions.get_player_fixture_prediction(player.id, nonexistent_id) == nil
+    end
+
+    test "a normal in-round open fixture still saves as :upserted", %{
+      round: round,
+      player: player,
+      open: open
+    } do
+      rows = [%{fixture_id: open.id, home_goals: 3, away_goals: 0, booster: false}]
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert results[open.id] == :upserted
+      assert Predictions.get_player_fixture_prediction(player.id, open.id).home_goals == 3
+    end
   end
 
   describe "get_player_fixture_prediction/2 (anti-copy focused getter)" do

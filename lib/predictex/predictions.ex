@@ -125,11 +125,23 @@ defmodule Predictex.Predictions do
   `:locked`), and the up-front booster clear only touches unlocked fixtures, so a booster
   already committed to a locked fixture is preserved. Otherwise mirrors the admin path:
   sparse-grid upsert with the booster-on-blank guard.
+
+  **Round-membership enforcement:** rows whose `fixture_id` does not belong to `round_id`
+  are rejected outright — result `:unknown`, never written. This is the primary
+  write-authorization guard at the trust boundary: a crafted payload cannot write a
+  prediction on a fixture from another round or a non-existent fixture. The existing
+  `locked?(nil, _now)` defensive clause is now unreachable from this path.
   """
   def save_round_predictions(player_id, round_id, rows, now \\ DateTime.utc_now())
       when is_list(rows) do
     fixtures = Map.new(Repo.all(from f in Fixture, where: f.round_id == ^round_id), &{&1.id, &1})
-    {locked, open} = Enum.split_with(rows, &locked?(Map.get(fixtures, &1.fixture_id), now))
+
+    # Partition rows by round membership FIRST.
+    # Unknown rows (fixture_id not in this round) are rejected immediately as :unknown.
+    {known, unknown} = Enum.split_with(rows, &Map.has_key?(fixtures, &1.fixture_id))
+
+    # Among known rows, split by lockout. Map.fetch! is safe — membership is guaranteed above.
+    {locked, open} = Enum.split_with(known, &locked?(Map.fetch!(fixtures, &1.fixture_id), now))
 
     Repo.transaction(fn ->
       open_ids = Enum.map(open, & &1.fixture_id)
@@ -147,6 +159,10 @@ defmodule Predictex.Predictions do
 
       results =
         Enum.reduce(locked, saved, fn row, acc -> Map.put(acc, row.fixture_id, :locked) end)
+
+      # Mark out-of-round / non-existent fixture ids as :unknown — never written.
+      results =
+        Enum.reduce(unknown, results, fn row, acc -> Map.put(acc, row.fixture_id, :unknown) end)
 
       if Enum.any?(results, fn {_id, r} -> r == {:error, :booster_on_blank} end) do
         Repo.rollback({:booster_on_blank, results})

@@ -42,8 +42,20 @@ defmodule PredictexWeb.MyPredictionsLive do
 
   @impl true
   def handle_event("save_round", params, socket) do
-    player_id = socket.assigns.current_scope.player.id
     active = active_round(socket.assigns.dash, socket.assigns.active_ordinal)
+
+    # Defense-in-depth guard: only proceed if the active round is an editable open-knockout
+    # round. Forged save_round events targeting group rounds or closed knockout rounds are
+    # silently dropped before any round_id or row processing occurs.
+    if editable_round?(active) do
+      do_save_round(params, active, socket)
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp do_save_round(params, active, socket) do
+    player_id = socket.assigns.current_scope.player.id
     round_id = active.round.id
     # nil means "No booster" radio was selected (or no booster radio was submitted at all).
     boost_id = parse_int(params["booster_fixture_id"])
