@@ -17,6 +17,7 @@ defmodule Predictex.Standings do
 
   import Ecto.Query, warn: false
 
+  alias Predictex.Ranking
   alias Predictex.Repo
   alias Predictex.Scoring
   alias Predictex.Accounts.Player
@@ -47,14 +48,15 @@ defmodule Predictex.Standings do
   bonus_by_round, breakdown}` sorted by `:total` descending, ties broken by name.
   `bonus_by_round` maps each round ordinal to its Round Bonus; each `breakdown`
   entry carries `%{ordinal, fixture_id, result}`.
+
+  This is the FK-join adapter over the shared `Predictex.Ranking` core: it resolves
+  each prediction to its fixture and hands the core already-scored entries; the
+  core owns the fold (totals, Round Bonus, sort).
   """
   def rank(players, fixtures) do
     fixtures_by_id = Map.new(fixtures, &{&1.id, &1})
-    rounds_meta = round_meta(fixtures)
-
-    players
-    |> Enum.map(&score_player(&1, fixtures_by_id, rounds_meta))
-    |> Enum.sort_by(&{-&1.total, &1.name})
+    scored_players = Enum.map(players, &scored_player(&1, fixtures_by_id))
+    Ranking.rank(scored_players, round_fixtures(fixtures))
   end
 
   @doc """
@@ -92,7 +94,10 @@ defmodule Predictex.Standings do
     {players, fixtures}
   end
 
-  defp score_player(player, fixtures_by_id, rounds_meta) do
+  # The FK join: resolve each prediction to its completed fixture and score it,
+  # tagging every entry with its round ordinal and `fixture_id` (which the
+  # dashboard reconciles against). The `Ranking` core folds these into totals.
+  defp scored_player(player, fixtures_by_id) do
     scored =
       for prediction <- player.predictions,
           fixture = Map.get(fixtures_by_id, prediction.fixture_id),
@@ -104,44 +109,11 @@ defmodule Predictex.Standings do
         }
       end
 
-    fixtures_total = scored |> Enum.map(& &1.result.fixture_total) |> Enum.sum()
-    bonus_by_round = bonus_by_round(scored, rounds_meta)
-    round_bonus_total = bonus_by_round |> Map.values() |> Enum.sum()
-
-    %{
-      player_id: player.id,
-      name: player.display_name,
-      fixtures_total: fixtures_total,
-      round_bonus_total: round_bonus_total,
-      total: fixtures_total + round_bonus_total,
-      bonus_by_round: bonus_by_round,
-      breakdown: scored
-    }
+    %{player_id: player.id, name: player.display_name, scored: scored}
   end
 
-  # Round Bonus per round ordinal (one computation feeds both the per-round figure and
-  # the total, so they cannot drift).
-  defp bonus_by_round(scored, rounds_meta) do
-    scored
-    |> Enum.group_by(& &1.ordinal)
-    |> Map.new(fn {ordinal, entries} ->
-      meta = Map.get(rounds_meta, ordinal)
-      results = Enum.map(entries, & &1.result)
-
-      complete? =
-        not is_nil(ordinal) and meta != nil and meta.complete? and
-          length(entries) == meta.count
-
-      {ordinal, Scoring.round_total(results, complete?).round_bonus}
-    end)
-  end
-
-  # Per-round-ordinal fixture count and whether every fixture is completed.
-  defp round_meta(fixtures) do
-    fixtures
-    |> Enum.group_by(& &1.round.ordinal)
-    |> Map.new(fn {ordinal, fxs} ->
-      {ordinal, %{count: length(fxs), complete?: Enum.all?(fxs, &(&1.status == :completed))}}
-    end)
+  # The fixture universe the core needs to size and complete each round.
+  defp round_fixtures(fixtures) do
+    Enum.map(fixtures, &%{ordinal: &1.round.ordinal, completed?: &1.status == :completed})
   end
 end

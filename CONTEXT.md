@@ -62,6 +62,14 @@ _Avoid_: table, ranking (use for the act of ranking, not the board itself).
 
 ## Standings & live buzz
 
+**Ranking core**:
+The pure fold every **leaderboard** shares (`Predictex.Ranking`): given already-joined, scored
+entries it owns the **fixtures total**, the **Round Bonus** completeness rule, the total, and the
+sort — everything the two boards must agree on. No DB. Each board keeps only its **join** (the
+DB-backed board resolves a **prediction** to a **fixture** by foreign key; the no-DB CLI board by
+normalized team name) and feeds the core. The join is the only real difference between them.
+_Avoid_: scorer, aggregator, engine (engine is the **Scoring** rules, not the ranking fold).
+
 **Ranking snapshot**:
 The loaded inputs for ranking — every player (with predictions) and every fixture (with its
 round) — captured once as `%Standings.Snapshot{}` at a single instant. The pure Gather edge:

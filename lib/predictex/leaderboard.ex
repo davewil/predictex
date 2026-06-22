@@ -21,12 +21,16 @@ defmodule Predictex.Leaderboard do
   correctly.
   """
 
-  alias Predictex.{Fifa, Results.Openfootball, Scoring}
+  alias Predictex.{Fifa, Ranking, Results.Openfootball, Scoring}
 
   @doc """
   Build ranked standings. Returns a list of player result maps sorted by `:total`
   descending (ties broken by name), each with `:name`, `:fixtures_total`,
-  `:round_bonus_total`, `:total`, and a per-fixture `:breakdown`.
+  `:round_bonus_total`, `:total`, `:bonus_by_round`, and a per-fixture `:breakdown`.
+
+  This is the team-name-join adapter over the shared `Predictex.Ranking` core: it
+  matches each prediction to its fixture by normalized team names and hands the
+  core already-scored entries; the core owns the fold (totals, Round Bonus, sort).
   """
   @spec build([map()], [map()], [map()]) :: [map()]
   def build(fixtures, players, cohort \\ []) do
@@ -39,20 +43,8 @@ defmodule Predictex.Leaderboard do
 
     fixture_idx = Map.new(fixtures, &{match_key(&1.team1, &1.team2), &1})
 
-    rounds =
-      fixtures
-      |> Enum.group_by(& &1.game_round.ordinal)
-      |> Map.new(fn {ordinal, fxs} ->
-        {ordinal,
-         %{
-           keys: Enum.map(fxs, &match_key(&1.team1, &1.team2)),
-           complete?: Enum.all?(fxs, &(&1.status == :completed))
-         }}
-      end)
-
-    players
-    |> Enum.map(&score_player(&1, fixture_idx, rounds))
-    |> Enum.sort_by(&{-&1.total, &1.name})
+    scored_players = Enum.map(players, &scored_player(&1, fixture_idx))
+    Ranking.rank(scored_players, round_fixtures(fixtures))
   end
 
   @doc "Derive fixtures from a decoded openfootball document, for callers that have the raw JSON."
@@ -61,7 +53,11 @@ defmodule Predictex.Leaderboard do
 
   # --- internals ---
 
-  defp score_player(player, fixture_idx, rounds) do
+  # The team-name join: match each prediction to its completed fixture by
+  # normalized names and score it, tagging every entry with its round ordinal and
+  # the full `fixture` (which the CLI breakdown prints). The `Ranking` core folds
+  # these into totals.
+  defp scored_player(player, fixture_idx) do
     scored =
       player
       |> Map.get(:predictions, [])
@@ -81,33 +77,12 @@ defmodule Predictex.Leaderboard do
         end
       end)
 
-    fixtures_total = scored |> Enum.map(& &1.result.fixture_total) |> Enum.sum()
-    round_bonus_total = round_bonus_total(scored, rounds)
-
-    %{
-      name: Map.get(player, :name),
-      fixtures_total: fixtures_total,
-      round_bonus_total: round_bonus_total,
-      total: fixtures_total + round_bonus_total,
-      breakdown: scored
-    }
+    %{name: Map.get(player, :name), scored: scored}
   end
 
-  # Sum the Round Bonus across every round the player fully and correctly predicted.
-  defp round_bonus_total(scored, rounds) do
-    scored
-    |> Enum.group_by(& &1.ordinal)
-    |> Enum.map(fn {ordinal, entries} ->
-      meta = Map.get(rounds, ordinal)
-      results = Enum.map(entries, & &1.result)
-
-      complete? =
-        not is_nil(ordinal) and meta != nil and meta.complete? and
-          length(entries) == length(meta.keys)
-
-      Scoring.round_total(results, complete?).round_bonus
-    end)
-    |> Enum.sum()
+  # The fixture universe the core needs to size and complete each round.
+  defp round_fixtures(fixtures) do
+    Enum.map(fixtures, &%{ordinal: &1.game_round.ordinal, completed?: &1.status == :completed})
   end
 
   defp attach_cohort(fixture, cohort_idx) do
