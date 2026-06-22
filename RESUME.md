@@ -58,34 +58,42 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-22)
 
-### ★ ACTIVE THREAD — Knockout Game (native predictions, re-based at R32) — SPEC + PLAN WRITTEN, READY TO EXECUTE
+### ★ ACTIVE THREAD — Knockout Game (native predictions, re-based at R32) — PHASE 1 BUILT (COMMITTED, LOCAL — NOT PUSHED/DEPLOYED)
 
 **The big pivot.** From the Round of 32, members enter predictions **natively in-app** (no FIFA
 round-trip), the leaderboard is **re-based** (a from-zero knockout-only board alongside the existing
-cumulative one), and **FIFA is the data authority** for the knockout game. This reverses the current
-"members never predict in-app" model — but **for knockouts only**; the group stage stays frozen/read-only.
-Realises bead **`predictex-2ww`**; wires in `uyf` (KO-ET goal filtering) and `hco` (FIFA bracket).
+cumulative one). Knockouts only; the group stage stays frozen/read-only. Realises bead **`predictex-2ww`**.
 
-- **Spec (agreed + advisor-reviewed):** `docs/superpowers/specs/2026-06-22-knockout-game-native-predictions-design.md`
-- **Plan (Phase 0 spike + Phase 1 foundation, TDD):** `docs/superpowers/plans/2026-06-22-knockout-game-phase1-foundation.md`
-- **Decisions locked (in the spec):** two boards (cumulative + knockout-only-from-0); FIFA authoritative
-  for bracket / scoreline / first-scorer / cohort; **FT-only (regulation) scoring preserved** for scoreline
-  AND first-scorer (ET excluded); first-player from a **searchable FIFA squad dropdown → stored as
-  `IdPlayer`, exact-match scoring** (squad↔scorer id-join CONFIRMED — both in the `/detail` body's
-  `Players`/`Goals`, `capture.ex:159`); entry on an editable `/predictions` for the open KO round;
-  `/import` superseded for KO (not deleted). **Safety net added:** FIFA-regulation scoreline reconciled
-  against openfootball `ft` (verified reg-only) — divergence on an ET match → flag + fall back to
-  openfootball; doubles as the ET-filter regression check that can't run until 28 Jun.
-- **This plan = Task 0 (FIFA-feed spike) + 4 TDD tasks:** `Standings.knockout_leaderboard/0`; Overall/Knockout
-  toggle on `/`; lockout-aware `Predictions.save_round_predictions/4`; editable `/predictions` native entry
-  (scoreline + first-team + booster). Ships a working KO game **minus the player picker**.
-- **Deferred to a FOLLOW-UP plan (after the spike):** player picker + squad ingestion (`SquadSync`,
-  `Prediction.first_scorer_player_id`, id-scoring); FIFA result-authority (bracket auto-populate,
-  regulation-filtered FIFA scoreline + first-scorer, openfootball reconciliation). The picker in v1 is
-  **contingent on Task 0** confirming the squad roster is available *pre-match*.
-- **▶ Execute:** start with **Task 0 (spike)** — includes a live `api.fifa.com` fetch (may need the user for
-  egress) and gates the follow-up; the 4 build tasks don't depend on it and can run in parallel. Recommended:
-  subagent-driven (fresh subagent per task, two-stage review). **Timeline: R32 ≈ 28 Jun.**
+**✅ PHASE 1 SHIPPED — committed local, 9 commits `8419a2f..f94a779`, `main` ahead of origin by 9, 447 tests green,
+NOT pushed (awaiting the user's explicit push call).** Built subagent-driven (fresh subagent + two-stage review
+per task; opus final whole-branch review). What landed:
+- **`Standings.knockout_leaderboard/0`** (`b888c76`) — re-based KO-only board (reuses pure `rank/2` over
+  knockout-stage fixtures; everyone from 0). **Overall/Knockout toggle on `/`** (`81a860e`) — KO button shows
+  only once a KO fixture exists.
+- **`Predictions.save_round_predictions/4`** (`9142bf1`) — lockout-aware member write path: locked fixtures
+  immutable (`:locked`), booster-clear scoped to unlocked fixtures so a locked booster survives.
+- **Editable `/predictions` native entry** (`5abc67b` + `9b7e20c` fix) — scoreline + first-team + one booster/round,
+  for the OPEN knockout round only (group + locked stay read-only). Booster-on-blank blocked (no silent loss).
+- **⚠️ Critical write-auth seam found in the final review + fixed** (`f94a779`): the `save_round` handler trusted
+  client picks fixture-ids and the plan-mandated `locked?(nil)->false` guard let an **out-of-round/locked
+  fixture be written** via a crafted phx event (post-kickoff edit). FIX (two layers): domain rejects rows whose
+  `fixture_id` isn't in the round (`:unknown`, never written) + handler guards with `editable_round?`. Re-reviewed
+  clean (opus). 3 DB-state regression tests.
+- **Spec/plan:** `docs/superpowers/specs/2026-06-22-knockout-game-native-predictions-design.md`,
+  `docs/superpowers/plans/2026-06-22-knockout-game-phase1-foundation.md`. SDD ledger: `.superpowers/sdd/progress.md`.
+
+**▶ NEXT (this thread):** (1) **push** when you say so → then it's a plain `main` push (Quality job only, no deploy);
+deploy is a separate tag call. (2) **Follow-up plan** (deferred, gated by the spike below): player picker + squad
+ingestion + id-based first-scorer scoring; FIFA result-authority (bracket auto-populate, regulation-filtered
+`Period∈{3,5}` FIFA scoreline + first-scorer, openfootball reconciliation). (3) `predictex-cij` (P3) — Phase-2
+per-fixture live/recap gate within an open KO round (cosmetic; write already safe).
+
+**Task-0 spike DONE** (`c9e18c2`, `docs/superpowers/research/2026-06-22-knockout-fifa-feed-spike.md`): squad↔scorer
+`IdPlayer` join CONFIRMED (8/8 goals resolve); **GATE — squad rosters ABSENT pre-match** (upcoming `/detail`
+returns teams but `Players[]`=0/0 days ahead; 26-man squad only at match time) → **picker stays deferred**, needs a
+dedicated squad-endpoint spike or free-text fallback. Regulation goals = `Period∈{3,5}`; match `Period 10`=finished-
+regulation; **ET period values UNKNOWN until 28 Jun** (the reconciliation safety-net doubles as the ET regression check).
+**Timeline: R32 ≈ 28 Jun.**
 
 ---
 
