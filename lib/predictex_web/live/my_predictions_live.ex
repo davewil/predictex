@@ -45,6 +45,7 @@ defmodule PredictexWeb.MyPredictionsLive do
     player_id = socket.assigns.current_scope.player.id
     active = active_round(socket.assigns.dash, socket.assigns.active_ordinal)
     round_id = active.round.id
+    # nil means "No booster" radio was selected (or no booster radio was submitted at all).
     boost_id = parse_int(params["booster_fixture_id"])
 
     rows =
@@ -71,20 +72,36 @@ defmodule PredictexWeb.MyPredictionsLive do
         end
       end)
 
-    case Predictions.save_round_predictions(player_id, round_id, rows) do
-      {:ok, _results} ->
-        {:noreply, socket |> refresh() |> put_flash(:info, "Saved")}
+    # Guard: if the member selected a booster fixture but left its score blank, that fixture
+    # was dropped from `rows` above. Surface the error now rather than silently discarding
+    # the booster selection.
+    booster_row_present? = is_nil(boost_id) or Enum.any?(rows, &(&1.fixture_id == boost_id))
 
-      {:error, {:booster_on_blank, _}} ->
-        {:noreply,
-         put_flash(
-           socket,
-           :error,
-           "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
-         )}
+    if booster_row_present? do
+      case Predictions.save_round_predictions(player_id, round_id, rows) do
+        {:ok, _results} ->
+          {:noreply, socket |> refresh() |> put_flash(:info, "Saved")}
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not save predictions.")}
+        # Defensive backstop — the guard above prevents the UI from producing this state,
+        # but we keep the user-facing error in case the domain fn ever sees booster+blank.
+        {:error, {:booster_on_blank, _}} ->
+          {:noreply,
+           put_flash(
+             socket,
+             :error,
+             "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
+           )}
+
+        {:error, _} ->
+          {:noreply, put_flash(socket, :error, "Could not save predictions.")}
+      end
+    else
+      {:noreply,
+       put_flash(
+         socket,
+         :error,
+         "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
+       )}
     end
   end
 

@@ -373,6 +373,76 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert pred.booster == true
   end
 
+  test "booster on blank-score fixture shows error flash and saves nothing", %{
+    conn: conn,
+    round: round
+  } do
+    player = player_fixture(%{display_name: "BoosterBlank"})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    # Complete the setup round (ordinal 1) so it doesn't steal "active".
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    # Predecessor knockout round needs a completed fixture so round_open? returns true.
+    {:ok, pred_round} =
+      Tournament.create_round(%{name: "Matchday 3", stage: :group, ordinal: 3})
+
+    _done3 =
+      fixture!(pred_round, %{
+        team1: "Brazil",
+        team2: "Argentina",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    ko_fx =
+      fixture!(ko_round, %{
+        team1: "England",
+        team2: "Germany",
+        kickoff_at: future
+      })
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    lv |> element("button", "Round of 16") |> render_click()
+
+    # Submit the form: booster set to ko_fx but home/away goals left blank.
+    html =
+      lv
+      |> form("#round-entry-4", %{
+        "picks" => %{
+          "#{ko_fx.id}" => %{
+            "home_goals" => "",
+            "away_goals" => "",
+            "first_scorer_side" => ""
+          }
+        },
+        "booster_fixture_id" => "#{ko_fx.id}"
+      })
+      |> render_submit()
+
+    # Error flash shown — nothing was saved.
+    assert html =~ "Can&#39;t boost a fixture with no scoreline"
+
+    # No prediction was written to the database.
+    pred = Predictions.get_player_fixture_prediction(player.id, ko_fx.id)
+    assert is_nil(pred) or pred.booster == false
+  end
+
   test "locked group rounds remain read-only — no entry form", %{conn: conn, round: round} do
     player = player_fixture(%{display_name: "ReadOnly"})
     future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
