@@ -118,6 +118,44 @@ defmodule Predictex.Predictions do
     end)
   end
 
+  @doc """
+  Member-facing round save (the lockout-aware sibling of `admin_save_round_predictions/3`).
+
+  Locked fixtures (kickoff passed) are immutable: their rows are not written (result
+  `:locked`), and the up-front booster clear only touches unlocked fixtures, so a booster
+  already committed to a locked fixture is preserved. Otherwise mirrors the admin path:
+  sparse-grid upsert with the booster-on-blank guard.
+  """
+  def save_round_predictions(player_id, round_id, rows, now \\ DateTime.utc_now())
+      when is_list(rows) do
+    fixtures = Map.new(Repo.all(from f in Fixture, where: f.round_id == ^round_id), &{&1.id, &1})
+    {locked, open} = Enum.split_with(rows, &locked?(Map.get(fixtures, &1.fixture_id), now))
+
+    Repo.transaction(fn ->
+      open_ids = Enum.map(open, & &1.fixture_id)
+
+      # Clear boosters only among the unlocked fixtures being (re)saved.
+      from(p in Prediction,
+        where: p.player_id == ^player_id and p.round_id == ^round_id and p.fixture_id in ^open_ids
+      )
+      |> Repo.update_all(set: [booster: false])
+
+      saved =
+        Enum.reduce(open, %{}, fn row, acc ->
+          Map.put(acc, row.fixture_id, save_round_row(player_id, round_id, row))
+        end)
+
+      results =
+        Enum.reduce(locked, saved, fn row, acc -> Map.put(acc, row.fixture_id, :locked) end)
+
+      if Enum.any?(results, fn {_id, r} -> r == {:error, :booster_on_blank} end) do
+        Repo.rollback({:booster_on_blank, results})
+      else
+        results
+      end
+    end)
+  end
+
   @doc "All players' predictions for one fixture, with the player preloaded (by-fixture admin lens)."
   def list_fixture_predictions(fixture_id) do
     from(p in Prediction, where: p.fixture_id == ^fixture_id, preload: [:player])
@@ -138,6 +176,7 @@ defmodule Predictex.Predictions do
   end
 
   @doc "A fixture is locked for predictions once kickoff has passed."
+  def locked?(nil, _now), do: false
   def locked?(%Fixture{kickoff_at: nil}, _now), do: false
   def locked?(%Fixture{kickoff_at: kickoff}, now), do: DateTime.compare(now, kickoff) != :lt
 

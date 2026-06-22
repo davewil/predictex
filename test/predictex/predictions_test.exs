@@ -208,6 +208,53 @@ defmodule Predictex.PredictionsTest do
     end
   end
 
+  describe "save_round_predictions/4 (member, lockout-aware)" do
+    setup %{round: round} do
+      future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+      past = DateTime.utc_now() |> DateTime.add(-3600, :second) |> DateTime.truncate(:second)
+      open = fixture!(round, %{kickoff_at: future})
+      locked = fixture!(round, %{kickoff_at: past})
+      %{open: open, locked: locked}
+    end
+
+    test "saves picks for unlocked fixtures", %{round: round, player: player, open: open} do
+      rows = [%{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: false}]
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert results[open.id] == :upserted
+      assert Predictions.get_player_fixture_prediction(player.id, open.id).home_goals == 2
+    end
+
+    test "refuses to write a locked fixture", %{round: round, player: player, locked: locked} do
+      rows = [%{fixture_id: locked.id, home_goals: 9, away_goals: 9, booster: false}]
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert results[locked.id] == :locked
+      assert Predictions.get_player_fixture_prediction(player.id, locked.id) == nil
+    end
+
+    test "a booster on a locked fixture is preserved when other rows save", %{
+      round: round,
+      player: player,
+      open: open,
+      locked: locked
+    } do
+      # Pre-existing booster on the (now) locked fixture, written while it was open.
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: player.id,
+          fixture_id: locked.id,
+          home_goals: 1,
+          away_goals: 0,
+          booster: true
+        })
+
+      rows = [%{fixture_id: open.id, home_goals: 0, away_goals: 0, booster: false}]
+      assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows)
+
+      # The locked fixture keeps its booster — the member can't move it.
+      assert Predictions.get_player_fixture_prediction(player.id, locked.id).booster == true
+    end
+  end
+
   describe "get_player_fixture_prediction/2 (anti-copy focused getter)" do
     test "returns the player's own prediction for the fixture", %{round: round, player: player} do
       f = fixture!(round)
