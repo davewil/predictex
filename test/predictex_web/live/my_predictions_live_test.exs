@@ -287,4 +287,104 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert rendered =~ "LIVE"
     assert rendered =~ "2-1"
   end
+
+  # --- knockout native entry (predictex knockout-game Phase 1, Task 4) ---
+
+  test "member enters native knockout picks via the editable form", %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "KoPlayer"})
+
+    # The setup block gives us a group round at ordinal 1 with no fixtures — it is
+    # incomplete (no fixtures) and will be the dashboard's active round by default.
+    # We need round_open? to return true for our knockout round (ordinal 4), which
+    # requires a completed predecessor at ordinal 3. We also close out ordinal 1 by
+    # adding a completed fixture so it does not compete as the active round.
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    # Complete the setup round (ordinal 1) so it doesn't steal "active".
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    # Predecessor of knockout round: ordinal 3, group stage, with a completed fixture.
+    {:ok, pred_round} =
+      Tournament.create_round(%{name: "Matchday 3", stage: :group, ordinal: 3})
+
+    _done3 =
+      fixture!(pred_round, %{
+        team1: "Brazil",
+        team2: "Argentina",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    # Knockout round at ordinal 4 (predecessor = ordinal 3, now complete → round_open? true).
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    ko_fx =
+      fixture!(ko_round, %{
+        team1: "England",
+        team2: "Germany",
+        kickoff_at: future
+      })
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    # Click the knockout round chip so it becomes the active round.
+    html = lv |> element("button", "Round of 16") |> render_click()
+
+    # The editable form should render for the open knockout round.
+    assert html =~ ~s(id="round-entry-4")
+    assert html =~ "England"
+    assert html =~ "Germany"
+
+    # Submit scoreline + first_scorer_side picks via the form.
+    html =
+      lv
+      |> form("#round-entry-4", %{
+        "picks" => %{
+          "#{ko_fx.id}" => %{
+            "home_goals" => "2",
+            "away_goals" => "1",
+            "first_scorer_side" => "home"
+          }
+        },
+        "booster_fixture_id" => "#{ko_fx.id}"
+      })
+      |> render_submit()
+
+    assert html =~ "Saved"
+
+    # Verify the prediction was written to the database.
+    pred = Predictions.get_player_fixture_prediction(player.id, ko_fx.id)
+    assert pred.home_goals == 2
+    assert pred.away_goals == 1
+    assert pred.first_scorer_side == :home
+    assert pred.booster == true
+  end
+
+  test "locked group rounds remain read-only — no entry form", %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "ReadOnly"})
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    _fx = fixture!(round, %{team1: "Italy", team2: "Japan", kickoff_at: future})
+
+    {:ok, _lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    # Group rounds are editable only via the import/admin flow, not the native KO form.
+    # The active round is ordinal 1 (group), so the read-only fixture grid shows, not a form.
+    refute html =~ ~s(id="round-entry-1")
+    assert html =~ "Italy"
+    assert html =~ "Japan"
+  end
 end

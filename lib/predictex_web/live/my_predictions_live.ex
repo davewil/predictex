@@ -1,8 +1,11 @@
 defmodule PredictexWeb.MyPredictionsLive do
   @moduledoc """
-  A member's read-only personal dashboard: their imported FIFA picks, per-fixture scoring,
-  and league rank. No prediction entry here — that lives in the admin (predictex-a02) and
-  import (predictex-xox) flows.
+  A member's personal dashboard: their picks, per-fixture scoring, and league rank.
+
+  Group-stage picks are imported via the FIFA import flow or entered by an admin.
+  Native prediction entry is available here for open knockout rounds (the round chips
+  show an editable scoreline + first-team + booster form for any knockout round whose
+  predecessor is fully completed).
   """
   use PredictexWeb, :live_view
 
@@ -38,6 +41,54 @@ defmodule PredictexWeb.MyPredictionsLive do
   end
 
   @impl true
+  def handle_event("save_round", params, socket) do
+    player_id = socket.assigns.current_scope.player.id
+    active = active_round(socket.assigns.dash, socket.assigns.active_ordinal)
+    round_id = active.round.id
+    boost_id = parse_int(params["booster_fixture_id"])
+
+    rows =
+      (params["picks"] || %{})
+      |> Enum.flat_map(fn {fid, attrs} ->
+        home = parse_int(attrs["home_goals"])
+        away = parse_int(attrs["away_goals"])
+
+        # Skip rows with blank goals — partial entries are ignored.
+        if is_nil(home) or is_nil(away) do
+          []
+        else
+          fixture_id = String.to_integer(fid)
+
+          [
+            %{
+              fixture_id: fixture_id,
+              home_goals: home,
+              away_goals: away,
+              first_scorer_side: parse_side(attrs["first_scorer_side"]),
+              booster: fixture_id == boost_id
+            }
+          ]
+        end
+      end)
+
+    case Predictions.save_round_predictions(player_id, round_id, rows) do
+      {:ok, _results} ->
+        {:noreply, socket |> refresh() |> put_flash(:info, "Saved")}
+
+      {:error, {:booster_on_blank, _}} ->
+        {:noreply,
+         put_flash(
+           socket,
+           :error,
+           "Can't boost a fixture with no scoreline — enter a score for the boosted fixture or pick \"No booster\". Nothing was saved."
+         )}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not save predictions.")}
+    end
+  end
+
+  @impl true
   # Clock-driven: re-pull, then sleep to the next preview/kickoff threshold (nil once past).
   def handle_info(:tick, socket) do
     socket = refresh(socket)
@@ -68,7 +119,12 @@ defmodule PredictexWeb.MyPredictionsLive do
 
   @impl true
   def render(assigns) do
-    assigns = assign(assigns, :active, active_round(assigns.dash, assigns.active_ordinal))
+    active = active_round(assigns.dash, assigns.active_ordinal)
+
+    assigns =
+      assigns
+      |> assign(:active, active)
+      |> assign(:editable_round?, editable_round?(active))
 
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} max_width="max-w-6xl">
@@ -155,7 +211,115 @@ defmodule PredictexWeb.MyPredictionsLive do
           </span>
         </div>
 
-        <div :if={@active} class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <%!-- Editable form for open knockout rounds (native KO entry) --%>
+        <.form
+          :if={@active && @editable_round?}
+          id={"round-entry-#{@active.round.ordinal}"}
+          for={%{}}
+          phx-submit="save_round"
+        >
+          <label class="label cursor-pointer gap-2 w-fit mb-2">
+            <span class="text-sm">No booster</span>
+            <input
+              type="radio"
+              class="radio radio-sm"
+              name="booster_fixture_id"
+              value=""
+              checked={Enum.all?(@active.fixtures, fn fx -> !fx.booster? end)}
+            />
+          </label>
+          <div class="space-y-3">
+            <div
+              :for={fx <- @active.fixtures}
+              class="rounded-box bg-base-100 border border-base-content/10 p-3 shadow"
+            >
+              <div class="flex items-center justify-between gap-2 mb-2">
+                <span class="flex items-center gap-1 text-sm font-bold">
+                  {Flags.flag(fx.fixture.team1)} {fx.fixture.team1}
+                </span>
+                <div class="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    class="input input-bordered font-score w-16 text-center"
+                    name={"picks[#{fx.fixture.id}][home_goals]"}
+                    value={fx.prediction && fx.prediction.home_goals}
+                    placeholder="—"
+                  />
+                  <span class="text-base-content/40 font-bold">–</span>
+                  <input
+                    type="number"
+                    min="0"
+                    class="input input-bordered font-score w-16 text-center"
+                    name={"picks[#{fx.fixture.id}][away_goals]"}
+                    value={fx.prediction && fx.prediction.away_goals}
+                    placeholder="—"
+                  />
+                </div>
+                <span class="flex items-center gap-1 text-sm font-bold">
+                  {fx.fixture.team2} {Flags.flag(fx.fixture.team2)}
+                </span>
+              </div>
+              <div class="flex items-center justify-between gap-4">
+                <fieldset class="flex items-center gap-3 text-xs">
+                  <legend class="text-xs font-semibold text-base-content/60 mr-1">
+                    First scorer
+                  </legend>
+                  <label class="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      class="radio radio-xs"
+                      name={"picks[#{fx.fixture.id}][first_scorer_side]"}
+                      value="home"
+                      checked={fx.prediction && fx.prediction.first_scorer_side == :home}
+                    />
+                    <span>{fx.fixture.team1}</span>
+                  </label>
+                  <label class="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      class="radio radio-xs"
+                      name={"picks[#{fx.fixture.id}][first_scorer_side]"}
+                      value="away"
+                      checked={fx.prediction && fx.prediction.first_scorer_side == :away}
+                    />
+                    <span>{fx.fixture.team2}</span>
+                  </label>
+                  <label class="flex items-center gap-1 cursor-pointer">
+                    <input
+                      type="radio"
+                      class="radio radio-xs"
+                      name={"picks[#{fx.fixture.id}][first_scorer_side]"}
+                      value=""
+                      checked={
+                        is_nil(fx.prediction) or
+                          is_nil(fx.prediction.first_scorer_side)
+                      }
+                    />
+                    <span class="text-base-content/50">None</span>
+                  </label>
+                </fieldset>
+                <label class="flex items-center gap-1 cursor-pointer text-xs">
+                  <input
+                    type="radio"
+                    class="radio radio-xs"
+                    name="booster_fixture_id"
+                    value={fx.fixture.id}
+                    checked={fx.booster?}
+                  />
+                  <span class="font-bold">⚡ Booster</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary mt-4">Save picks</button>
+        </.form>
+
+        <%!-- Read-only fixture grid for group rounds and locked knockout rounds --%>
+        <div
+          :if={@active && not @editable_round?}
+          class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        >
           <.fixture_card
             :for={fx <- @active.fixtures}
             fx={fx}
@@ -214,6 +378,28 @@ defmodule PredictexWeb.MyPredictionsLive do
 
   defp active_round(dash, ordinal),
     do: Enum.find(dash.rounds, &(&1.round.ordinal == ordinal))
+
+  # A round is editable in-place iff it is a knockout round AND currently open for predictions
+  # (i.e. its predecessor round is fully completed). Group rounds are read-only here — they
+  # are entered via the FIFA import or admin flows.
+  defp editable_round?(%{round: %{stage: :knockout} = round}),
+    do: Tournament.round_open?(round)
+
+  defp editable_round?(_), do: false
+
+  defp parse_side("home"), do: :home
+  defp parse_side("away"), do: :away
+  defp parse_side(_), do: nil
+
+  defp parse_int(nil), do: nil
+  defp parse_int(""), do: nil
+
+  defp parse_int(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, ""} -> n
+      _ -> nil
+    end
+  end
 
   defp ordinal(nil), do: "—"
   defp ordinal(n) when n in [11, 12, 13], do: "#{n}th"
