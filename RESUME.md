@@ -52,8 +52,42 @@ the app scores them against real results and ranks a leaderboard.
   entry on behalf of players** from screenshots (`a02`, **shipped** — `/admin/predictions`)
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
+  - ⚠️ **This is changing for the KNOCKOUTS.** The active Knockout-Game thread (see "Continue here")
+    makes `/predictions` **editable** for the open knockout round — members predict natively in-app from
+    R32. Group stage stays as described above (frozen, FIFA-import). Spec/plan committed; not yet built.
 
-## ⏵ Continue here (2026-06-21)
+## ⏵ Continue here (2026-06-22)
+
+### ★ ACTIVE THREAD — Knockout Game (native predictions, re-based at R32) — SPEC + PLAN WRITTEN, READY TO EXECUTE
+
+**The big pivot.** From the Round of 32, members enter predictions **natively in-app** (no FIFA
+round-trip), the leaderboard is **re-based** (a from-zero knockout-only board alongside the existing
+cumulative one), and **FIFA is the data authority** for the knockout game. This reverses the current
+"members never predict in-app" model — but **for knockouts only**; the group stage stays frozen/read-only.
+Realises bead **`predictex-2ww`**; wires in `uyf` (KO-ET goal filtering) and `hco` (FIFA bracket).
+
+- **Spec (agreed + advisor-reviewed):** `docs/superpowers/specs/2026-06-22-knockout-game-native-predictions-design.md`
+- **Plan (Phase 0 spike + Phase 1 foundation, TDD):** `docs/superpowers/plans/2026-06-22-knockout-game-phase1-foundation.md`
+- **Decisions locked (in the spec):** two boards (cumulative + knockout-only-from-0); FIFA authoritative
+  for bracket / scoreline / first-scorer / cohort; **FT-only (regulation) scoring preserved** for scoreline
+  AND first-scorer (ET excluded); first-player from a **searchable FIFA squad dropdown → stored as
+  `IdPlayer`, exact-match scoring** (squad↔scorer id-join CONFIRMED — both in the `/detail` body's
+  `Players`/`Goals`, `capture.ex:159`); entry on an editable `/predictions` for the open KO round;
+  `/import` superseded for KO (not deleted). **Safety net added:** FIFA-regulation scoreline reconciled
+  against openfootball `ft` (verified reg-only) — divergence on an ET match → flag + fall back to
+  openfootball; doubles as the ET-filter regression check that can't run until 28 Jun.
+- **This plan = Task 0 (FIFA-feed spike) + 4 TDD tasks:** `Standings.knockout_leaderboard/0`; Overall/Knockout
+  toggle on `/`; lockout-aware `Predictions.save_round_predictions/4`; editable `/predictions` native entry
+  (scoreline + first-team + booster). Ships a working KO game **minus the player picker**.
+- **Deferred to a FOLLOW-UP plan (after the spike):** player picker + squad ingestion (`SquadSync`,
+  `Prediction.first_scorer_player_id`, id-scoring); FIFA result-authority (bracket auto-populate,
+  regulation-filtered FIFA scoreline + first-scorer, openfootball reconciliation). The picker in v1 is
+  **contingent on Task 0** confirming the squad roster is available *pre-match*.
+- **▶ Execute:** start with **Task 0 (spike)** — includes a live `api.fifa.com` fetch (may need the user for
+  egress) and gates the follow-up; the 4 build tasks don't depend on it and can run in parallel. Recommended:
+  subagent-driven (fresh subagent per task, two-stage review). **Timeline: R32 ≈ 28 Jun.**
+
+---
 
 **Latest deployed tag `v0.11.12`** (deployed + verified 2026-06-21: Deploy success, `/health` 200, anon
 `/` 200) — bundles **`kcx`** ("If your pick lands" projected leaderboard on `/fixtures/:id`: per-viewer
@@ -63,8 +97,7 @@ board after kickoff — anti-copy render gate; v1 scoreline-only w/ knockout cav
 rush through minute-only filler — was a flat 1s/frame that crawled). No migration (both additive).
 Reviewed clean (kcx: code-reviewer, no material issues). Spec/plan:
 `docs/superpowers/{specs/2026-06-21-kcx-pick-projection-design.md,plans/2026-06-21-kcx-pick-projection.md}`.
-**Eyeball-then-close:** `kcx` (pre-kickoff fixture w/ a pick → only your row "you'd be #N ▲Δ", no other
-names; after kickoff → full board) and `i1s` (one real replay at the new pace: `400021510` / `400021504`).
+**Both CLOSED 2026-06-22** (eyeballed in prod: kcx pre-kickoff + live; i1s replay pace accepted).
 
 **Prior deployed tag `v0.11.11`** (deployed + verified 2026-06-20) — bundles **`hco` WS4** (knockout first-team/first-scorer in the `/fixtures/:id` picks reveal)
 **+ `i1s` match replay**: replay a completed fixture's captured buzz timeline as a read-only, in-process,
@@ -85,10 +118,10 @@ Spec/plan: `docs/superpowers/{specs/2026-06-20-match-replay-strategy-design.md,p
 > `mix.lock`, so a test-only override fails CI's compile-env validation while passing locally (stale local
 > `_build`). Flag tests isolate via an `on_exit` `FunWithFlags.Store.Cache.flush/0` (pure ETS) instead.
 
-> 🚫 **DEPLOY FREEZE from 17:00 (2026-06-21) — Spain match.** No `git tag vX.Y.Z` during the live-match
-> window (a container recreate drops in-progress capture frames). v0.11.12 landed ~16:52 BST, before
-> kickoff. Plain `main` pushes are fine (Quality job only, no recreate); only tags deploy. Resume deploys
-> after the match finishes and capture clears.
+> 🚫 **DEPLOY RULE (durable): never `git tag vX.Y.Z` mid-capture** — a container recreate drops
+> in-progress frames. The 2026-06-21 Spain-match freeze is **lifted** (match over; v0.11.12 had landed
+> ~16:52 BST before kickoff). Going forward, before any deploy check no match is live/capturing; plain
+> `main` pushes are always safe (Quality job only, no recreate).
 
 **`g8m` post-deploy VERIFIED** (2026-06-21 prod read: all 32 KO fixtures have `source_num` — `{32, 32}`);
 final no-dup confirmation still awaits bracket resolution. `hco` WS1 (fifa_match_id backfill) still gated on
@@ -121,60 +154,18 @@ bracket resolution. Next session picks from the backlog below.
   - **`predictex-p4o` left OPEN** — close after eyeballing a real settled group fixture's breakdown in prod.
     Cards remain in `predictex-bdq`.
 
-**▶ NEXT — start here next session:**
+**▶ NEXT — start here next session:** the **Knockout Game** thread at the top of this section is the
+active priority (spec + plan written, ready to execute, R32 ≈ 28 Jun). Backlog below.
 
-1. ~~**`predictex-kcx`** — "if your pick lands" projected leaderboard.~~ ✅ **CLOSED 2026-06-22**
-   (built + reviewed + deployed v0.11.12; eyeballed in prod pre-kickoff + live — own row/headline pre-kickoff,
-   full board after lock). Shipped surface (for reference):
-   `Predictions.get_player_fixture_prediction/2` (anti-copy focused getter) · `Buzz.pick_projection/4` +
-   extracted `enrich_rows/2` (shared with `scenarios_with_deltas/3`, one `leaderboard/0` pull, no new math) ·
-   `FixtureLive` `@pick_projection` assign + `#pick-projection` render section. Anti-copy resolved via a
-   **render gate** (the projected board re-scores every player vs your scoreline, so per-player deltas would
-   leak picks pre-kickoff): **pre-kickoff → viewer's own row + headline only** (aggregate rank, no leak);
-   **post-kickoff → full top-8 board** (`:if={@picks_visible?}`, picks already public). v1 = scoreline-only
-   (knockout undercounts first-scorer bonus → caveat shown; group stage exact). Unconditional, read-only.
-   Spec/plan: `docs/superpowers/{specs/2026-06-21-kcx-pick-projection-design.md,plans/2026-06-21-kcx-pick-projection.md}`.
-   **Eyeball before close:** a pre-kickoff fixture where you have a pick → card shows only your row + "you'd
-   be #N ▲Δ", no other names; after kickoff → full board with your row highlighted. Then `bd close
-   predictex-kcx`.
+**Recently CLOSED (2026-06-22):** `kcx` ("If your pick lands" projected leaderboard, v0.11.12 — eyeballed
+pre-kickoff + live) · `i1s` (replay engine + adaptive pacing, v0.11.12 — accepted in prod) · `p4o` (settled
+group-stage goal breakdown, eyeballed). Specs/plans under `docs/superpowers/` if detail is needed.
 
-   <details><summary>Original agreed design (2026-06-21) — for reference</summary>
-
-   Add an "If your pick lands" card to `/fixtures/:id` that projects the leaderboard assuming the *viewing
-   member's own scoreline pick* for this fixture is the final result. Agreed decisions:
-   - **Visibility:** whenever the viewer HAS a pick AND `fixture.status != :completed` (pre-kickoff **and**
-     during play; never on a settled fixture — so it never collides with `i1s` replay, which only runs on
-     completed fixtures).
-   - **Anti-copy:** fetch the viewer's OWN pick directly (a focused `get`, NOT the full picks list — that
-     stays hidden pre-kickoff). Own pick only → safe to show before the reveal.
-   - **Reuse, no new math:** `Standings.project(fixture_id, your_h, your_a)` + the existing buzz rank-delta
-     logic (likely a small `Buzz.pick_projection/3`-style helper returning one scenario's row+delta shape).
-     Computed in `load_all` alongside `@scenarios` (same recompute cadence).
-   - **Rendering = Approach A:** reuse the "What if…" scenario-card — one card titled "If your pick lands"
-     with a headline (e.g. `🇧🇷 Brazil 2–1 → you'd move 7th ▲ 3rd`) + top-8 board, viewer row highlighted.
-   - **UNCONDITIONAL** (no feature flag) — low-risk, read-only, reuses tested `project/3`; consistent with
-     live buzz being unconditional.
-   - **v1 = SCORELINE only.** `project/3` takes only `(h,a)`, so a **knockout** projection would undercount
-     the first-scorer bonus uniformly (it can't represent the assumed first-scorer) — DEFERRED refinement
-     (would need `project` to optionally take the assumed first-scorer). Group stage (all we have until
-     28 Jun) is exact. Note this limitation in the card or spec.
-   - **Tests:** pure helper (pick → projected board + delta); LiveView (card shows pre-kickoff with the
-     viewer's own pick + correct rank delta; hidden when no pick; hidden when settled; anti-copy: the
-     pre-kickoff card exposes only the viewer's own pick, never others').
-   </details>
-
-2. ~~**`predictex-i1s`** — match replay engine + adaptive pacing.~~ ✅ **CLOSED 2026-06-22** (engine shipped
-   v0.11.11; adaptive pacing v0.11.12 — `Replay.tick_delay_ms/1`: 1400ms dwell on score-change frames, 250ms
-   rush through filler; accepted in prod). Tune knobs if needed: the two constants in `lib/predictex/replay.ex`.
-
-3. ~~**`predictex-p4o`** — eyeball goal breakdown.~~ ✅ **CLOSED 2026-06-21** (eyeballed in prod: settled
-   group-stage goal breakdown renders correctly).
-
-4. **`predictex-hco` (P2) — WS1 fifa_match_id backfill, gated on bracket resolution** (after the final group
+1. **`predictex-hco` (P2) — WS1 fifa_match_id backfill, gated on bracket resolution** (after the final group
    match: fetch `rounds.json` + run `Fifa.LiveIds.assign`, confirm 104/104). WS2/WS3 ✅; `g8m` verified
    `{32,32}`; verify WS1/WS2 live on the first KO 28 Jun. (`g8m`'s final no-dup check also lands at resolution.)
 
-5. **Other backlog (`bd ready`):** `4ez` (per-fixture points + risky banner on FixtureCard), `a4j` (cache
+2. **Other backlog (`bd ready`):** `4ez` (per-fixture points + risky banner on FixtureCard), `a4j` (cache
    `Standings.leaderboard/0`), `c9s` (team-name snapshot + regression test), `dmh` (ConnCase async-safety),
    `bl8` (Live.Updater rescue), `uyf` (P4, knockout-ET goal filtering — gated on `hco`).
 
