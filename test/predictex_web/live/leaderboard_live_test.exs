@@ -83,9 +83,10 @@ defmodule PredictexWeb.LeaderboardLiveTest do
     {:ok, ko} =
       Predictex.Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 4})
 
-    {:ok, gfx} =
+    # Two group fixtures to build up overall score for GroupOnly
+    {:ok, gfx1} =
       Predictex.Tournament.create_fixture(%{
-        external_ref: "g",
+        external_ref: "g1",
         team1: "A",
         team2: "B",
         round_id: group.id,
@@ -94,11 +95,22 @@ defmodule PredictexWeb.LeaderboardLiveTest do
         away_goals: 0
       })
 
+    {:ok, gfx2} =
+      Predictex.Tournament.create_fixture(%{
+        external_ref: "g2",
+        team1: "C",
+        team2: "D",
+        round_id: group.id,
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1
+      })
+
     {:ok, kfx} =
       Predictex.Tournament.create_fixture(%{
         external_ref: "k",
-        team1: "C",
-        team2: "D",
+        team1: "E",
+        team2: "F",
         round_id: ko.id,
         status: :completed,
         home_goals: 2,
@@ -108,14 +120,24 @@ defmodule PredictexWeb.LeaderboardLiveTest do
     gonly = player_fixture(%{display_name: "GroupOnly"})
     both = player_fixture(%{display_name: "BothRounds"})
 
+    # GroupOnly scores both group fixtures exactly (60 overall points)
     {:ok, _} =
       Predictex.Predictions.create_prediction(%{
         player_id: gonly.id,
-        fixture_id: gfx.id,
+        fixture_id: gfx1.id,
         home_goals: 1,
         away_goals: 0
       })
 
+    {:ok, _} =
+      Predictex.Predictions.create_prediction(%{
+        player_id: gonly.id,
+        fixture_id: gfx2.id,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    # BothRounds scores the knockout fixture exactly (30 knockout points only)
     {:ok, _} =
       Predictex.Predictions.admin_upsert_prediction(%{
         player_id: both.id,
@@ -125,11 +147,13 @@ defmodule PredictexWeb.LeaderboardLiveTest do
       })
 
     {:ok, lv, html} = live(conn, ~p"/")
-    # Default board = overall: GroupOnly (30) leads.
+    # Overall board: GroupOnly is the league leader (highest overall score)
+    assert html =~ "League leader"
     assert html =~ "GroupOnly"
 
-    # Switch to knockout: only BothRounds has knockout points; GroupOnly sits at 0.
+    # Switch to knockout: BothRounds is now the league leader (only player with knockout points)
     html = lv |> element("button", "Knockout") |> render_click()
+    assert html =~ "League leader"
     assert html =~ "BothRounds"
   end
 
