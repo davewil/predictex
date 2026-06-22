@@ -52,48 +52,83 @@ the app scores them against real results and ranks a leaderboard.
   entry on behalf of players** from screenshots (`a02`, **shipped** — `/admin/predictions`)
   or **member self-import** (`xox`, **code-complete & reviewed, pending manual validation** —
   `/import`). `/predictions` only *displays* them.
-  - ⚠️ **This is changing for the KNOCKOUTS.** The active Knockout-Game thread (see "Continue here")
-    makes `/predictions` **editable** for the open knockout round — members predict natively in-app from
-    R32. Group stage stays as described above (frozen, FIFA-import). Spec/plan committed; not yet built.
+  - ⚠️ **This is changing for the KNOCKOUTS.** The Knockout-Game thread (see "Continue here") makes
+    `/predictions` **editable** for the open knockout round — members predict natively in-app from R32. Group
+    stage stays as described above (frozen, FIFA-import). **Phase 1 is BUILT + pushed (not yet deployed).**
 
-## ⏵ Continue here (2026-06-22)
+## ⏵ Continue here (2026-06-23)
 
-### ★ ACTIVE THREAD — Knockout Game (native predictions, re-based at R32) — PHASE 1 BUILT (COMMITTED, LOCAL — NOT PUSHED/DEPLOYED)
+### ★ NEXT SESSION — start with architecture-deepening candidate #1 (collapse the two ranking implementations)
 
-**The big pivot.** From the Round of 32, members enter predictions **natively in-app** (no FIFA
-round-trip), the leaderboard is **re-based** (a from-zero knockout-only board alongside the existing
-cumulative one). Knockouts only; the group stage stays frozen/read-only. Realises bead **`predictex-2ww`**.
+From an architecture review (the `improve-codebase-architecture` skill), candidates **#4 and #3 are DONE +
+pushed** (block below). **#1 is the next to take** — same flow: drop into the grilling loop, lock the design
+decisions, then strict TDD → commit-local.
 
-**✅ PHASE 1 SHIPPED — committed local, 9 commits `8419a2f..f94a779`, `main` ahead of origin by 9, 447 tests green,
-NOT pushed (awaiting the user's explicit push call).** Built subagent-driven (fresh subagent + two-stage review
-per task; opus final whole-branch review). What landed:
-- **`Standings.knockout_leaderboard/0`** (`b888c76`) — re-based KO-only board (reuses pure `rank/2` over
-  knockout-stage fixtures; everyone from 0). **Overall/Knockout toggle on `/`** (`81a860e`) — KO button shows
-  only once a KO fixture exists.
-- **`Predictions.save_round_predictions/4`** (`9142bf1`) — lockout-aware member write path: locked fixtures
-  immutable (`:locked`), booster-clear scoped to unlocked fixtures so a locked booster survives.
-- **Editable `/predictions` native entry** (`5abc67b` + `9b7e20c` fix) — scoreline + first-team + one booster/round,
-  for the OPEN knockout round only (group + locked stay read-only). Booster-on-blank blocked (no silent loss).
-- **⚠️ Critical write-auth seam found in the final review + fixed** (`f94a779`): the `save_round` handler trusted
-  client picks fixture-ids and the plan-mandated `locked?(nil)->false` guard let an **out-of-round/locked
-  fixture be written** via a crafted phx event (post-kickoff edit). FIX (two layers): domain rejects rows whose
-  `fixture_id` isn't in the round (`:unknown`, never written) + handler guards with `editable_round?`. Re-reviewed
-  clean (opus). 3 DB-state regression tests.
+- **The friction:** `Predictex.Standings` (DB-backed, joins predictions↔fixtures by FK) and
+  `Predictex.Leaderboard` (pure/no-DB CLI aggregator, joins by a normalised team-name `match_key`) BOTH
+  reimplement the full scoring loop — group by round ordinal, completeness vs round fixture count,
+  `Scoring.round_total/2`, sum `fixtures_total + round_bonus_total`, sort by `{-total, name}`. The join is the
+  ONLY real difference; everything else is duplicated, so a scoring-rule change must be made twice and divergence
+  is silent.
+- **Deletion test:** delete `Leaderboard` → the no-DB ranking reappears (the CLI `mix predictex.leaderboard`
+  needs it) but as a full reimplementation, not a thin adapter — earns its keep; the duplication is the friction.
+- **Deepening sketch:** extract the pure ranking core (today `Standings.rank/2` + private
+  `score_player`/`bonus_by_round`/`round_meta`) into a shared pure module both call (e.g. `Predictex.Ranking`, no
+  Repo/Ecto). Each module keeps only its join (FK vs `match_key`) and feeds the core already-joined inputs +
+  round_meta. **Grill this tension:** a NEW pure module vs reusing `Standings.rank/2` — the latter couples the
+  DB-free CLI tool to the DB-aware `Standings`, so a separate pure core is probably right.
+- **Scope:** `Leaderboard` powers ONLY `mix predictex.leaderboard` (a dev/ops CLI), so the silent-divergence
+  blast radius is the CLI board, not the members' board — the review rated #1 **Strong** for the
+  locality/duplication win but was honest about the CLI-only scope.
+- **Vocabulary:** `CONTEXT.md` (NEW, repo root) is now the domain glossary — pick row, prediction-intake
+  boundary, ranking snapshot, buzz, scenario + core terms. Add ranking terms there as #1 crystallises.
+
+### ★ ARCHITECTURE REVIEW — candidates #4 + #3 DONE & PUSHED (origin/main = `277142c`)
+Both via the `improve-codebase-architecture` grilling loop → strict TDD → commit-local → pushed. 456 tests green.
+- **#4 — one pure prediction-intake boundary (`47fc15c`).** `Predictions.parse_pick_rows/2` +
+  `validate_pick_rows/1` (pure) own raw-params→pick-row parsing AND the booster-on-blank invariant; the member +
+  admin LiveViews and FIFA import all cross it. Deleted three duplicated per-view parsers + the member's inline
+  booster guard + the duplicated error strings; graceful int parsing (forged non-int key skips, no 500). Created
+  `CONTEXT.md`.
+- **#3 — single ranking snapshot (`277142c`).** `Standings.snapshot/0` + `%Standings.Snapshot{}` (own file) +
+  pure `rank/1`/`project/4`; `Buzz` now runs over a passed snapshot → **~11 board loads/live event → 1** (and
+  more consistent: one instant). Deleted a dead full-leaderboard load in `Buzz.headlines` + the loading
+  `Standings.project/3`. `buzz_test` is now pure zero-DB (proves Buzz no longer loads). Follow-up
+  **`predictex-0ft`** (P4): memoize the base ranking inside the snapshot so in-memory `project` stops re-ranking.
+
+### ★ ACTIVE FEATURE (deadline-driven, R32 ≈ 28 Jun) — Knockout Game (native predictions, re-based at R32) — PHASE 1 PUSHED, NOT DEPLOYED
+
+**The big pivot.** From the Round of 32, members enter predictions **natively in-app** (no FIFA round-trip), the
+leaderboard is **re-based** (a from-zero knockout-only board alongside the cumulative one). Knockouts only; the
+group stage stays frozen/read-only. Realises bead **`predictex-2ww`**.
+
+**✅ PHASE 1 PUSHED** — `8419a2f..f94a779` on `origin/main` (the #4/#3 refactors landed on top). **NOT yet
+deployed/tagged** — deploy is a separate `scripts/pre-deploy` → `git tag` gate (check nothing's mid-capture first).
+Built subagent-driven (fresh subagent + two-stage review per task; opus final whole-branch review). What landed:
+- **`Standings.knockout_leaderboard/0`** (`b888c76`) — re-based KO-only board. **Overall/Knockout toggle on `/`**
+  (`81a860e`) — KO button shows only once a KO fixture exists.
+- **`Predictions.save_round_predictions/4`** (`9142bf1`) — lockout-aware member write path (locked fixtures
+  immutable; booster-clear scoped to unlocked so a locked booster survives).
+- **Editable `/predictions` native entry** (`5abc67b` + `9b7e20c` fix) — scoreline + first-team + one
+  booster/round, OPEN knockout round only (group + locked stay read-only). Booster-on-blank blocked.
+- **⚠️ Critical write-auth seam found in the final review + fixed** (`f94a779`): a crafted phx event could write an
+  out-of-round/locked fixture (post-kickoff edit). FIX (two layers): domain rejects rows whose `fixture_id` isn't
+  in the round (`:unknown`); handler guards with `editable_round?`. Re-reviewed clean (opus). 3 regression tests.
+  **NOTE:** the member + admin save handlers were *since refactored by candidate #4* to route through
+  `Predictions.parse_pick_rows/2`; the write-auth round-membership guard still lives in `save_round_predictions/4`.
 - **Spec/plan:** `docs/superpowers/specs/2026-06-22-knockout-game-native-predictions-design.md`,
   `docs/superpowers/plans/2026-06-22-knockout-game-phase1-foundation.md`. SDD ledger: `.superpowers/sdd/progress.md`.
 
-**▶ NEXT (this thread):** (1) **push** when you say so → then it's a plain `main` push (Quality job only, no deploy);
-deploy is a separate tag call. (2) **Follow-up plan** (deferred, gated by the spike below): player picker + squad
-ingestion + id-based first-scorer scoring; FIFA result-authority (bracket auto-populate, regulation-filtered
-`Period∈{3,5}` FIFA scoreline + first-scorer, openfootball reconciliation). (3) `predictex-cij` (P3) — Phase-2
-per-fixture live/recap gate within an open KO round (cosmetic; write already safe).
+**▶ NEXT (KO thread):** (1) **deploy** Phase 1 when ready (separate tag gate; not mid-capture). (2) **Follow-up
+plan** (deferred, gated by the spike): player picker + squad ingestion + id-based first-scorer scoring; FIFA
+result-authority (bracket auto-populate, regulation-filtered `Period∈{3,5}` FIFA scoreline + first-scorer,
+openfootball reconciliation). (3) `predictex-cij` (P3) — Phase-2 per-fixture live/recap gate within an open KO round.
 
 **Task-0 spike DONE** (`c9e18c2`, `docs/superpowers/research/2026-06-22-knockout-fifa-feed-spike.md`): squad↔scorer
 `IdPlayer` join CONFIRMED (8/8 goals resolve); **GATE — squad rosters ABSENT pre-match** (upcoming `/detail`
 returns teams but `Players[]`=0/0 days ahead; 26-man squad only at match time) → **picker stays deferred**, needs a
 dedicated squad-endpoint spike or free-text fallback. Regulation goals = `Period∈{3,5}`; match `Period 10`=finished-
 regulation; **ET period values UNKNOWN until 28 Jun** (the reconciliation safety-net doubles as the ET regression check).
-**Timeline: R32 ≈ 28 Jun.**
 
 ---
 
@@ -162,8 +197,9 @@ bracket resolution. Next session picks from the backlog below.
   - **`predictex-p4o` left OPEN** — close after eyeballing a real settled group fixture's breakdown in prod.
     Cards remain in `predictex-bdq`.
 
-**▶ NEXT — start here next session:** the **Knockout Game** thread at the top of this section is the
-active priority (spec + plan written, ready to execute, R32 ≈ 28 Jun). Backlog below.
+**▶ NEXT — start here next session:** architecture-deepening **candidate #1** (collapse the two ranking
+implementations) — see the top of "⏵ Continue here". The **Knockout Game** remains the deadline-driven feature
+(Phase 1 pushed, not deployed; R32 ≈ 28 Jun). Backlog below.
 
 **Recently CLOSED (2026-06-22):** `kcx` ("If your pick lands" projected leaderboard, v0.11.12 — eyeballed
 pre-kickoff + live) · `i1s` (replay engine + adaptive pacing, v0.11.12 — accepted in prod) · `p4o` (settled
@@ -226,7 +262,7 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **408 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
+- **456 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
   deps.unlock --check-unused, format --check-formatted, **credo --strict**, test) — run on every Elixir commit
   by lefthook and by CI's Quality job (CI also runs `sobelow`). Single source = the `precommit` alias in
   mix.exs; tuning in `.credo.exs`/`.sobelow-skips`. Details: CLAUDE.md "Build & Test". Never `--no-verify`.
@@ -238,9 +274,17 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - `Predictex.Fifa` — **pure** openfootball → FIFA 8-game-round mapping. `Predictex.Fifa.Cohort` —
   **pure** join of FIFA `matchStats.json` cohort → fixtures (`plan/3`; `{utc_date, team-set}` key +
   home/away orientation; **data-verified FIFA↔openfootball alias table** — 8 divergences, the core of `c9s`).
-- `Predictex.Leaderboard` — **pure** DB-free aggregator (drives `mix predictex.leaderboard`).
-- `Predictex.Standings` — DB-backed leaderboard (`leaderboard/0`), reuses `Scoring`. Entries
-  now also carry `bonus_by_round` + per-fixture `fixture_id` so the dashboard reconciles totals.
+- `Predictex.Leaderboard` — **pure** DB-free aggregator (drives `mix predictex.leaderboard`). ⚠️ Duplicates
+  the full scoring loop with `Standings` (joins by team-name vs FK) — the target of architecture candidate **#1**
+  (collapse into one shared pure ranking core; see "Continue here").
+- `Predictex.Standings` — DB-backed leaderboard. **`snapshot/0`** is the single Gather edge (loads players+fixtures
+  once into `%Standings.Snapshot{}`); pure **`rank/1`** + **`project/4`** run over it (no Repo); `leaderboard/0`/
+  `knockout_leaderboard/0` are thin edges. `Buzz` runs entirely over a passed snapshot (architecture #3). Entries
+  carry `bonus_by_round` + per-fixture `fixture_id` so the dashboard reconciles totals.
+- `Predictex.Predictions` — the **prediction-intake boundary** (architecture #4): pure `parse_pick_rows/2` +
+  `validate_pick_rows/1` turn raw form params into validated pick rows and own the booster-on-blank invariant;
+  the member + admin forms and FIFA import all cross it. Persistence (`save_round_predictions/4` /
+  `admin_save_round_predictions/3`) trusts validated rows; the latter enforces round-membership write-auth.
 - `Predictex.Dashboard` — read model for `/predictions`: pure `build/4` + `for_player/2` edge;
   consumes `Standings` as the **single scoring authority** (does no scoring of its own).
 - `PredictexWeb.Flags` — team name → flag emoji, keyed on real openfootball strings (⚽ fallback).
@@ -350,6 +394,9 @@ playability unlock** — admins can now enter predictions on behalf of players. 
 - Known debt: `unconfirmed_player_fixture` + magic-link tests exercise an unreachable state (tied to dormant email) — clean up when the email epic lands. Real-browser auth click-through not yet done.
 
 ## Docs map
+- `CONTEXT.md` (repo root) — **domain glossary** (created during the architecture review): pick row,
+  prediction-intake boundary, ranking snapshot, buzz, scenario + core terms. The `improve-codebase-architecture`
+  grilling loop reads + extends it.
 - `docs/rules.md` — game rules + §9 scoring/data contract (source of truth).
 - `docs/plan.md` — original (Ultraplan) implementation plan.
 - `docs/runbooks/deployment.md` — deploy, secrets, prod ops.
