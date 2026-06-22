@@ -76,6 +76,63 @@ defmodule PredictexWeb.LeaderboardLiveTest do
     assert html =~ "/fixtures/#{fx.id}"
   end
 
+  test "toggles between the overall and knockout boards", %{conn: conn} do
+    {:ok, group} =
+      Predictex.Tournament.create_round(%{name: "Group 1", stage: :group, ordinal: 1})
+
+    {:ok, ko} =
+      Predictex.Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 4})
+
+    {:ok, gfx} =
+      Predictex.Tournament.create_fixture(%{
+        external_ref: "g",
+        team1: "A",
+        team2: "B",
+        round_id: group.id,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, kfx} =
+      Predictex.Tournament.create_fixture(%{
+        external_ref: "k",
+        team1: "C",
+        team2: "D",
+        round_id: ko.id,
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    gonly = player_fixture(%{display_name: "GroupOnly"})
+    both = player_fixture(%{display_name: "BothRounds"})
+
+    {:ok, _} =
+      Predictex.Predictions.create_prediction(%{
+        player_id: gonly.id,
+        fixture_id: gfx.id,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, _} =
+      Predictex.Predictions.admin_upsert_prediction(%{
+        player_id: both.id,
+        fixture_id: kfx.id,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    {:ok, lv, html} = live(conn, ~p"/")
+    # Default board = overall: GroupOnly (30) leads.
+    assert html =~ "GroupOnly"
+
+    # Switch to knockout: only BothRounds has knockout points; GroupOnly sits at 0.
+    html = lv |> element("button", "Knockout") |> render_click()
+    assert html =~ "BothRounds"
+  end
+
   describe "current player highlight (predictex-kzz)" do
     setup do
       {:ok, round} = Tournament.create_round(%{name: "Round 1", stage: :group, ordinal: 1})

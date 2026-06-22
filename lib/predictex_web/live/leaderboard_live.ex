@@ -9,15 +9,31 @@ defmodule PredictexWeb.LeaderboardLive do
 
   @impl true
   def mount(_params, _session, socket) do
-    standings = Standings.leaderboard()
+    overall = Standings.leaderboard()
+    knockout = Standings.knockout_leaderboard()
 
     {:ok,
      socket
      |> assign(:page_title, "Leaderboard")
      |> assign(:completed, Tournament.completed_fixture_count())
-     |> assign(:standings, standings)
-     |> assign(:whatsapp_text, whatsapp_text(standings))
+     |> assign(:board, :overall)
+     |> assign(:overall, overall)
+     |> assign(:knockout, knockout)
+     |> assign(:standings, overall)
+     |> assign(:whatsapp_text, whatsapp_text(overall))
      |> assign(:live_fixtures, Tournament.list_live_fixtures())}
+  end
+
+  @impl true
+  def handle_event("select_board", %{"board" => board}, socket) do
+    board = String.to_existing_atom(board)
+    standings = if board == :knockout, do: socket.assigns.knockout, else: socket.assigns.overall
+
+    {:noreply,
+     socket
+     |> assign(:board, board)
+     |> assign(:standings, standings)
+     |> assign(:whatsapp_text, whatsapp_text(standings))}
   end
 
   @impl true
@@ -43,6 +59,31 @@ defmodule PredictexWeb.LeaderboardLive do
             class="btn btn-primary btn-sm gap-2 shadow-lg shadow-primary/30"
           >
             📋 Copy WhatsApp text
+          </button>
+        </div>
+
+        <div :if={@knockout != []} class="flex gap-2">
+          <button
+            phx-click="select_board"
+            phx-value-board="overall"
+            class={[
+              "rounded-full px-3 py-1 text-xs font-bold",
+              (@board == :overall && "bg-primary text-primary-content") ||
+                "bg-base-200 text-base-content/70"
+            ]}
+          >
+            Overall
+          </button>
+          <button
+            phx-click="select_board"
+            phx-value-board="knockout"
+            class={[
+              "rounded-full px-3 py-1 text-xs font-bold",
+              (@board == :knockout && "bg-primary text-primary-content") ||
+                "bg-base-200 text-base-content/70"
+            ]}
+          >
+            Knockout
           </button>
         </div>
 
