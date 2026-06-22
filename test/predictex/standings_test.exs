@@ -106,4 +106,86 @@ defmodule Predictex.StandingsTest do
     # Dave swept the completed round 1 (ordinal 1) → a single +20 round bonus
     assert first.bonus_by_round == %{1 => 20}
   end
+
+  describe "knockout_leaderboard/0 (re-based, knockout-only)" do
+    test "ranks only knockout-stage points, ignoring group fixtures" do
+      {:ok, group} = Tournament.create_round(%{name: "Group 2", stage: :group, ordinal: 2})
+      {:ok, ko} = Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 5})
+
+      {:ok, gfx} =
+        Tournament.create_fixture(%{
+          external_ref: "g1",
+          team1: "A",
+          team2: "B",
+          round_id: group.id,
+          status: :completed,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      {:ok, kfx} =
+        Tournament.create_fixture(%{
+          external_ref: "k1",
+          team1: "C",
+          team2: "D",
+          round_id: ko.id,
+          status: :completed,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      alice = player_fixture(%{display_name: "Alice"})
+
+      # Exact group pick (would be +30 on the overall board) and exact KO pick (+30 KO-only).
+      {:ok, _} =
+        Predictions.create_prediction(%{
+          player_id: alice.id,
+          fixture_id: gfx.id,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: alice.id,
+          fixture_id: kfx.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      [row] = Standings.knockout_leaderboard()
+      assert row.player_id == alice.id
+      # Knockout board excludes the group fixture entirely: only the KO pick counts.
+      assert row.fixtures_total == 30
+      assert Enum.all?(row.breakdown, fn b -> b.fixture_id == kfx.id end)
+    end
+
+    test "a player with only group points sits at 0 on the knockout board" do
+      {:ok, group} = Tournament.create_round(%{name: "Group 3", stage: :group, ordinal: 3})
+
+      {:ok, gfx} =
+        Tournament.create_fixture(%{
+          external_ref: "g2",
+          team1: "A",
+          team2: "B",
+          round_id: group.id,
+          status: :completed,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      bob = player_fixture(%{display_name: "Bob"})
+
+      {:ok, _} =
+        Predictions.create_prediction(%{
+          player_id: bob.id,
+          fixture_id: gfx.id,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      [row] = Standings.knockout_leaderboard()
+      assert row.total == 0
+    end
+  end
 end

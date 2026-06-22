@@ -47,6 +47,17 @@ defmodule Predictex.Standings do
   end
 
   @doc """
+  Re-based knockout-only standings: ranks every player over knockout-stage fixtures only,
+  so the board starts from 0 at the first knockout round. Reuses the pure `rank/2`, so
+  booster, risky/cohort and per-round bonus all apply within the knockout stage.
+  """
+  def knockout_leaderboard do
+    {players, fixtures} = load_ranking_inputs()
+    knockout = Enum.filter(fixtures, &(&1.round.stage == :knockout))
+    rank(players, knockout)
+  end
+
+  @doc """
   Projected leaderboard as if `fixture_id` finished `home`-`away`. Swaps that one fixture
   to `:completed` in memory and reuses the pure `rank/2`, so booster, risky/cohort, and
   round bonus are all honoured. Persists nothing.
