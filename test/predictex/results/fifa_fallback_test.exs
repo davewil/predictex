@@ -2,6 +2,7 @@ defmodule Predictex.Results.FifaFallbackTest do
   use Predictex.DataCase, async: true
 
   alias Predictex.Results.FifaFallback
+  alias Predictex.Results.Ingest
   alias Predictex.Tournament
 
   defp group_fixture(status \\ :scheduled),
@@ -127,6 +128,50 @@ defmodule Predictex.Results.FifaFallbackTest do
 
       assert %{candidates: 0, settled: 0} = FifaFallback.run()
       assert %{status: :scheduled} = Tournament.get_fixture!(recent.id)
+    end
+
+    test "full-tick durability: fallback settle survives a subsequent no-result openfootball sync" do
+      # France-v-Iraq scenario: FIFA fallback settles the fixture; a later openfootball sync
+      # carries no score for it — the Ingest no-downgrade guard must preserve the result.
+      _fixture =
+        db_group_fixture(%{
+          team1: "Mexico",
+          team2: "South Africa",
+          external_ref: "2026-06-11 Mexico v South Africa",
+          fifa_match_id: "400",
+          status: :scheduled,
+          kickoff_at: DateTime.add(DateTime.utc_now(), -200 * 60)
+        })
+
+      put_body_fun(%{
+        "400" => %{
+          "MatchStatus" => 0,
+          "HomeTeam" => %{"Score" => 3},
+          "AwayTeam" => %{"Score" => 0}
+        }
+      })
+
+      assert %{settled: 1} = FifaFallback.run()
+
+      # Openfootball sync: same fixture listed but with no score (nil).
+      Ingest.sync(%{
+        "matches" => [
+          %{
+            "round" => "Matchday 1",
+            "date" => "2026-06-11",
+            "time" => "13:00 UTC-6",
+            "group" => "Group A",
+            "team1" => "Mexico",
+            "team2" => "South Africa",
+            "score" => nil
+          }
+        ]
+      })
+
+      # Reload via external_ref — the no-downgrade guard must keep the fallback result intact.
+      reloaded = Tournament.get_fixture_by_ref("2026-06-11 Mexico v South Africa")
+      assert reloaded.status == :completed
+      assert {reloaded.home_goals, reloaded.away_goals} == {3, 0}
     end
 
     test "broadcasts a change when something settles" do
