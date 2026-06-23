@@ -1,7 +1,8 @@
 defmodule Predictex.Results.FifaFallbackTest do
-  use ExUnit.Case, async: true
+  use Predictex.DataCase, async: true
 
   alias Predictex.Results.FifaFallback
+  alias Predictex.Tournament
 
   defp group_fixture(status \\ :scheduled),
     do: %{round: %{stage: :group}, status: status}
@@ -35,5 +36,93 @@ defmodule Predictex.Results.FifaFallbackTest do
 
   test "skips when there is no captured body" do
     assert :skip = FifaFallback.settle_attrs(group_fixture(), nil)
+  end
+
+  defp db_group_fixture(attrs) do
+    round =
+      Tournament.get_round_by_ordinal(1) ||
+        (
+          {:ok, r} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})
+          r
+        )
+
+    {:ok, f} =
+      Tournament.create_fixture(
+        Map.merge(
+          %{
+            external_ref: "ref-#{System.unique_integer([:positive])}",
+            team1: "A",
+            team2: "B",
+            round_id: round.id,
+            kickoff_at: DateTime.add(DateTime.utc_now(), -200 * 60)
+          },
+          attrs
+        )
+      )
+
+    f
+  end
+
+  defp put_body_fun(map) do
+    Application.put_env(:predictex, :fifa_fallback_body_fun, fn id -> Map.get(map, id) end)
+    on_exit(fn -> Application.delete_env(:predictex, :fifa_fallback_body_fun) end)
+  end
+
+  describe "run/0" do
+    test "settles an eligible candidate and leaves others alone" do
+      eligible = db_group_fixture(%{fifa_match_id: "100", status: :scheduled})
+      not_finished = db_group_fixture(%{fifa_match_id: "101", status: :scheduled})
+
+      already =
+        db_group_fixture(%{
+          fifa_match_id: "102",
+          status: :completed,
+          home_goals: 1,
+          away_goals: 1
+        })
+
+      put_body_fun(%{
+        "100" => %{
+          "MatchStatus" => 0,
+          "HomeTeam" => %{"Score" => 3},
+          "AwayTeam" => %{"Score" => 0}
+        },
+        "101" => %{
+          "MatchStatus" => 3,
+          "HomeTeam" => %{"Score" => 1},
+          "AwayTeam" => %{"Score" => 0}
+        },
+        "102" => %{
+          "MatchStatus" => 0,
+          "HomeTeam" => %{"Score" => 5},
+          "AwayTeam" => %{"Score" => 5}
+        }
+      })
+
+      assert %{settled: 1} = FifaFallback.run()
+
+      assert %{status: :completed, home_goals: 3, away_goals: 0} =
+               Tournament.get_fixture!(eligible.id)
+
+      assert %{status: :scheduled} = Tournament.get_fixture!(not_finished.id)
+      # already-completed is untouched by the fallback (1-1 stays, not 5-5)
+      assert %{home_goals: 1, away_goals: 1} = Tournament.get_fixture!(already.id)
+    end
+
+    test "broadcasts a change when something settles" do
+      db_group_fixture(%{fifa_match_id: "200", status: :scheduled})
+      Tournament.subscribe_changes()
+
+      put_body_fun(%{
+        "200" => %{
+          "MatchStatus" => 0,
+          "HomeTeam" => %{"Score" => 1},
+          "AwayTeam" => %{"Score" => 0}
+        }
+      })
+
+      FifaFallback.run()
+      assert_received :fixtures_changed
+    end
   end
 end

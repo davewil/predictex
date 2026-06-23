@@ -11,6 +11,51 @@ defmodule Predictex.Results.FifaFallback do
   Knockouts (extra-time / penalties) are out of scope — `predictex-uyf`.
   """
 
+  import Ecto.Query, only: [from: 2]
+
+  alias Predictex.{Capture, Repo, Tournament}
+  alias Predictex.Tournament.Fixture
+
+  # Don't trust an early/abandoned MatchStatus 0 frame; a group match can't finish before this.
+  @min_elapsed_min 100
+
+  @doc """
+  Settle every eligible candidate from its latest captured FIFA finished frame. Returns a summary
+  `%{candidates: n, settled: m}` and broadcasts a fixtures-changed signal when anything settled.
+  """
+  @spec run() :: %{candidates: non_neg_integer(), settled: non_neg_integer()}
+  def run do
+    cutoff = DateTime.add(DateTime.utc_now(), -@min_elapsed_min * 60)
+
+    candidates =
+      Repo.all(
+        from f in Fixture,
+          where:
+            not is_nil(f.fifa_match_id) and f.status != :completed and f.kickoff_at < ^cutoff,
+          preload: :round
+      )
+
+    settled =
+      Enum.flat_map(candidates, fn f ->
+        case settle_attrs(f, body_fun().(f.fifa_match_id)) do
+          {:ok, attrs} ->
+            Tournament.update_fixture(f, attrs)
+            [f.id]
+
+          :skip ->
+            []
+        end
+      end)
+
+    if settled != [], do: Tournament.broadcast_change()
+
+    %{candidates: length(candidates), settled: length(settled)}
+  end
+
+  defp body_fun do
+    Application.get_env(:predictex, :fifa_fallback_body_fun, &Capture.latest_detail_body/1)
+  end
+
   @doc """
   Decide whether a captured FIFA `/detail` body finalizes `fixture`. Pure.
 
