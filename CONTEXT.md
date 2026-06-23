@@ -55,6 +55,14 @@ The real, authoritative outcome of a **fixture** (final regulation score, first 
 which **predictions** are scored. Distinct from a player's **scoreline**.
 _Avoid_: outcome, actual.
 
+**FIFA result fallback**:
+A bounded exception to openfootball's **result** authority (`Predictex.Results.FifaFallback`): when
+openfootball has no result for a played **group** **fixture** but our FIFA capture shows it finished
+(`MatchStatus 0`), settle the fixture provisionally from the captured score. openfootball reclaims
+authority on its next real-result sync; a `:completed` fixture never reverts to scheduled (the
+`Ingest` no-downgrade guard). Knockouts (extra-time / penalties) are out of scope.
+_Avoid_: result source, scraper.
+
 **Leaderboard**:
 The ranked standings. Two boards exist: the cumulative board (all rounds) and the re-based
 **knockout** board (knockout rounds only, from zero).
