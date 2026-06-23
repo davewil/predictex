@@ -12,22 +12,35 @@ defmodule Predictex.Workers.ResultSync do
 
   require Logger
 
-  alias Predictex.Results.Ingest
+  alias Predictex.Results.{FifaFallback, Ingest}
 
   @impl Oban.Worker
   def perform(_job) do
-    case sync_fun().() do
+    result = sync_fun().()
+
+    # Run the FIFA-capture fallback unconditionally — it's most valuable exactly when openfootball
+    # is down, so it must not be gated on the sync succeeding (predictex-iy1).
+    fallback = fallback_fun().()
+
+    case result do
       {:error, reason} ->
-        Logger.error("result sync failed: #{inspect(reason)}")
+        Logger.error(
+          "result sync failed: #{inspect(reason)} (fifa_fallback: #{inspect(fallback)})"
+        )
+
         {:error, reason}
 
       summary ->
-        Logger.info("result sync ok: #{inspect(summary)}")
+        Logger.info("result sync ok: #{inspect(summary)} (fifa_fallback: #{inspect(fallback)})")
         :ok
     end
   end
 
   defp sync_fun do
     Application.get_env(:predictex, :result_sync_fun, &Ingest.sync_from_url/0)
+  end
+
+  defp fallback_fun do
+    Application.get_env(:predictex, :fifa_fallback_fun, &FifaFallback.run/0)
   end
 end

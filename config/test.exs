@@ -55,6 +55,8 @@ config :predictex, :result_sync_fun, fn ->
   %{rounds: 0, fixtures_ok: 0, fixtures_error: 0, source: "stub"}
 end
 
+config :predictex, :fifa_fallback_fun, fn -> %{candidates: 0, settled: 0} end
+
 # Cohort sync source stubbed in tests (no network); worker tests override per-test.
 config :predictex, :cohort_source_fun, fn -> {:ok, %{rounds: [], match_stats: %{}}} end
 config :predictex, :fifa_reference_fun, fn -> {:ok, []} end
