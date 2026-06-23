@@ -4,8 +4,15 @@ defmodule Predictex.Workers.LiveScoreSync do
   with a `fifa_match_id` currently inside its capture window, fetches FIFA's per-match detail
   endpoint and broadcasts `{:snapshot, fixture_id, body, captured_at, fifa_match_id, url}` on
   `Predictex.PubSub` topic `"fifa:snapshots"`. The window opens 10 minutes before kickoff and
-  closes 210 minutes after — wide enough to cover knockout extra-time and penalties (~155-185min)
-  plus the finished frame that clears `is_live` (predictex-cvx).
+  normally closes 210 minutes after — wide enough to cover knockout extra-time and penalties
+  (~155-185min) plus the finished frame that clears `is_live` (predictex-cvx).
+
+  **Capture follows liveness, not a fixed clock.** The window also stays open for as long as a
+  fixture is still flagged `is_live` — so a match whose real-world duration runs past 210 minutes
+  (a weather/floodlight suspension: France v Iraq 2026-06-22 sat ~2h at half-time, FIFA
+  `MatchStatus` 11) keeps capturing through the break and resumption until FIFA's finished frame
+  (`MatchStatus` 0) clears `is_live` naturally. Without this the producer chain stopped at
+  kickoff+210min mid-second-half and the late goals + final score were lost.
 
   The worker does NOT write any fixture `live_*` columns from snapshots. `Predictex.Live.Updater`
   (a PubSub subscriber) decodes each snapshot and writes them.
@@ -46,6 +53,12 @@ defmodule Predictex.Workers.LiveScoreSync do
   @detail_base "https://api.fifa.com/api/v3/live/football/17/285023/289273"
   @pre_min 10
   @post_min 210
+  # Last-resort backstop for `clear_stuck_live/1`. Must comfortably exceed the longest
+  # realistic match duration *including* a weather suspension (France v Iraq ran ~kickoff+230min
+  # after a ~2h break), so the time backstop never force-clears a genuinely-live, delayed match —
+  # that races the `is_live`-extended capture window and would kill capture mid-match. openfootball
+  # `:completed` remains the *primary* self-heal; this only fires on a double feed failure.
+  @abandon_min 360
   @interval 30
 
   def start, do: %{} |> new() |> Oban.insert()
@@ -61,20 +74,26 @@ defmodule Predictex.Workers.LiveScoreSync do
     :ok
   end
 
-  # Fixtures to actively capture: have a fifa_match_id and sit inside the time window. We do
-  # NOT gate on openfootball's `status` here. openfootball derives `:completed` from a full-time
-  # (regulation) score, so it could in principle flag a knockout `:completed` while extra time /
-  # penalties are still being played; gating publish on that would blank the buzz during the ET/
-  # shootout peak. FIFA's live feed drives capture through the whole match; `clear_stuck_live/1`
-  # uses `:completed` only to *clear* a stuck flag, where the worst case is a benign flicker
-  # (the live frames keep re-asserting `is_live`) rather than a blackout.
+  # Fixtures to actively capture: have a fifa_match_id and either sit inside the time window OR
+  # are still flagged `is_live`. The `is_live` arm is what makes capture weather-proof — a match
+  # suspended past kickoff+210min (FIFA `MatchStatus` ∉ {0,1} → `is_live` stays true) keeps being
+  # polled until its finished frame (`MatchStatus` 0) clears `is_live`. The */5 cron re-evaluates
+  # this every tick, so even if the self-chain lapses the fixture is picked back up.
+  #
+  # We do NOT gate on openfootball's `status`. openfootball derives `:completed` from a full-time
+  # (regulation) score, so it could flag a knockout `:completed` while extra time / penalties are
+  # still being played; gating publish on that would blank the buzz during the ET/shootout peak.
+  # FIFA's live feed drives capture through the whole match; `clear_stuck_live/1` uses `:completed`
+  # only to *clear* a stuck flag, where the worst case is a benign flicker rather than a blackout.
   defp in_window(now) do
     from_t = DateTime.add(now, -@post_min * 60)
     to_t = DateTime.add(now, @pre_min * 60)
 
     Repo.all(
       from f in Fixture,
-        where: not is_nil(f.fifa_match_id) and f.kickoff_at <= ^to_t and f.kickoff_at >= ^from_t
+        where:
+          not is_nil(f.fifa_match_id) and f.kickoff_at <= ^to_t and
+            (f.kickoff_at >= ^from_t or f.is_live == true)
     )
   end
 
@@ -82,11 +101,13 @@ defmodule Predictex.Workers.LiveScoreSync do
   # independently of the producer chain (predictex-cvx). Clear when openfootball has marked
   # the match `:completed` — authoritative, and clears within ~one ResultSync cycle even while
   # the fixture is still in-window (the predictex-d17 endpoint-stall case) — OR, as a last-resort
-  # backstop for a double feed failure, once kickoff is older than the capture window. Runs on
-  # every tick, including the */5 cron ticks that fire after the self-reschedule chain has stopped.
+  # backstop for a double feed failure, once kickoff is older than `@abandon_min`. That backstop
+  # is deliberately *longer* than the `@post_min` capture floor: clearing at `@post_min` would
+  # race the `is_live`-extended window and kill capture mid-match for a weather-delayed game.
+  # Runs on every tick, including the */5 cron ticks after the self-reschedule chain has stopped.
   # Reads openfootball's `status` read-only; writes only `is_live` (the two-writer rule holds).
   defp clear_stuck_live(now) do
-    cutoff = DateTime.add(now, -@post_min * 60)
+    cutoff = DateTime.add(now, -@abandon_min * 60)
 
     Repo.all(
       from f in Fixture,

@@ -118,6 +118,59 @@ defmodule Predictex.Workers.LiveScoreSyncTest do
     assert fixture_id == f.id
   end
 
+  test "keeps capturing a still-live fixture past the 210min window (weather-delayed match)" do
+    # France v Iraq 2026-06-22: a ~2h half-time weather suspension pushed the match's real
+    # end past kickoff+210min. The match was still in play (is_live, MatchStatus 3) when the
+    # old fixed window dropped it — losing the final frames. Capture must follow liveness.
+    f =
+      fixture(%{
+        external_ref: "weather",
+        kickoff_at: minutes_ago(250),
+        fifa_match_id: "492",
+        is_live: true,
+        status: :scheduled
+      })
+
+    Phoenix.PubSub.subscribe(Predictex.PubSub, "fifa:snapshots")
+    put_fetch(fn _url -> {:ok, 200, %{"MatchStatus" => 3}} end)
+
+    assert :ok = perform_job(Live, %{})
+    assert_received {:snapshot, fixture_id, _body, _at, "492", _url}
+    assert fixture_id == f.id
+    assert_enqueued(worker: Live)
+  end
+
+  test "does not force-clear a still-live fixture past the 210min window (weather break)" do
+    f =
+      fixture(%{
+        external_ref: "weather2",
+        kickoff_at: minutes_ago(250),
+        fifa_match_id: "492",
+        is_live: true,
+        status: :scheduled
+      })
+
+    put_fetch(fn _url -> {:ok, 200, %{"MatchStatus" => 3}} end)
+
+    assert :ok = perform_job(Live, %{})
+    assert %{is_live: true} = Tournament.get_fixture!(f.id)
+  end
+
+  test "a finished fixture past the window is not re-captured (is_live is the only extension)" do
+    fixture(%{
+      external_ref: "done-old",
+      kickoff_at: minutes_ago(250),
+      fifa_match_id: "493",
+      is_live: false,
+      status: :completed
+    })
+
+    Phoenix.PubSub.subscribe(Predictex.PubSub, "fifa:snapshots")
+    assert :ok = perform_job(Live, %{})
+    refute_received {:snapshot, _, _, _, "493", _}
+    refute_enqueued(worker: Live)
+  end
+
   test "clears a :completed fixture's is_live while the chain runs for a concurrent live match (d17 fast-path)" do
     done =
       fixture(%{
@@ -149,11 +202,11 @@ defmodule Predictex.Workers.LiveScoreSyncTest do
     assert_enqueued(worker: Live)
   end
 
-  test "clears is_live for a stuck fixture past the window (time backstop)" do
+  test "clears is_live for a stuck fixture past the abandon backstop (double feed failure)" do
     f =
       fixture(%{
         external_ref: "stuck",
-        kickoff_at: minutes_ago(250),
+        kickoff_at: minutes_ago(370),
         is_live: true,
         status: :scheduled
       })
@@ -186,7 +239,7 @@ defmodule Predictex.Workers.LiveScoreSyncTest do
     f =
       fixture(%{
         external_ref: "twice",
-        kickoff_at: minutes_ago(250),
+        kickoff_at: minutes_ago(370),
         is_live: true,
         status: :scheduled
       })
