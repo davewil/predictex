@@ -1,7 +1,8 @@
 defmodule PredictexWeb.FixtureLiveTest do
-  # async: false retained pending a separate async-safety review (predictex-uhf follow-up);
-  # live_buzz was contracted away (the feature is unconditional), so there is no flag state here.
-  use PredictexWeb.ConnCase, async: false
+  # Runs async: the replay describe explicitly grants its supervised Replay.Cache an Ecto
+  # sandbox allowance (predictex-dmh) — the only process here that touches the Repo outside
+  # the test's own caller chain.
+  use PredictexWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
   import Predictex.AccountsFixtures
@@ -117,7 +118,14 @@ defmodule PredictexWeb.FixtureLiveTest do
 
   describe "replay mode" do
     setup do
-      start_supervised!(Predictex.Replay.Cache)
+      cache = start_supervised!(Predictex.Replay.Cache)
+
+      # Replay.Cache is a supervised GenServer that reads the Repo in its OWN process. Under
+      # async (isolated sandbox) it isn't in the test's caller chain, so without an explicit
+      # allowance its read raises DBConnection.OwnershipError (predictex-dmh). Grant it the
+      # test's connection. Race-free: tests in one module run sequentially, and this is the
+      # only block that exercises the Cache.
+      Ecto.Adapters.SQL.Sandbox.allow(Predictex.Repo, self(), cache)
       # Enable the flag for this block. The DB write rolls back with the sandbox txn; the
       # ETS cache would otherwise survive the rollback and leak an enabled flag into later
       # tests (whose mounts would then hit the test-gated-out Replay.Cache and crash). So we

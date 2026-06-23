@@ -96,15 +96,13 @@ defmodule Predictex.Fifa.LiveIdsTest do
   end
 
   test "assign/1 writes ids and returns a name/slot summary" do
-    # one knockout fixture matched by slot (placeholder teams), one group matched by name
-    ko =
-      fixture(%{
-        team1: "2A",
-        team2: "2B",
-        round_id: ko_round().id,
-        kickoff_at: ~U[2026-06-28 19:00:00Z]
-      })
-
+    # one knockout fixture matched by slot (placeholder teams), one group matched by name.
+    #
+    # Create the group round (ordinal 1) BEFORE the knockout round (ordinal 4, via ko_round/0).
+    # Every async test that inserts rounds must acquire the rounds.ordinal unique-index locks
+    # in ascending order: a single descending inserter (high ordinal then low) lets concurrent
+    # sandbox transactions form a lock cycle, and PostgreSQL kills one with a deadlock
+    # (predictex-dmh). Ascending-everywhere keeps the lock-wait graph acyclic.
     {:ok, gr} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})
 
     grp =
@@ -113,6 +111,14 @@ defmodule Predictex.Fifa.LiveIdsTest do
         team2: "Brazil",
         round_id: gr.id,
         kickoff_at: ~U[2026-06-11 19:00:00Z]
+      })
+
+    ko =
+      fixture(%{
+        team1: "2A",
+        team2: "2B",
+        round_id: ko_round().id,
+        kickoff_at: ~U[2026-06-28 19:00:00Z]
       })
 
     rounds = [

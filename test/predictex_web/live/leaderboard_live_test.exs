@@ -1,7 +1,7 @@
 defmodule PredictexWeb.LeaderboardLiveTest do
-  # async: false retained pending a separate async-safety review (predictex-uhf follow-up);
-  # live_buzz was contracted away (live fixtures show unconditionally), so no flag state here.
-  use PredictexWeb.ConnCase, async: false
+  # Runs async: this view mutates no global state (live_buzz was contracted away), and it
+  # never touches the supervised Replay.Cache, so isolated-sandbox mode is safe (predictex-dmh).
+  use PredictexWeb.ConnCase, async: true
 
   import Phoenix.LiveViewTest
 
