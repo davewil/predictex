@@ -11,6 +11,8 @@ defmodule Predictex.Results.FifaFallback do
   Knockouts (extra-time / penalties) are out of scope — `predictex-uyf`.
   """
 
+  require Logger
+
   import Ecto.Query, only: [from: 2]
 
   alias Predictex.{Capture, Repo, Tournament}
@@ -35,12 +37,23 @@ defmodule Predictex.Results.FifaFallback do
           preload: :round
       )
 
+    body = body_fun()
+
     settled =
       Enum.flat_map(candidates, fn f ->
-        case settle_attrs(f, body_fun().(f.fifa_match_id)) do
+        case settle_attrs(f, body.(f.fifa_match_id)) do
           {:ok, attrs} ->
-            Tournament.update_fixture(f, attrs)
-            [f.id]
+            case Tournament.update_fixture(f, attrs) do
+              {:ok, _} ->
+                [f.id]
+
+              {:error, changeset} ->
+                Logger.warning(
+                  "FifaFallback: failed to update fixture #{f.id}: #{inspect(changeset.errors)}"
+                )
+
+                []
+            end
 
           :skip ->
             []

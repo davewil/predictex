@@ -109,6 +109,26 @@ defmodule Predictex.Results.FifaFallbackTest do
       assert %{home_goals: 1, away_goals: 1} = Tournament.get_fixture!(already.id)
     end
 
+    test "does not settle a fixture whose kickoff is inside the cutoff window" do
+      recent =
+        db_group_fixture(%{
+          fifa_match_id: "300",
+          status: :scheduled,
+          kickoff_at: DateTime.add(DateTime.utc_now(), -50 * 60)
+        })
+
+      put_body_fun(%{
+        "300" => %{
+          "MatchStatus" => 0,
+          "HomeTeam" => %{"Score" => 2},
+          "AwayTeam" => %{"Score" => 1}
+        }
+      })
+
+      assert %{candidates: 0, settled: 0} = FifaFallback.run()
+      assert %{status: :scheduled} = Tournament.get_fixture!(recent.id)
+    end
+
     test "broadcasts a change when something settles" do
       db_group_fixture(%{fifa_match_id: "200", status: :scheduled})
       Tournament.subscribe_changes()
