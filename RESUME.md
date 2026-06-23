@@ -76,73 +76,53 @@ the app scores them against real results and ranks a leaderboard.
   `/import`). `/predictions` only *displays* them.
   - ⚠️ **This is changing for the KNOCKOUTS.** The Knockout-Game thread (see "Continue here") makes
     `/predictions` **editable** for the open knockout round — members predict natively in-app from R32. Group
-    stage stays as described above (frozen, FIFA-import). **Phase 1 is BUILT + pushed (not yet deployed).**
+    stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
+    verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-23)
+## ⏵ Continue here (2026-06-23, end of session)
 
-### ★ NEXT SESSION — architecture review COMPLETE (#4, #3, #1 all done); next is the Knockout Game or backlog
+Everything below is **DEPLOYED and live as `v0.11.14`** (see "Live right now"). Branch up to date with
+origin. The next pivotal date is **28 Jun (R32 starts)** — three things verify themselves then.
 
-All three architecture-deepening candidates from the `improve-codebase-architecture` review are done (#4 + #3
-pushed; **#1 committed-local @ `4ea177f`, NOT pushed** — block below). The deadline-driven **Knockout Game**
-(Phase 1 pushed, not deployed; R32 ≈ 28 Jun) is the live feature thread; `bd ready` for the rest. Follow-up
-from #1: `predictex-0ft` (P4) — memoize the base ranking inside the snapshot so in-memory `project` stops
-re-ranking.
+### ★ NEXT SESSION — the 28 Jun knockout cutover
+- **`predictex-hco` WS1 (deployed v0.11.14) — VERIFY on 28 Jun.** `Workers.KnockoutIds` (cron `*/10`) self-arms:
+  once FIFA publishes the KO bracket in `rounds.json`, it backfills all 32 KO `fifa_match_id`s (name-join + a
+  KO-only date+time **slot fallback**, proxy-verified to the minute on all 72 group matches). Watch the log reach
+  `KO fifa_match_id: 32/32`, then confirm the first KO (Sun 28 Jun 20:00) captures through ET/pens with `is_live`
+  clearing on finish → **closes `hco`**. WS2 already covered (cvx + ius). Currently `0/32` (FIFA KO rounds empty).
+- **Knockout Game Phase 1 (native R32 entry) is DEPLOYED** (its commits `8419a2f..f94a779` rode the v0.11.x tags
+  from main HEAD). ⚠️ **VERIFY the editable native entry actually renders on `/predictions` for the open R32** — a
+  2026-06-23 screenshot showed R32 in the read-only FIFA-import style ("Make / update picks on FIFA"), so confirm
+  whether the native scoreline / first-team / booster inputs show for the open KO round or are gated. Phase-2
+  follow-ups: `cij` (P3, per-fixture live/recap gate within an open KO round), `i9k` (KO import + first-scorer),
+  and the deferred player-picker (squad rosters ABSENT pre-match — needs a squad-endpoint spike or free-text
+  fallback; regulation goals = `Period∈{3,5}`, `Period 10`=finished-regulation, ET period values UNKNOWN until 28 Jun).
 
-### ★ ARCHITECTURE REVIEW — candidates #4 + #3 + #1 ALL DONE (#4/#3 pushed @ `277142c`; #1 committed-local @ `4ea177f`)
-All via the `improve-codebase-architecture` grilling loop → strict TDD → commit-local. 467 tests green.
-- **#1 — one shared pure ranking core (`4ea177f`, committed-local, NOT pushed).** New pure `Predictex.Ranking`
-  (zero Repo/Ecto) owns the fold both boards duplicated — group by round ordinal, Round Bonus completeness vs
-  round fixture count, `Scoring.round_total/2`, sum `fixtures_total + round_bonus_total`, sort `{-total, name}`.
-  `Standings.rank/2` (FK join) and `Leaderboard.build/3` (team-name join) now keep ONLY their join, build
-  already-scored entries, and hand them + the fixture universe (`[%{ordinal, completed?}]`) to the core. Core
-  requires `:name` + `:scored`, echoes the rest (Standings carries `:player_id`); completeness rule lives in the
-  seam. `Standings.rank/2` byte-identical in/out (Buzz/Dashboard/project unchanged); `Leaderboard.build/3` gains
-  an invisible `:bonus_by_round` (no consumer/whole-map assert). +11 direct `Ranking` tests on trivial
-  `%{ordinal, result}` maps (no scoreable fixtures). CONTEXT.md gains the "ranking core" term.
-- **#4 — one pure prediction-intake boundary (`47fc15c`).** `Predictions.parse_pick_rows/2` +
-  `validate_pick_rows/1` (pure) own raw-params→pick-row parsing AND the booster-on-blank invariant; the member +
-  admin LiveViews and FIFA import all cross it. Deleted three duplicated per-view parsers + the member's inline
-  booster guard + the duplicated error strings; graceful int parsing (forged non-int key skips, no 500). Created
-  `CONTEXT.md`.
-- **#3 — single ranking snapshot (`277142c`).** `Standings.snapshot/0` + `%Standings.Snapshot{}` (own file) +
-  pure `rank/1`/`project/4`; `Buzz` now runs over a passed snapshot → **~11 board loads/live event → 1** (and
-  more consistent: one instant). Deleted a dead full-leaderboard load in `Buzz.headlines` + the loading
-  `Standings.project/3`. `buzz_test` is now pure zero-DB (proves Buzz no longer loads). Follow-up
-  **`predictex-0ft`** (P4): memoize the base ranking inside the snapshot so in-memory `project` stops re-ranking.
+### ★ SHIPPED THIS SESSION (2026-06-23) — all deployed + verified live
+- **Architecture review COMPLETE** (`improve-codebase-architecture`): **#4** prediction-intake boundary
+  (`Predictions.parse_pick_rows/2`+`validate_pick_rows/1`, `47fc15c`), **#3** single ranking snapshot
+  (`Standings.snapshot/0`, ~11 board loads/event→1, `277142c`), **#1** shared pure ranking core
+  (`Predictex.Ranking` — `Standings`+`Leaderboard` both feed one fold; `4ea177f`). All pushed + deployed.
+  Follow-up: **`predictex-0ft`** (P4) — memoize the base ranking in the snapshot so in-memory `project` stops re-ranking.
+- **`predictex-ius` (v0.11.13) — weather-proof live capture.** `LiveScoreSync` keeps capturing while `is_live`
+  (FIFA `MatchStatus 11`=weather suspension stays live), so a delayed match isn't cut at kickoff+210min;
+  `clear_stuck_live` backstop → `@abandon_min`=360. Found via France v Iraq (a ~2h half-time weather break truncated
+  capture at 74'). bd memory `fifa-matchstatus-11-suspended`.
+- **`predictex-iy1` (v0.11.13) — FIFA-capture result fallback.** `ResultSync` settles a played GROUP fixture
+  provisionally from the captured FIFA finished frame (`MatchStatus 0`) when openfootball lags;
+  `Predictex.Results.FifaFallback`; plus an `Ingest` no-downgrade guard so a `:completed` fixture never reverts to
+  `:scheduled`. VERIFY on the next openfootball lag (real-world). Spec/plan: `docs/superpowers/{specs,plans}/2026-06-23-iy1-*`.
+- **`predictex-hco` WS1 (v0.11.14)** — see "NEXT" above.
+- **`g8m` CLOSED** — no-dup invariant verified at partial bracket resolution (3 R32 teams resolved in place, 0 dups).
+- **⚠️ France v Iraq settled manually 3-0** (admin override) — openfootball STILL has no result for it; if it never
+  lands, the manual override stands (the fallback can't help — its capture predates the ius fix, so no finished frame).
 
-### ★ ACTIVE FEATURE (deadline-driven, R32 ≈ 28 Jun) — Knockout Game (native predictions, re-based at R32) — PHASE 1 PUSHED, NOT DEPLOYED
-
-**The big pivot.** From the Round of 32, members enter predictions **natively in-app** (no FIFA round-trip), the
-leaderboard is **re-based** (a from-zero knockout-only board alongside the cumulative one). Knockouts only; the
-group stage stays frozen/read-only. Realises bead **`predictex-2ww`**.
-
-**✅ PHASE 1 PUSHED** — `8419a2f..f94a779` on `origin/main` (the #4/#3 refactors landed on top). **NOT yet
-deployed/tagged** — deploy is a separate `scripts/pre-deploy` → `git tag` gate (check nothing's mid-capture first).
-Built subagent-driven (fresh subagent + two-stage review per task; opus final whole-branch review). What landed:
-- **`Standings.knockout_leaderboard/0`** (`b888c76`) — re-based KO-only board. **Overall/Knockout toggle on `/`**
-  (`81a860e`) — KO button shows only once a KO fixture exists.
-- **`Predictions.save_round_predictions/4`** (`9142bf1`) — lockout-aware member write path (locked fixtures
-  immutable; booster-clear scoped to unlocked so a locked booster survives).
-- **Editable `/predictions` native entry** (`5abc67b` + `9b7e20c` fix) — scoreline + first-team + one
-  booster/round, OPEN knockout round only (group + locked stay read-only). Booster-on-blank blocked.
-- **⚠️ Critical write-auth seam found in the final review + fixed** (`f94a779`): a crafted phx event could write an
-  out-of-round/locked fixture (post-kickoff edit). FIX (two layers): domain rejects rows whose `fixture_id` isn't
-  in the round (`:unknown`); handler guards with `editable_round?`. Re-reviewed clean (opus). 3 regression tests.
-  **NOTE:** the member + admin save handlers were *since refactored by candidate #4* to route through
-  `Predictions.parse_pick_rows/2`; the write-auth round-membership guard still lives in `save_round_predictions/4`.
-- **Spec/plan:** `docs/superpowers/specs/2026-06-22-knockout-game-native-predictions-design.md`,
-  `docs/superpowers/plans/2026-06-22-knockout-game-phase1-foundation.md`. SDD ledger: `.superpowers/sdd/progress.md`.
-
-**▶ NEXT (KO thread):** (1) **deploy** Phase 1 when ready (separate tag gate; not mid-capture). (2) **Follow-up
-plan** (deferred, gated by the spike): player picker + squad ingestion + id-based first-scorer scoring; FIFA
-result-authority (bracket auto-populate, regulation-filtered `Period∈{3,5}` FIFA scoreline + first-scorer,
-openfootball reconciliation). (3) `predictex-cij` (P3) — Phase-2 per-fixture live/recap gate within an open KO round.
-
-**Task-0 spike DONE** (`c9e18c2`, `docs/superpowers/research/2026-06-22-knockout-fifa-feed-spike.md`): squad↔scorer
-`IdPlayer` join CONFIRMED (8/8 goals resolve); **GATE — squad rosters ABSENT pre-match** (upcoming `/detail`
-returns teams but `Players[]`=0/0 days ahead; 26-man squad only at match time) → **picker stays deferred**, needs a
-dedicated squad-endpoint spike or free-text fallback. Regulation goals = `Period∈{3,5}`; match `Period 10`=finished-
-regulation; **ET period values UNKNOWN until 28 Jun** (the reconciliation safety-net doubles as the ET regression check).
+### Knockout Game — design refs (Phase 1 deployed; Phase 2 deferred)
+Spec/plan: `docs/superpowers/{specs/2026-06-22-knockout-game-native-predictions-design.md,plans/2026-06-22-knockout-game-phase1-foundation.md}`.
+SDD ledger: `.superpowers/sdd/progress.md`. The write-auth round-membership guard lives in `save_round_predictions/4`
+(member+admin saves route through `parse_pick_rows/2` since arch #4). Task-0 spike:
+`docs/superpowers/research/2026-06-22-knockout-fifa-feed-spike.md` (squad↔scorer `IdPlayer` join confirmed 8/8;
+picker deferred — squad rosters absent pre-match).
 
 ---
 
@@ -211,21 +191,22 @@ bracket resolution. Next session picks from the backlog below.
   - **`predictex-p4o` left OPEN** — close after eyeballing a real settled group fixture's breakdown in prod.
     Cards remain in `predictex-bdq`.
 
-**▶ NEXT — start here next session:** architecture review is COMPLETE (#4/#3/#1 all done — #1 committed-local
-@ `4ea177f`, not pushed; see top of "⏵ Continue here"). The **Knockout Game** is the deadline-driven feature
-(Phase 1 pushed, not deployed; R32 ≈ 28 Jun). Backlog below.
+**▶ NEXT — start here next session:** see the **"⏵ Continue here"** block at the top — it's the current source
+of truth. Headline: everything is deployed (`v0.11.14`); the **28 Jun knockout cutover** is the focus (verify
+`hco` WS1 self-arms `32/32` + first-KO capture; verify Phase 1 native R32 entry renders). Backlog below.
 
-**Recently CLOSED (2026-06-22):** `kcx` ("If your pick lands" projected leaderboard, v0.11.12 — eyeballed
-pre-kickoff + live) · `i1s` (replay engine + adaptive pacing, v0.11.12 — accepted in prod) · `p4o` (settled
-group-stage goal breakdown, eyeballed). Specs/plans under `docs/superpowers/` if detail is needed.
+**Recently CLOSED:** `g8m` (KO no-dup, 2026-06-23) · `ius`/`iy1` (weather capture + result fallback, v0.11.13) ·
+`kcx`/`i1s`/`p4o` (2026-06-22). Specs/plans under `docs/superpowers/` if detail is needed.
 
-1. **`predictex-hco` (P2) — WS1 fifa_match_id backfill, gated on bracket resolution** (after the final group
-   match: fetch `rounds.json` + run `Fifa.LiveIds.assign`, confirm 104/104). WS2/WS3 ✅; `g8m` verified
-   `{32,32}`; verify WS1/WS2 live on the first KO 28 Jun. (`g8m`'s final no-dup check also lands at resolution.)
+1. **`predictex-hco` (P2, IN PROGRESS) — WS1 BUILT + DEPLOYED (v0.11.14), self-arming.** `Workers.KnockoutIds`
+   (`*/10`) backfills KO `fifa_match_id` the moment FIFA publishes `rounds.json` KO matches (name-join + KO-only
+   slot fallback). WS2/WS3 ✅; `g8m` closed. **Verify on 28 Jun:** `KO fifa_match_id: 32/32` then first-KO capture
+   through ET/pens, `is_live` clears → close `hco`.
 
-2. **Other backlog (`bd ready`):** `4ez` (per-fixture points + risky banner on FixtureCard), `a4j` (cache
-   `Standings.leaderboard/0`), `c9s` (team-name snapshot + regression test), `dmh` (ConnCase async-safety),
-   `bl8` (Live.Updater rescue), `uyf` (P4, knockout-ET goal filtering — gated on `hco`).
+2. **Other backlog (`bd ready`):** `cij`/`i9k` (KO Phase 2), `0ft` (memoize ranking in snapshot), `4ez`
+   (per-fixture points + risky banner on FixtureCard), `a4j` (cache `Standings.leaderboard/0`), `c9s` (team-name
+   snapshot + regression test), `dmh` (ConnCase async-safety — suite has known intermittent flakes), `bl8`
+   (Live.Updater rescue), `uyf` (P4, knockout-ET goal filtering — gated on `hco`).
 
 **Workflow rule (this session, durable):** commit autonomously when green; **push and tag/push (deploy) are
 the user's explicit call** — never auto-push. Authoritative in CLAUDE.md → "Conventions & Patterns → Commit
@@ -276,7 +257,7 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **456 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
+- **494 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
   deps.unlock --check-unused, format --check-formatted, **credo --strict**, test) — run on every Elixir commit
   by lefthook and by CI's Quality job (CI also runs `sobelow`). Single source = the `precommit` alias in
   mix.exs; tuning in `.credo.exs`/`.sobelow-skips`. Details: CLAUDE.md "Build & Test". Never `--no-verify`.
@@ -288,9 +269,11 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - `Predictex.Fifa` — **pure** openfootball → FIFA 8-game-round mapping. `Predictex.Fifa.Cohort` —
   **pure** join of FIFA `matchStats.json` cohort → fixtures (`plan/3`; `{utc_date, team-set}` key +
   home/away orientation; **data-verified FIFA↔openfootball alias table** — 8 divergences, the core of `c9s`).
-- `Predictex.Leaderboard` — **pure** DB-free aggregator (drives `mix predictex.leaderboard`). ⚠️ Duplicates
-  the full scoring loop with `Standings` (joins by team-name vs FK) — the target of architecture candidate **#1**
-  (collapse into one shared pure ranking core; see "Continue here").
+- `Predictex.Ranking` — **pure** shared ranking core (zero Repo/Ecto, architecture #1): the fold both boards run
+  (group by round ordinal, Round Bonus completeness, `Scoring.round_total/2`, total, sort). Each board feeds it
+  already-joined `%{name, scored}` entries + the fixture universe; only their join differs.
+- `Predictex.Leaderboard` — **pure** DB-free aggregator (drives `mix predictex.leaderboard`); the team-name-join
+  adapter over `Predictex.Ranking` (`Standings` is the FK-join adapter — #1 collapsed the duplicated loop).
 - `Predictex.Standings` — DB-backed leaderboard. **`snapshot/0`** is the single Gather edge (loads players+fixtures
   once into `%Standings.Snapshot{}`); pure **`rank/1`** + **`project/4`** run over it (no Repo); `leaderboard/0`/
   `knockout_leaderboard/0` are thin edges. `Buzz` runs entirely over a passed snapshot (architecture #3). Entries
@@ -302,11 +285,18 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - `Predictex.Dashboard` — read model for `/predictions`: pure `build/4` + `for_player/2` edge;
   consumes `Standings` as the **single scoring authority** (does no scoring of its own).
 - `PredictexWeb.Flags` — team name → flag emoji, keyed on real openfootball strings (⚽ fallback).
-- `Predictex.Results.Ingest` — DB ingestion (`plan/1` pure, `commit/1` act; upserts; `@replace_on_conflict` excludes `cohort_*_pct`, so result sync never fights cohort sync).
-- **Background jobs (Oban):** `Predictex.Workers.ResultSync` (every 15 min) runs `Ingest.sync_from_url/0`;
-  `Predictex.Workers.CohortSync` (hourly) fetches FIFA reference+cohort JSON and applies `Fifa.Cohort.plan/3`,
-  **overwriting** `cohort_*_pct` (FIFA is the cohort source; admin `a02` cohort entry is now a vestigial
-  stop-gap). Both sync sources injectable for tests (`:result_sync_fun`, `:cohort_source_fun`).
+- `Predictex.Results.Ingest` — DB ingestion (`plan/1` pure, `commit/1` act). Fixture identity: KO by stable
+  `source_num`, group by `external_ref` (`find_fixture/1`, g8m); changeset-update casts only parsed attrs so
+  cohort `%`s survive. **No-downgrade guard (iy1):** a `:completed` fixture never reverts to `:scheduled` when a
+  sync carries no result.
+- `Predictex.Results.FifaFallback` — **pure** `settle_attrs/2` + `run/0` edge (iy1): settles a played GROUP
+  fixture from the captured FIFA finished frame (`MatchStatus 0`) when openfootball lags. The bounded exception
+  to the two-writer rule.
+- **Background jobs (Oban):** `Workers.ResultSync` (`*/15`) runs `Ingest.sync_from_url/0` **then `FifaFallback.run/0`**
+  (unconditionally, so the fallback fires even when openfootball is down); `Workers.CohortSync` (hourly) applies
+  `Fifa.Cohort.plan/3`, overwriting `cohort_*_pct`; `Workers.LiveScoreSync` (`*/5`) is the capture producer;
+  `Workers.KnockoutIds` (`*/10`, hco WS1) self-arms KO `fifa_match_id` backfill. Sync sources injectable for tests
+  (`:result_sync_fun`, `:fifa_fallback_fun`, `:cohort_source_fun`, `:ko_ids_rounds_fun`).
 - Contexts: `Tournament` (rounds/fixtures, `round_open?`), `Accounts` (players/auth, `promote_admin/1`), `Predictions` (lockout-aware `create_prediction`).
 - Schemas: `Round`, `Fixture`, `Player`, `Prediction` (partial unique index = one booster per player per round).
 - Web: `LeaderboardLive` (`/`, public), `MyPredictionsLive` (`/predictions`, auth — read-only:
