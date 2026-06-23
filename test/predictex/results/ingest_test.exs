@@ -163,6 +163,58 @@ defmodule Predictex.Results.IngestTest do
     assert {resolved.home_goals, resolved.away_goals} == {2, 1}
   end
 
+  describe "no-downgrade guard" do
+    @scored %{
+      "matches" => [
+        %{
+          "round" => "Matchday 1",
+          "date" => "2026-06-11",
+          "time" => "13:00 UTC-6",
+          "group" => "Group A",
+          "team1" => "Mexico",
+          "team2" => "South Africa",
+          "score" => %{"ft" => [2, 0]}
+        }
+      ]
+    }
+    @no_score put_in(@scored, ["matches", Access.at(0), "score"], nil)
+
+    test "a settled fixture is not reverted when a later sync carries no result" do
+      Ingest.sync(@scored)
+      fx = Tournament.get_fixture_by_ref("2026-06-11 Mexico v South Africa")
+      assert fx.status == :completed and {fx.home_goals, fx.away_goals} == {2, 0}
+
+      # openfootball momentarily drops the score for the same fixture
+      Ingest.sync(@no_score)
+
+      fx2 = Tournament.get_fixture_by_ref("2026-06-11 Mexico v South Africa")
+      assert fx2.status == :completed
+      assert {fx2.home_goals, fx2.away_goals} == {2, 0}
+    end
+
+    test "a real result still overwrites a settled fixture (authoritative correction)" do
+      Ingest.sync(@scored)
+      corrected = put_in(@scored, ["matches", Access.at(0), "score"], %{"ft" => [3, 1]})
+
+      Ingest.sync(corrected)
+
+      fx = Tournament.get_fixture_by_ref("2026-06-11 Mexico v South Africa")
+      assert {fx.home_goals, fx.away_goals} == {3, 1}
+    end
+
+    test "non-result fields still update on a no-result sync (g8m path preserved)" do
+      Ingest.sync(@scored)
+      # same fixture identity (external_ref derives from date+teams), kickoff time moved, no score
+      moved = put_in(@no_score, ["matches", Access.at(0), "time"], "20:00 UTC-6")
+
+      Ingest.sync(moved)
+
+      fx = Tournament.get_fixture_by_ref("2026-06-11 Mexico v South Africa")
+      assert fx.status == :completed
+      assert fx.kickoff_at == ~U[2026-06-12 02:00:00Z]
+    end
+  end
+
   test "first sync stamps source_num onto a pre-existing placeholder KO fixture via the ref fallback (predictex-g8m bootstrap)" do
     # Simulate prod: a knockout fixture created BEFORE g8m — source_num is NULL, teams still placeholder.
     {:ok, round} =

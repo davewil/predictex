@@ -24,6 +24,18 @@ defmodule Predictex.Results.Ingest do
 
   @default_url "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
 
+  # Result-derived fields. openfootball only ever produces these when it actually has a result
+  # (Openfootball.ft_score returns :completed + integer goals only for an integer `ft` score).
+  @result_fields [
+    :status,
+    :home_goals,
+    :away_goals,
+    :first_scorer_side,
+    :first_scorer_player,
+    :first_goal_owngoal,
+    :goals
+  ]
+
   # --- Gather ---
 
   def sync_from_url(url \\ @default_url) do
@@ -122,8 +134,11 @@ defmodule Predictex.Results.Ingest do
     # columns are the backstop — a concurrent double-insert returns {:error, changeset} (counted
     # in fixtures_error), never a duplicate row. In practice the 15-min ResultSync is single-flight.
     case find_fixture(attrs) do
-      nil -> %Fixture{} |> Fixture.changeset(attrs) |> Repo.insert()
-      %Fixture{} = existing -> existing |> Fixture.changeset(attrs) |> Repo.update()
+      nil ->
+        %Fixture{} |> Fixture.changeset(attrs) |> Repo.insert()
+
+      %Fixture{} = existing ->
+        existing |> Fixture.changeset(preserve_settled(existing, attrs)) |> Repo.update()
     end
   end
 
@@ -138,4 +153,15 @@ defmodule Predictex.Results.Ingest do
   end
 
   defp find_fixture(%{external_ref: ref}), do: Tournament.get_fixture_by_ref(ref)
+
+  # A :completed fixture never reverts to :scheduled via a sync. When openfootball carries no
+  # result for an already-settled fixture (status != :completed), keep its result fields and
+  # update only the non-result fields (teams / kickoff / source_num — the predictex-g8m
+  # bracket-resolution path). A real result (status :completed) writes through normally.
+  defp preserve_settled(%Fixture{status: :completed}, %{status: status} = attrs)
+       when status != :completed do
+    Map.drop(attrs, @result_fields)
+  end
+
+  defp preserve_settled(_existing, attrs), do: attrs
 end
