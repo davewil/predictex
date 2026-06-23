@@ -45,6 +45,14 @@ defmodule Predictex.LiveScoreTest do
     assert %{is_live: false} = LiveScore.attrs_from_body(%{"MatchStatus" => 1}, f)
   end
 
+  test "attrs_from_body/2 keeps a suspended match (MatchStatus 11) live" do
+    # France v Iraq 2026-06-22: FIFA reported MatchStatus 11 during a ~2h weather break.
+    # Only 0/1 are not-live, so any suspension/interruption code stays live — that is what
+    # keeps capture alive through a break (predictex-ius). Do NOT narrow this to `== 3`.
+    f = fixture()
+    assert %{is_live: true} = LiveScore.attrs_from_body(%{"MatchStatus" => 11}, f)
+  end
+
   test "attrs_from_body/2 keeps the existing score when the body omits it" do
     f = fixture(%{live_home_goals: 2, live_away_goals: 1})
     body = %{"MatchStatus" => 3, "MatchTime" => "70'"}
