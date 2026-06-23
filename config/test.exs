@@ -57,6 +57,9 @@ end
 
 config :predictex, :fifa_fallback_fun, fn -> %{candidates: 0, settled: 0} end
 
+# Knockout-id backfill rounds source stubbed (no network); worker tests override per-test.
+config :predictex, :ko_ids_rounds_fun, fn -> {:ok, []} end
+
 # Cohort sync source stubbed in tests (no network); worker tests override per-test.
 config :predictex, :cohort_source_fun, fn -> {:ok, %{rounds: [], match_stats: %{}}} end
 config :predictex, :fifa_reference_fun, fn -> {:ok, []} end

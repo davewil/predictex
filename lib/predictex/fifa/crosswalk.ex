@@ -45,6 +45,25 @@ defmodule Predictex.Fifa.Crosswalk do
     Map.get(@aliases, n, n)
   end
 
+  @doc """
+  A `{utc_date, hour, minute}` slot identity — date+time to the minute, in UTC.
+
+  Used for knockout fixtures, where each match has a distinct kickoff slot (unlike the group
+  stage, which runs several matches per day, so the team-set stays part of `match_key/3`). Both
+  feeds reduce to the same tuple: our `kickoff_at` is UTC; FIFA's offset ISO8601 is converted to
+  UTC by `DateTime.from_iso8601/1`. Verified equal to the minute across all 72 group matches.
+  """
+  def slot_key(%DateTime{} = dt), do: {DateTime.to_date(dt), dt.hour, dt.minute}
+
+  def slot_key(iso) when is_binary(iso) do
+    case DateTime.from_iso8601(iso) do
+      {:ok, dt, _offset} -> {DateTime.to_date(dt), dt.hour, dt.minute}
+      _ -> nil
+    end
+  end
+
+  def slot_key(_), do: nil
+
   @doc "Returns the UTC `Date` for a `DateTime` struct or an offset ISO8601 string; `nil` otherwise."
   # FIFA `date` is offset-bearing ISO8601 ("...+01:00"); fixture kickoff_at is UTC.
   # Both reduce to a UTC Date for the key.
