@@ -12,7 +12,19 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.10` (deployed + verified 2026-06-20: Deploy success, migration
+- **Latest deployed tag:** `v0.11.13` (deployed + verified 2026-06-23: Deploy success, no migration,
+  `/health` 200, anon `/` 200, new code live in prod) — bundles **`predictex-ius`** (weather-proof live
+  capture: `Workers.LiveScoreSync` keeps capturing while `is_live` so a weather-suspended match —
+  FIFA `MatchStatus 11` — is captured to its real finish instead of being cut off at kickoff+210min;
+  `clear_stuck_live` backstop decoupled to `@abandon_min`=360) **+ `predictex-iy1`** (FIFA-capture result
+  fallback: `ResultSync` settles a played **group** fixture provisionally from the captured FIFA finished
+  frame `MatchStatus 0` when openfootball lags — `Predictex.Results.FifaFallback`; plus an `Ingest`
+  no-downgrade guard so a `:completed` fixture never reverts to `:scheduled` via a no-result sync,
+  killing the revert flicker. Both closed. Spec/plan: `docs/superpowers/{specs,plans}/2026-06-23-iy1-*`).
+  ⚠️ France v Iraq was settled manually 3-0 (admin override) before the fallback shipped — openfootball
+  still has no result for it; the fallback covers matches going forward (its finished frame needs the ius
+  capture fix, which this same tag deploys).
+- **Prior deployed tag:** `v0.11.10` (deployed + verified 2026-06-20: Deploy success, migration
   `AddSourceNumToFixtures` applied in prod, `/health` 200, anon `/` 200) — bundles **`9p0`** (closed:
   `/predictions` live updates via the coarse `Tournament` `"fixtures:changed"` PubSub topic, 30s poll
   removed) **+ `g8m`** (KO fixtures now key on openfootball's stable `num` so a knockout's teams resolve
