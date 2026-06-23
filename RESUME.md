@@ -12,7 +12,17 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.13` (deployed + verified 2026-06-23: Deploy success, no migration,
+- **Latest deployed tag:** `v0.11.14` (deployed + verified 2026-06-23: Deploy success, no migration,
+  `/health` 200, anon `/` 200, `Workers.KnockoutIds`/`Crosswalk.slot_key` live, KO coverage `0/32`
+  pending FIFA bracket) — **`predictex-hco` WS1**: self-arming knockout `fifa_match_id` backfill.
+  `Workers.KnockoutIds` (cron `*/10`) stop-before-fetch → fetch `rounds.json` + `LiveIds.assign` the
+  moment FIFA publishes the bracket; `LiveIds.plan` skip-already-assigned + a KO-only date+time **slot
+  fallback** (`Crosswalk.slot_key`, proxy-verified to the minute on all 72 group matches) robust to
+  openfootball team-resolution lag; group stays name-join. **WS1 verifies on 28 Jun** (KO rounds populate
+  → worker assigns → `32/32` → first KO captured through ET/pens, `is_live` clears). `g8m` closed (no-dup
+  verified at partial bracket resolution). **▶ Next KO item:** `predictex-cij` (P3, per-fixture live/recap
+  gate within an open KO round); `predictex-i9k` (xox KO import + first-scorer).
+- **Prior deployed tag:** `v0.11.13` (deployed + verified 2026-06-23: Deploy success, no migration,
   `/health` 200, anon `/` 200, new code live in prod) — bundles **`predictex-ius`** (weather-proof live
   capture: `Workers.LiveScoreSync` keeps capturing while `is_live` so a weather-suspended match —
   FIFA `MatchStatus 11` — is captured to its real finish instead of being cut off at kickoff+210min;
