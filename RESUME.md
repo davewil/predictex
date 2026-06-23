@@ -79,10 +79,22 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-23, end of session)
+## ⏵ Continue here (2026-06-23, laptop handoff)
 
-Everything below is **DEPLOYED and live as `v0.11.14`** (see "Live right now"). Branch up to date with
-origin. The next pivotal date is **28 Jun (R32 starts)** — three things verify themselves then.
+Deployed tag is still **`v0.11.14`** (see "Live right now") — **nothing deployed this session.** `main` is
+pushed and up to date with origin, **4 commits ahead of the v0.11.14 tag** (all test/docs/tooling, no prod
+change, so no redeploy needed): `e385da9` 28-Jun cutover regression test · `506aa8d` `c9s` flags golden-file
+snapshot · `368e6d6` ADR 0001 · `f7c577d` `dmh` async-safety. The next pivotal date is **28 Jun (R32 starts)** —
+the KO-cutover items verify themselves then.
+
+> ✅ **Resolved this session — the R32 "read-only" screenshot is correct-by-design, not a bug.** `/predictions`
+> gates the editable native KO form on `editable_round?/1 → Tournament.round_open?/1`, and a knockout round
+> opens only when its predecessor is fully `:completed` (`round_complete?/1`). R32's predecessor is the last
+> group round, still mid-flight, so R32 correctly shows the read-only FIFA-import grid; the native form unlocks
+> automatically when the group stage ends. The 28-Jun cutover (read-only→editable flip) is now **CI-proven**
+> by the new regression test (`e385da9`) — it drives the real `settle → broadcast_change → round_open? flips`
+> chain. So "verify native R32 entry renders" is no longer a live-discovery risk; only the FIFA-side pieces
+> (`hco` WS1 `32/32`, first-KO capture) still need a real 28-Jun eyeball.
 
 ### ★ NEXT SESSION — the 28 Jun knockout cutover
 - **`predictex-hco` WS1 (deployed v0.11.14) — VERIFY on 28 Jun.** `Workers.KnockoutIds` (cron `*/10`) self-arms:
@@ -98,7 +110,29 @@ origin. The next pivotal date is **28 Jun (R32 starts)** — three things verify
   and the deferred player-picker (squad rosters ABSENT pre-match — needs a squad-endpoint spike or free-text
   fallback; regulation goals = `Period∈{3,5}`, `Period 10`=finished-regulation, ET period values UNKNOWN until 28 Jun).
 
-### ★ SHIPPED THIS SESSION (2026-06-23) — all deployed + verified live
+### ★ SHIPPED THIS SESSION (2026-06-23) — laptop-handoff batch (committed + pushed, NOT deployed)
+- **28-Jun cutover regression test** (`e385da9`) — drives the read-only→editable KO flip in CI (settle last
+  group fixture → `broadcast_change` → `round_open?` flips → editable form renders + saves). Converts the
+  "eyeball it live on match day" risk into a CI invariant. See the ✅ note in "Continue here".
+- **`predictex-c9s` CLOSED** (`506aa8d`) — `PredictexWeb.Flags` golden-file regression. Frozen snapshot of the
+  openfootball 2026 feed's distinct team-name set (`test/support/fixtures/openfootball/team_names_2026.txt`,
+  109 strings @ 2026-06-23) + `flags_snapshot_test.exs` asserting Flags ≡ the feed's 48 real nations exactly
+  (coverage + no-stale) and every placeholder → ⚽. Mutation-verified. Regen via `curl|jq` documented in the
+  test moduledoc (the stand-in for the live-feed fetch CI can't do).
+- **`predictex-dmh` CLOSED** (`f7c577d`) — async-safety review done; `fixture_live`/`leaderboard`/`my_predictions`
+  now `async: true`. **Two root causes** (not the bead's single guess): (1) `Replay.Cache` singleton GenServer
+  reads the Repo in its own process → `Sandbox.allow/3` in the replay setup; (2) `rounds.ordinal` unique-index
+  **deadlock** (40P01) — `live_ids_test` inserted KO-ordinal-4 before group-ordinal-1 while others go ascending
+  → lock cycle. Fixed by ascending order; the **suite-wide "create rounds ascending" invariant is documented in
+  `DataCase.setup_sandbox`**. This was the real "intermittent flake" behind the `Postgrex disconnected` noise
+  (that log line itself is **known-benign** sandbox teardown). Verified 0/20 full-suite runs.
+- **ADR 0001 added** (`368e6d6`) — `docs/adr/0001-capture-worker-deployment-isolation.md` (first ADR; status
+  **Deferred**). Records the curiosity-driven design: why multi-node is the wrong fix for deploy-mid-capture
+  frame-loss, and the proportionate direction (one-image/two-role worker split + Postgres LISTEN/NOTIFY PubSub,
+  with `4ya` capture durability as the complementary unplanned-restart fix). Trigger to revisit: post-28-Jun +
+  recurring deploy friction. Cross-linked from `4ya`.
+
+### ★ SHIPPED EARLIER (2026-06-23) — all deployed + verified live
 - **Architecture review COMPLETE** (`improve-codebase-architecture`): **#4** prediction-intake boundary
   (`Predictions.parse_pick_rows/2`+`validate_pick_rows/1`, `47fc15c`), **#3** single ranking snapshot
   (`Standings.snapshot/0`, ~11 board loads/event→1, `277142c`), **#1** shared pure ranking core
@@ -195,7 +229,8 @@ bracket resolution. Next session picks from the backlog below.
 of truth. Headline: everything is deployed (`v0.11.14`); the **28 Jun knockout cutover** is the focus (verify
 `hco` WS1 self-arms `32/32` + first-KO capture; verify Phase 1 native R32 entry renders). Backlog below.
 
-**Recently CLOSED:** `g8m` (KO no-dup, 2026-06-23) · `ius`/`iy1` (weather capture + result fallback, v0.11.13) ·
+**Recently CLOSED:** `c9s` (flags golden-file snapshot, 2026-06-23) · `dmh` (async-safety / 2 root causes,
+2026-06-23) · `g8m` (KO no-dup, 2026-06-23) · `ius`/`iy1` (weather capture + result fallback, v0.11.13) ·
 `kcx`/`i1s`/`p4o` (2026-06-22). Specs/plans under `docs/superpowers/` if detail is needed.
 
 1. **`predictex-hco` (P2, IN PROGRESS) — WS1 BUILT + DEPLOYED (v0.11.14), self-arming.** `Workers.KnockoutIds`
@@ -204,9 +239,9 @@ of truth. Headline: everything is deployed (`v0.11.14`); the **28 Jun knockout c
    through ET/pens, `is_live` clears → close `hco`.
 
 2. **Other backlog (`bd ready`):** `cij`/`i9k` (KO Phase 2), `0ft` (memoize ranking in snapshot), `4ez`
-   (per-fixture points + risky banner on FixtureCard), `a4j` (cache `Standings.leaderboard/0`), `c9s` (team-name
-   snapshot + regression test), `dmh` (ConnCase async-safety — suite has known intermittent flakes), `bl8`
-   (Live.Updater rescue), `uyf` (P4, knockout-ET goal filtering — gated on `hco`).
+   (per-fixture points + risky banner on FixtureCard), `a4j` (cache `Standings.leaderboard/0`), `bl8`
+   (Live.Updater rescue), `l3n` (rfm capture polish), `uyf` (P4, knockout-ET goal filtering — gated on `hco`),
+   `4ya` (P4, capture durability — see ADR 0001), `3kv`/`4ez`/perf items. (`c9s` + `dmh` CLOSED this session.)
 
 **Workflow rule (this session, durable):** commit autonomously when green; **push and tag/push (deploy) are
 the user's explicit call** — never auto-push. Authoritative in CLAUDE.md → "Conventions & Patterns → Commit
@@ -257,7 +292,9 @@ AND compiles warning-clean on Oban 2.23). Two-writer rule: FIFA drives `live_*`,
 - Elixir **1.20.1** / OTP **28** via **mise** (`.mise.toml`). **Always run `mise exec -- mix …`** — plain `mix` is the wrong version.
 - Phoenix **1.8.8**, Ecto/Postgres, `phx.gen.auth` (password), Bcrypt, StreamData.
 - Local Postgres: `postgres/postgres` superuser; dev DB `predictex_dev`, test `predictex_test`.
-- **494 tests** green (incl. 7 property laws). **The gate is `mix precommit`** (compile --warnings-as-errors,
+- **499 tests** green (492 tests + 7 property laws). The 3 ConnCase live-test files now run `async: true`
+  (`dmh`); when a test creates multiple rounds, insert them **ascending by `:ordinal`** (deadlock invariant,
+  documented in `DataCase.setup_sandbox`). **The gate is `mix precommit`** (compile --warnings-as-errors,
   deps.unlock --check-unused, format --check-formatted, **credo --strict**, test) — run on every Elixir commit
   by lefthook and by CI's Quality job (CI also runs `sobelow`). Single source = the `precommit` alias in
   mix.exs; tuning in `.credo.exs`/`.sobelow-skips`. Details: CLAUDE.md "Build & Test". Never `--no-verify`.
@@ -398,6 +435,8 @@ playability unlock** — admins can now enter predictions on behalf of players. 
 - Known debt: `unconfirmed_player_fixture` + magic-link tests exercise an unreachable state (tied to dormant email) — clean up when the email epic lands. Real-browser auth click-through not yet done.
 
 ## Docs map
+- `docs/adr/0001-capture-worker-deployment-isolation.md` — **first ADR** (status Deferred): deploy-mid-capture
+  isolation — why not multi-node, the one-image/two-role worker split + Postgres-PubSub direction, relation to `4ya`.
 - `CONTEXT.md` (repo root) — **domain glossary** (created during the architecture review): pick row,
   prediction-intake boundary, ranking snapshot, buzz, scenario + core terms. The `improve-codebase-architecture`
   grilling loop reads + extends it.
