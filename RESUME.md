@@ -116,6 +116,46 @@ safety confirmed clear before each tag). `main` is pushed and up to date with or
 
 The next pivotal date is still **28 Jun (R32 starts)** — the KO-cutover items verify themselves then.
 
+### ★ ACTIVE THREAD (cross-machine handoff 2026-06-24) — "go fully native in-app for the knockouts" (`predictex-2ww`)
+
+**Status: brainstorm just started, then paused to transfer machines. No code written; nothing stranded — `main`
+is pushed + up to date with origin, so a `git pull` on the other machine has everything. (`.remember/` is
+**gitignored**, so this RESUME block is the handoff — don't look for context in `.remember`.) Resume by picking
+a sub-goal below.**
+
+**The trigger:** user observed "I'm not seeing the ability to enter predictions." **Diagnosis (confirmed in
+code, not a bug):** native KO entry is already BUILT + DEPLOYED (Phase 1) but **gated invisible until ~28 Jun.**
+- `/predictions` renders the editable native form only via `editable_round?/1` (`my_predictions_live.ex:377`),
+  which is true **only** for `stage: :knockout` rounds where `Tournament.round_open?/1` holds.
+- `round_open?/1` (`tournament.ex:45`) requires the **predecessor round fully `:completed`**
+  (`round_complete?/1` = every fixture in it `:completed`).
+- It's 24 Jun, group stage still running → no KO round open → even selecting the **R32 tab** shows the read-only
+  grid. Group rounds are read-only by design (FIFA-import). **Net: right now NO member can natively enter a
+  pick anywhere**; the R32 form auto-appears when the last group match settles (~28 Jun).
+
+**What already exists (don't re-design):**
+- Spec (advisor-reviewed, locked decisions): `docs/superpowers/specs/2026-06-22-knockout-game-native-predictions-design.md`
+- Phase 1 plan: `docs/superpowers/plans/2026-06-22-knockout-game-phase1-foundation.md`;
+  FIFA-feed spike: `docs/superpowers/research/2026-06-22-knockout-fifa-feed-spike.md`
+- Phase 1 SHIPPED + deployed: editable `/predictions` for the open KO round (scoreline + first-team + booster),
+  knockout-only re-based board (`Standings.knockout_leaderboard/0`) + Overall/Knockout toggle on `/`,
+  lockout-aware `save_round_predictions/4` with the out-of-round/locked write-auth seam.
+- Locked scope decision: **group stage stays frozen/FIFA-import**; native entry is **knockout-only (R32+)**.
+
+**Phase 2 gaps (open beads):** `cij` (per-fixture live/recap gate *within* an open round — today it's a uniform
+input grid even for already-kicked-off KO fixtures; write is safe, cosmetic), `i9k` (KO first-scorer import),
+deferred **player-picker** (spike verdict: squad rosters ABSENT pre-match from FIFA `/detail` → needs a
+dedicated squad-endpoint spike or a free-text fallback; scoring already gates the first-player component).
+
+**DECISION PENDING — pick one to resume (this was the unanswered brainstorm question):**
+- **(a) Make native KO entry testable NOW** (before 28 Jun) — a preview path / seed test data / or rethink the
+  gate, so it's verified before match day instead of discovered live. *Directly addresses the "can't see entry" pain.*
+- **(b) Build the Phase 2 gaps** — `cij` per-fixture gate, then `i9k` / player-picker. Design exists; execution.
+- **(c) Reconsider the gate/UX** — should R32 open as soon as the bracket is known rather than at full group
+  completion? A design conversation about the entry model itself.
+- Resume protocol: re-invoke the brainstorming skill (it was active when paused) once a sub-goal is chosen, OR
+  go straight to `writing-plans` for (b) since its design is already locked.
+
 > ✅ **Resolved this session — the R32 "read-only" screenshot is correct-by-design, not a bug.** `/predictions`
 > gates the editable native KO form on `editable_round?/1 → Tournament.round_open?/1`, and a knockout round
 > opens only when its predecessor is fully `:completed` (`round_complete?/1`). R32's predecessor is the last
