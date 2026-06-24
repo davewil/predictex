@@ -12,7 +12,18 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.14` (deployed + verified 2026-06-23: Deploy success, no migration,
+- **Latest deployed tag:** `v0.11.15` (deployed + verified 2026-06-24: Deploy success, no migration,
+  `/health` 200, anon `/` 200) — **`predictex-4ez` (CLOSED)**: per-fixture scoring breakdown chips +
+  risky-pick banner on the FixtureCard. `Scoring.score/3` already exposed `:components`; `Dashboard.build/4`
+  was projecting it down to just `fixture_total` at the boundary — now it carries the full `result` through
+  `fixture_view`, which derives `breakdown` (non-zero scoring lines as labelled+toned chips in the canonical
+  scoring-legend order) + `risky_pct` (cohort share of the predicted winner that fired the risky bonus, read
+  from the same integer field `Scoring` used). `fixture_card/1` renders the chips + a "Risky pick paid off —
+  only N% backed it" banner. **Booster reconciliation:** chips stay BASE values (matching the static legend)
+  and a `×2` badge bridges to the doubled headline `points`. code-reviewer APPROVED; 507 tests. ⚠️ Chips +
+  banner show on the **auth-gated `/predictions` for SETTLED fixtures only** — eyeball one real settled
+  fixture to confirm render.
+- **Prior deployed tag:** `v0.11.14` (deployed + verified 2026-06-23: Deploy success, no migration,
   `/health` 200, anon `/` 200, `Workers.KnockoutIds`/`Crosswalk.slot_key` live, KO coverage `0/32`
   pending FIFA bracket) — **`predictex-hco` WS1**: self-arming knockout `fifa_match_id` backfill.
   `Workers.KnockoutIds` (cron `*/10`) stop-before-fetch → fetch `rounds.json` + `LiveIds.assign` the
@@ -79,13 +90,14 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-23, laptop handoff)
+## ⏵ Continue here (2026-06-24)
 
-Deployed tag is still **`v0.11.14`** (see "Live right now") — **nothing deployed this session.** `main` is
-pushed and up to date with origin, **4 commits ahead of the v0.11.14 tag** (all test/docs/tooling, no prod
-change, so no redeploy needed): `e385da9` 28-Jun cutover regression test · `506aa8d` `c9s` flags golden-file
-snapshot · `368e6d6` ADR 0001 · `f7c577d` `dmh` async-safety. The next pivotal date is **28 Jun (R32 starts)** —
-the KO-cutover items verify themselves then.
+Deployed tag is **`v0.11.15`** (see "Live right now") — **shipped `predictex-4ez` this session** (per-fixture
+scoring breakdown + risky banner on the FixtureCard). `main` is pushed and up to date with origin; the tag
+deployed clean (Deploy success, no migration, `/health` 200, anon `/` 200, verified 16:38 UTC; pre-deploy gate
+green; live-match safety confirmed clear before tagging). **One eyeball left for 4ez:** confirm the breakdown
+chips + risky banner render on the auth-gated `/predictions` for a real SETTLED fixture (CI can't cover the
+authed render). The next pivotal date is still **28 Jun (R32 starts)** — the KO-cutover items verify themselves then.
 
 > ✅ **Resolved this session — the R32 "read-only" screenshot is correct-by-design, not a bug.** `/predictions`
 > gates the editable native KO form on `editable_round?/1 → Tournament.round_open?/1`, and a knockout round
@@ -226,10 +238,11 @@ bracket resolution. Next session picks from the backlog below.
     Cards remain in `predictex-bdq`.
 
 **▶ NEXT — start here next session:** see the **"⏵ Continue here"** block at the top — it's the current source
-of truth. Headline: everything is deployed (`v0.11.14`); the **28 Jun knockout cutover** is the focus (verify
+of truth. Headline: everything is deployed (`v0.11.15`); the **28 Jun knockout cutover** is the focus (verify
 `hco` WS1 self-arms `32/32` + first-KO capture; verify Phase 1 native R32 entry renders). Backlog below.
 
-**Recently CLOSED:** `c9s` (flags golden-file snapshot, 2026-06-23) · `dmh` (async-safety / 2 root causes,
+**Recently CLOSED:** `4ez` (per-fixture breakdown + risky banner, deployed v0.11.15 2026-06-24) ·
+`c9s` (flags golden-file snapshot, 2026-06-23) · `dmh` (async-safety / 2 root causes,
 2026-06-23) · `g8m` (KO no-dup, 2026-06-23) · `ius`/`iy1` (weather capture + result fallback, v0.11.13) ·
 `kcx`/`i1s`/`p4o` (2026-06-22). Specs/plans under `docs/superpowers/` if detail is needed.
 
@@ -238,10 +251,10 @@ of truth. Headline: everything is deployed (`v0.11.14`); the **28 Jun knockout c
    slot fallback). WS2/WS3 ✅; `g8m` closed. **Verify on 28 Jun:** `KO fifa_match_id: 32/32` then first-KO capture
    through ET/pens, `is_live` clears → close `hco`.
 
-2. **Other backlog (`bd ready`):** `cij`/`i9k` (KO Phase 2), `0ft` (memoize ranking in snapshot), `4ez`
-   (per-fixture points + risky banner on FixtureCard), `a4j` (cache `Standings.leaderboard/0`), `bl8`
-   (Live.Updater rescue), `l3n` (rfm capture polish), `uyf` (P4, knockout-ET goal filtering — gated on `hco`),
-   `4ya` (P4, capture durability — see ADR 0001), `3kv`/`4ez`/perf items. (`c9s` + `dmh` CLOSED this session.)
+2. **Other backlog (`bd ready`):** `cij`/`i9k` (KO Phase 2), `0ft` (memoize ranking in snapshot), `a4j`
+   (cache `Standings.leaderboard/0`), `bl8` (Live.Updater rescue), `l3n` (rfm capture polish), `uyf` (P4,
+   knockout-ET goal filtering — gated on `hco`), `4ya` (P4, capture durability — see ADR 0001), `3kv`/perf
+   items. (`4ez` CLOSED + deployed v0.11.15 this session; `c9s` + `dmh` CLOSED previously.)
 
 **Workflow rule (this session, durable):** commit autonomously when green; **push and tag/push (deploy) are
 the user's explicit call** — never auto-push. Authoritative in CLAUDE.md → "Conventions & Patterns → Commit
