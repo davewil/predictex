@@ -298,6 +298,84 @@ defmodule Predictex.PredictionsTest do
     end
   end
 
+  describe "prediction writes broadcast a coarse fixture-change (live dashboards re-pull)" do
+    # The gap predictex-4ez scoping surfaced: only result-settle paths broadcast, so an
+    # admin entering/importing a prediction on an already-completed fixture changed the
+    # standings while open `/predictions` sessions stayed stale. Every successful write
+    # now emits the same coarse `:fixtures_changed` signal the settle path uses (9p0).
+    # assert_received: the broadcast is synchronous on the local node — no async window.
+
+    test "create_prediction broadcasts on success", %{round: round, player: player} do
+      f = fixture!(round)
+      Tournament.subscribe_changes()
+
+      {:ok, _} =
+        Predictions.create_prediction(%{
+          player_id: player.id,
+          fixture_id: f.id,
+          home_goals: 1,
+          away_goals: 0
+        })
+
+      assert_received :fixtures_changed
+    end
+
+    test "create_prediction does NOT broadcast on a failed (locked) write", %{
+      round: round,
+      player: player
+    } do
+      past = DateTime.utc_now() |> DateTime.add(-60, :second) |> DateTime.truncate(:second)
+      f = fixture!(round, %{kickoff_at: past})
+      Tournament.subscribe_changes()
+
+      assert {:error, :locked} =
+               Predictions.create_prediction(%{
+                 player_id: player.id,
+                 fixture_id: f.id,
+                 home_goals: 1,
+                 away_goals: 0
+               })
+
+      refute_received :fixtures_changed
+    end
+
+    test "admin_upsert_prediction broadcasts on success", %{round: round, player: player} do
+      f = fixture!(round)
+      Tournament.subscribe_changes()
+
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: player.id,
+          fixture_id: f.id,
+          home_goals: 2,
+          away_goals: 1
+        })
+
+      assert_received :fixtures_changed
+    end
+
+    test "admin_save_round_predictions broadcasts on success", %{round: round, player: player} do
+      f = fixture!(round)
+      Tournament.subscribe_changes()
+
+      rows = [%{fixture_id: f.id, home_goals: 1, away_goals: 1, booster: false}]
+      assert {:ok, _} = Predictions.admin_save_round_predictions(player.id, round.id, rows)
+
+      assert_received :fixtures_changed
+    end
+
+    test "save_round_predictions broadcasts on success", %{round: round, player: player} do
+      future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+      f = fixture!(round, %{kickoff_at: future})
+      Tournament.subscribe_changes()
+
+      rows = [%{fixture_id: f.id, home_goals: 2, away_goals: 0, booster: false}]
+      assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows)
+
+      assert_received :fixtures_changed
+    end
+  end
+
   describe "get_player_fixture_prediction/2 (anti-copy focused getter)" do
     test "returns the player's own prediction for the fixture", %{round: round, player: player} do
       f = fixture!(round)

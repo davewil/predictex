@@ -11,6 +11,7 @@ defmodule Predictex.Predictions do
 
   alias Predictex.Repo
   alias Predictex.Predictions.Prediction
+  alias Predictex.Tournament
   alias Predictex.Tournament.Fixture
 
   def list_predictions, do: Repo.all(Prediction)
@@ -40,6 +41,7 @@ defmodule Predictex.Predictions do
       |> then(&Prediction.changeset(%Prediction{}, &1))
       |> Repo.insert()
     end
+    |> broadcast_on_success()
   end
 
   @doc """
@@ -80,6 +82,7 @@ defmodule Predictex.Predictions do
       {:error, reason} ->
         {:error, reason}
     end
+    |> broadcast_on_success()
   end
 
   @doc """
@@ -116,6 +119,7 @@ defmodule Predictex.Predictions do
         results
       end
     end)
+    |> broadcast_on_success()
   end
 
   @doc """
@@ -170,6 +174,7 @@ defmodule Predictex.Predictions do
         results
       end
     end)
+    |> broadcast_on_success()
   end
 
   @doc "All players' predictions for one fixture, with the player preloaded (by-fixture admin lens)."
@@ -247,6 +252,19 @@ defmodule Predictex.Predictions do
   end
 
   # --- internals ---
+
+  # A successful prediction write can change the standings (an admin/import write on an
+  # already-completed fixture scores immediately, and any pick changes that player's
+  # dashboard), so emit the same coarse `:fixtures_changed` signal the result-settle paths
+  # use (predictex-9p0) — open `/predictions` sessions re-pull instead of going stale.
+  # Coarse by design: over-broadcasting just costs subscribers a cheap re-pull; missing one
+  # leaves a stale board. Only `{:ok, _}` writes broadcast — failed/locked writes do not.
+  defp broadcast_on_success({:ok, _} = result) do
+    Tournament.broadcast_change()
+    result
+  end
+
+  defp broadcast_on_success(result), do: result
 
   defp fetch_fixture(attrs) do
     case attrs[:fixture_id] || attrs["fixture_id"] do
