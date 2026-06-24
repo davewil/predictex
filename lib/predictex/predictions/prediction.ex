@@ -37,8 +37,8 @@ defmodule Predictex.Predictions.Prediction do
       :round_id
     ])
     |> validate_required([:home_goals, :away_goals, :player_id, :fixture_id, :round_id])
-    |> validate_number(:home_goals, greater_than_or_equal_to: 0)
-    |> validate_number(:away_goals, greater_than_or_equal_to: 0)
+    |> validate_number(:home_goals, greater_than_or_equal_to: 0, less_than_or_equal_to: 9)
+    |> validate_number(:away_goals, greater_than_or_equal_to: 0, less_than_or_equal_to: 9)
     |> assoc_constraint(:player)
     |> assoc_constraint(:fixture)
     |> assoc_constraint(:round)

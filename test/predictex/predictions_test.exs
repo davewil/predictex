@@ -39,6 +39,32 @@ defmodule Predictex.PredictionsTest do
     assert pred.round_id == round.id
   end
 
+  test "rejects a prediction with more than 9 goals", %{round: round, player: player} do
+    f = fixture!(round)
+
+    assert {:error, cs} =
+             Predictions.create_prediction(%{
+               player_id: player.id,
+               fixture_id: f.id,
+               home_goals: 10,
+               away_goals: 0
+             })
+
+    assert %{home_goals: ["must be less than or equal to 9"]} = errors_on(cs)
+  end
+
+  test "accepts boundary goal values 0 and 9", %{round: round, player: player} do
+    f = fixture!(round)
+
+    assert {:ok, _} =
+             Predictions.create_prediction(%{
+               player_id: player.id,
+               fixture_id: f.id,
+               home_goals: 9,
+               away_goals: 0
+             })
+  end
+
   test "only one prediction per player per fixture", %{round: round, player: player} do
     f = fixture!(round)
 

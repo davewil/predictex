@@ -209,98 +209,99 @@ defmodule PredictexWeb.MyPredictionsLive do
           id={"round-entry-#{@active.round.ordinal}"}
           for={%{}}
           phx-submit="save_round"
+          phx-hook=".RoundEntry"
         >
-          <label class="label cursor-pointer gap-2 w-fit mb-2">
-            <span class="text-sm">No booster</span>
-            <input
-              type="radio"
-              class="radio radio-sm"
-              name="booster_fixture_id"
-              value=""
-              checked={Enum.all?(@active.fixtures, fn fx -> !fx.booster? end)}
-            />
-          </label>
-          <div class="space-y-3">
+          <input
+            type="text"
+            class="sr-only"
+            tabindex="-1"
+            aria-hidden="true"
+            name="booster_fixture_id"
+            value={current_booster_id(@active.fixtures)}
+            data-booster-input
+          />
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <div
               :for={fx <- @active.fixtures}
+              data-fixture-card
               class="rounded-box bg-base-100 border border-base-content/10 p-3 shadow"
             >
-              <div class="flex items-center justify-between gap-2 mb-2">
-                <span class="flex items-center gap-1 text-sm font-bold">
-                  {Flags.flag(fx.fixture.team1)} {fx.fixture.team1}
+              <div class="flex items-center justify-between gap-2">
+                <span class="flex items-center gap-1 text-sm font-bold min-w-0">
+                  {Flags.flag(fx.fixture.team1)} <span class="truncate">{fx.fixture.team1}</span>
                 </span>
-                <div class="flex items-center gap-1">
-                  <input
-                    type="number"
-                    min="0"
-                    class="input input-bordered font-score w-16 text-center"
-                    name={"picks[#{fx.fixture.id}][home_goals]"}
-                    value={fx.prediction && fx.prediction.home_goals}
-                    placeholder="—"
-                  />
-                  <span class="text-base-content/40 font-bold">–</span>
-                  <input
-                    type="number"
-                    min="0"
-                    class="input input-bordered font-score w-16 text-center"
-                    name={"picks[#{fx.fixture.id}][away_goals]"}
-                    value={fx.prediction && fx.prediction.away_goals}
-                    placeholder="—"
-                  />
-                </div>
-                <span class="flex items-center gap-1 text-sm font-bold">
-                  {fx.fixture.team2} {Flags.flag(fx.fixture.team2)}
-                </span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  pattern="[0-9]"
+                  maxlength="1"
+                  data-goal-input
+                  class="input input-bordered font-score w-14 text-center shrink-0"
+                  name={"picks[#{fx.fixture.id}][home_goals]"}
+                  value={fx.prediction && fx.prediction.home_goals}
+                  placeholder="—"
+                />
               </div>
-              <div class="flex items-center justify-between gap-4">
-                <fieldset class="flex items-center gap-3 text-xs">
-                  <legend class="text-xs font-semibold text-base-content/60 mr-1">
-                    First scorer
-                  </legend>
-                  <label class="flex items-center gap-1 cursor-pointer">
+              <div class="flex items-center justify-between gap-2 mt-1">
+                <span class="flex items-center gap-1 text-sm font-bold min-w-0">
+                  {Flags.flag(fx.fixture.team2)} <span class="truncate">{fx.fixture.team2}</span>
+                </span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  pattern="[0-9]"
+                  maxlength="1"
+                  data-goal-input
+                  class="input input-bordered font-score w-14 text-center shrink-0"
+                  name={"picks[#{fx.fixture.id}][away_goals]"}
+                  value={fx.prediction && fx.prediction.away_goals}
+                  placeholder="—"
+                />
+              </div>
+              <div class="mt-2 space-y-2 border-t border-base-content/10 pt-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-base-content/60">First scorer</span>
+                  <div class="flex items-center gap-1">
                     <input
-                      type="radio"
-                      class="radio radio-xs"
+                      type="text"
+                      class="sr-only"
+                      tabindex="-1"
+                      aria-hidden="true"
                       name={"picks[#{fx.fixture.id}][first_scorer_side]"}
-                      value="home"
-                      checked={fx.prediction && fx.prediction.first_scorer_side == :home}
+                      value={scorer_value(fx)}
+                      data-scorer-input
                     />
-                    <span>{fx.fixture.team1}</span>
-                  </label>
-                  <label class="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      class="radio radio-xs"
-                      name={"picks[#{fx.fixture.id}][first_scorer_side]"}
-                      value="away"
-                      checked={fx.prediction && fx.prediction.first_scorer_side == :away}
-                    />
-                    <span>{fx.fixture.team2}</span>
-                  </label>
-                  <label class="flex items-center gap-1 cursor-pointer">
-                    <input
-                      type="radio"
-                      class="radio radio-xs"
-                      name={"picks[#{fx.fixture.id}][first_scorer_side]"}
-                      value=""
-                      checked={
-                        is_nil(fx.prediction) or
-                          is_nil(fx.prediction.first_scorer_side)
-                      }
-                    />
-                    <span class="text-base-content/50">None</span>
-                  </label>
-                </fieldset>
-                <label class="flex items-center gap-1 cursor-pointer text-xs">
-                  <input
-                    type="radio"
-                    class="radio radio-xs"
-                    name="booster_fixture_id"
-                    value={fx.fixture.id}
-                    checked={fx.booster?}
-                  />
-                  <span class="font-bold">⚡ Booster</span>
-                </label>
+                    <button
+                      type="button"
+                      data-scorer-btn
+                      data-side="home"
+                      aria-pressed={to_string(scorer_pressed?(fx, :home))}
+                      title={"First scorer: #{fx.fixture.team1}"}
+                      class={"min-w-11 #{toggle_btn_class(scorer_pressed?(fx, :home))}"}
+                    >
+                      {Flags.flag(fx.fixture.team1)}
+                    </button>
+                    <button
+                      type="button"
+                      data-scorer-btn
+                      data-side="away"
+                      aria-pressed={to_string(scorer_pressed?(fx, :away))}
+                      title={"First scorer: #{fx.fixture.team2}"}
+                      class={"min-w-11 #{toggle_btn_class(scorer_pressed?(fx, :away))}"}
+                    >
+                      {Flags.flag(fx.fixture.team2)}
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  data-booster-btn
+                  data-fixture={fx.fixture.id}
+                  aria-pressed={to_string(fx.booster?)}
+                  class={"w-full #{toggle_btn_class(fx.booster?)}"}
+                >
+                  ⚡ Booster
+                </button>
               </div>
             </div>
           </div>
@@ -364,6 +365,82 @@ defmodule PredictexWeb.MyPredictionsLive do
           }
         }
       </script>
+
+      <script :type={Phoenix.LiveView.ColocatedHook} name=".RoundEntry">
+        export default {
+          goalInputs() {
+            return Array.from(this.el.querySelectorAll("[data-goal-input]"))
+          },
+          setPressed(btn, on) {
+            btn.setAttribute("aria-pressed", on ? "true" : "false")
+            btn.classList.toggle("btn-primary", on)
+            btn.classList.toggle("btn-ghost", !on)
+          },
+          // First scorer: re-tap the lit flag clears to None; tapping a side is exclusive within the card.
+          toggleScorer(btn) {
+            const card = btn.closest("[data-fixture-card]")
+            const input = card.querySelector("[data-scorer-input]")
+            const wasOn = input.value === btn.dataset.side
+            card.querySelectorAll("[data-scorer-btn]").forEach((b) => this.setPressed(b, false))
+            input.value = wasOn ? "" : btn.dataset.side
+            if (!wasOn) this.setPressed(btn, true)
+          },
+          // Booster: round-exclusive — turning one on clears the rest; re-tap turns it off.
+          toggleBooster(btn) {
+            const input = this.el.querySelector("[data-booster-input]")
+            const wasOn = input.value === btn.dataset.fixture
+            this.el.querySelectorAll("[data-booster-btn]").forEach((b) => this.setPressed(b, false))
+            input.value = wasOn ? "" : btn.dataset.fixture
+            if (!wasOn) this.setPressed(btn, true)
+          },
+          focusRel(el, offset) {
+            const inputs = this.goalInputs()
+            const target = inputs[inputs.indexOf(el) + offset]
+            if (target) { target.focus(); target.select() }
+          },
+          mounted() {
+            // Auto-focus the first box on desktop (fine pointer). On touch we skip it
+            // so the on-screen keyboard doesn't spring up the moment the tab opens.
+            const fine = window.matchMedia && window.matchMedia("(pointer: fine)").matches
+            if (fine) {
+              const first = this.el.querySelector("[data-goal-input]")
+              if (first) first.focus()
+            }
+
+            this.el.addEventListener("input", (e) => {
+              const el = e.target
+              if (!el.matches || !el.matches("[data-goal-input]")) return
+              const deleting = e.inputType && e.inputType.startsWith("delete")
+              // Keep only the last digit typed (0-9); strip anything else.
+              el.value = el.value.replace(/[^0-9]/g, "").slice(-1)
+              if (el.value) {
+                this.focusRel(el, +1)
+              } else if (deleting) {
+                // A digit was deleted (mobile-reliable: keydown Backspace is flaky on
+                // virtual keyboards) — step back so corrections keep flowing.
+                this.focusRel(el, -1)
+              }
+            })
+
+            this.el.addEventListener("keydown", (e) => {
+              const el = e.target
+              if (!el.matches || !el.matches("[data-goal-input]")) return
+              // Backspace on an already-empty box steps back to the previous goal box.
+              if (e.key === "Backspace" && el.value === "") {
+                e.preventDefault()
+                this.focusRel(el, -1)
+              }
+            })
+
+            this.el.addEventListener("click", (e) => {
+              const scorer = e.target.closest("[data-scorer-btn]")
+              if (scorer) { this.toggleScorer(scorer); return }
+              const booster = e.target.closest("[data-booster-btn]")
+              if (booster) { this.toggleBooster(booster) }
+            })
+          }
+        }
+      </script>
     </Layouts.app>
     """
   end
@@ -378,6 +455,26 @@ defmodule PredictexWeb.MyPredictionsLive do
     do: Tournament.round_open?(round)
 
   defp editable_round?(_), do: false
+
+  # --- native KO entry: toggle-button state (the JS hook drives these from the rendered values) ---
+
+  # The single round-wide booster target: the id of the fixture currently boosted, or "" for none.
+  defp current_booster_id(fixtures) do
+    case Enum.find(fixtures, & &1.booster?) do
+      nil -> ""
+      fx -> fx.fixture.id
+    end
+  end
+
+  defp scorer_value(%{prediction: %{first_scorer_side: :home}}), do: "home"
+  defp scorer_value(%{prediction: %{first_scorer_side: :away}}), do: "away"
+  defp scorer_value(_fx), do: ""
+
+  defp scorer_pressed?(fx, side), do: scorer_value(fx) == Atom.to_string(side)
+
+  # min-h-11 = 44px, the recommended minimum touch target.
+  defp toggle_btn_class(true), do: "btn btn-sm min-h-11 btn-primary"
+  defp toggle_btn_class(false), do: "btn btn-sm min-h-11 btn-ghost border border-base-content/20"
 
   defp ordinal(nil), do: "—"
   defp ordinal(n) when n in [11, 12, 13], do: "#{n}th"
