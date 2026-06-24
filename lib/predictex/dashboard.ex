@@ -44,10 +44,10 @@ defmodule Predictex.Dashboard do
   def build(rounds, predictions_by_fixture, standing, now) do
     entry = standing.entry
 
-    {points_by_fixture, bonus_by_round} =
+    {results_by_fixture, bonus_by_round} =
       case entry do
         nil -> {%{}, %{}}
-        e -> {Map.new(e.breakdown, &{&1.fixture_id, &1.result.fixture_total}), e.bonus_by_round}
+        e -> {Map.new(e.breakdown, &{&1.fixture_id, &1.result}), e.bonus_by_round}
       end
 
     {total, fixtures_total, round_bonus_total} =
@@ -66,7 +66,7 @@ defmodule Predictex.Dashboard do
           fixtures:
             Enum.map(
               round.fixtures,
-              &fixture_view(&1, predictions_by_fixture, points_by_fixture, now)
+              &fixture_view(&1, predictions_by_fixture, results_by_fixture, now)
             )
         }
       end)
@@ -134,19 +134,57 @@ defmodule Predictex.Dashboard do
     end
   end
 
-  defp fixture_view(fixture, predictions_by_fixture, points_by_fixture, now) do
+  defp fixture_view(fixture, predictions_by_fixture, results_by_fixture, now) do
     prediction = Map.get(predictions_by_fixture, fixture.id)
+    result = Map.get(results_by_fixture, fixture.id)
 
     %{
       fixture: fixture,
       prediction: prediction,
       status: fixture.status,
       locked?: Predictions.locked?(fixture, now),
-      points: Map.get(points_by_fixture, fixture.id),
+      points: result && result.fixture_total,
+      breakdown: result && breakdown_chips(result.components),
+      risky_pct: result && risky_pct(result.components, prediction, fixture),
       booster?: prediction != nil and prediction.booster == true,
       exact?: exact?(prediction, fixture)
     }
   end
+
+  # The per-fixture scoring breakdown (predictex-4ez): each scoring line that earned
+  # points, as a labelled+toned chip in the canonical order of the scoring legend.
+  # Tones mirror `PredictexWeb.PredictexComponents` (`scoring_legend/1`). On a boosted
+  # fixture these are the *base* values — the headline `points` is doubled, so the UI
+  # surfaces the `×2` via `booster?` rather than scaling each chip.
+  @breakdown_spec [
+    {:correct_outcome, "Outcome", "success"},
+    {:correct_home_goals, "Home", "success"},
+    {:correct_away_goals, "Away", "success"},
+    {:correct_goal_difference, "GD", "success"},
+    {:correct_score_bonus, "Exact", "accent"},
+    {:risky_bonus, "Risky", "accent"},
+    {:first_team_to_score, "First team", "info"},
+    {:first_player_to_score, "First scorer", "info"}
+  ]
+
+  defp breakdown_chips(components) do
+    for {key, label, tone} <- @breakdown_spec,
+        pts = Map.fetch!(components, key),
+        pts > 0,
+        do: %{label: label, pts: pts, tone: tone}
+  end
+
+  # When the risky bonus fired, the predicted winner is unambiguous (risky never fires
+  # on a draw) and that side's cohort share is guaranteed a number (`Scoring` required
+  # `is_number(cohort) and cohort < 20`). Read the same integer field `Scoring` used so
+  # the displayed N is exactly the value that triggered the bonus. nil otherwise.
+  defp risky_pct(%{risky_bonus: rb}, prediction, fixture) when rb > 0 do
+    if prediction.home_goals > prediction.away_goals,
+      do: fixture.cohort_home_pct,
+      else: fixture.cohort_away_pct
+  end
+
+  defp risky_pct(_components, _prediction, _fixture), do: nil
 
   defp exact?(nil, _fixture), do: false
   defp exact?(_prediction, %{status: status}) when status != :completed, do: false

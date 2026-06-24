@@ -19,6 +19,24 @@ defmodule Predictex.DashboardTest do
   defp build_dash(rounds),
     do: Dashboard.build(rounds, %{}, %{entry: nil, rank: 1, of: 1}, ~U[2026-06-15 12:00:00Z])
 
+  # A `Scoring.score/3`-shaped components map — production always sets every key,
+  # so test doubles must too (CLAUDE.md: test fixtures stay honest to the contract).
+  defp components(overrides) do
+    Map.merge(
+      %{
+        correct_outcome: 0,
+        correct_home_goals: 0,
+        correct_away_goals: 0,
+        correct_goal_difference: 0,
+        correct_score_bonus: 0,
+        risky_bonus: 0,
+        first_team_to_score: 0,
+        first_player_to_score: 0
+      },
+      overrides
+    )
+  end
+
   test "build assembles per-fixture view and takes points/total/rank from the standings entry" do
     now = ~U[2026-06-15 12:00:00Z]
 
@@ -65,7 +83,24 @@ defmodule Predictex.DashboardTest do
       fixtures_total: 50,
       round_bonus_total: 20,
       bonus_by_round: %{1 => 20},
-      breakdown: [%{ordinal: 1, fixture_id: 1, result: %{fixture_total: 50}}]
+      breakdown: [
+        %{
+          ordinal: 1,
+          fixture_id: 1,
+          result: %{
+            fixture_total: 60,
+            booster: true,
+            components:
+              components(%{
+                correct_outcome: 10,
+                correct_home_goals: 5,
+                correct_away_goals: 5,
+                correct_goal_difference: 5,
+                correct_score_bonus: 5
+              })
+          }
+        }
+      ]
     }
 
     view = Dashboard.build(rounds, preds, %{entry: entry, rank: 9, of: 14}, now)
@@ -77,9 +112,155 @@ defmodule Predictex.DashboardTest do
     assert r1.active? and r1.round_bonus == 20
     [fc, fl, fo] = r1.fixtures
 
-    assert fc.points == 50 and fc.booster? and fc.exact?
+    assert fc.points == 60 and fc.booster? and fc.exact?
     assert fl.locked? and fl.points == nil and fl.prediction
     assert fo.prediction == nil and fo.locked? == false
+  end
+
+  describe "per-fixture scoring breakdown" do
+    defp entry_with(breakdown),
+      do: %{
+        player_id: 7,
+        name: "Dave",
+        total: 0,
+        fixtures_total: 0,
+        round_bonus_total: 0,
+        bonus_by_round: %{},
+        breakdown: breakdown
+      }
+
+    defp scored_round(fixture, prediction, result) do
+      rounds = [round_with(1, :group, [fixture])]
+      preds = %{fixture.id => prediction}
+      entry = entry_with([%{ordinal: 1, fixture_id: fixture.id, result: result}])
+
+      view =
+        Dashboard.build(rounds, preds, %{entry: entry, rank: 1, of: 1}, ~U[2026-06-15 12:00:00Z])
+
+      hd(hd(view.rounds).fixtures)
+    end
+
+    test "surfaces non-zero components as labelled, toned chips in canonical order" do
+      fixture = %Fixture{
+        id: 1,
+        round_id: 1,
+        team1: "Mexico",
+        team2: "Poland",
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1,
+        kickoff_at: dt(-3600)
+      }
+
+      pred = %Prediction{fixture_id: 1, home_goals: 1, away_goals: 0, booster: false}
+
+      # correct away/home win outcome + goal difference, but wrong scoreline → no exact
+      result = %{
+        fixture_total: 15,
+        booster: false,
+        components: components(%{correct_outcome: 10, correct_goal_difference: 5})
+      }
+
+      fv = scored_round(fixture, pred, result)
+
+      assert fv.breakdown == [
+               %{label: "Outcome", pts: 10, tone: "success"},
+               %{label: "GD", pts: 5, tone: "success"}
+             ]
+
+      assert fv.points == 15
+      refute fv.booster?
+      assert fv.risky_pct == nil
+    end
+
+    test "risky_pct reads the cohort share of the predicted winning side that triggered the bonus" do
+      fixture = %Fixture{
+        id: 1,
+        round_id: 1,
+        team1: "Morocco",
+        team2: "Spain",
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0,
+        cohort_home_pct: 12,
+        cohort_away_pct: 81,
+        kickoff_at: dt(-3600)
+      }
+
+      # predicted Morocco (home) to win — the underdog side
+      pred = %Prediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: false}
+
+      result = %{
+        fixture_total: 25,
+        booster: false,
+        components:
+          components(%{correct_outcome: 10, correct_goal_difference: 5, risky_bonus: 10})
+      }
+
+      fv = scored_round(fixture, pred, result)
+
+      assert %{label: "Risky", pts: 10, tone: "accent"} in fv.breakdown
+      assert fv.risky_pct == 12
+    end
+
+    test "boosted fixture keeps base components — the headline points are doubled (reconciles via booster?)" do
+      fixture = %Fixture{
+        id: 1,
+        round_id: 1,
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1,
+        kickoff_at: dt(-3600)
+      }
+
+      pred = %Prediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: true}
+
+      result = %{
+        fixture_total: 60,
+        booster: true,
+        components:
+          components(%{
+            correct_outcome: 10,
+            correct_home_goals: 5,
+            correct_away_goals: 5,
+            correct_goal_difference: 5,
+            correct_score_bonus: 5
+          })
+      }
+
+      fv = scored_round(fixture, pred, result)
+
+      # chips sum to the BASE (30); points is the doubled headline (60); booster? lets the UI show ×2
+      assert Enum.sum(Enum.map(fv.breakdown, & &1.pts)) == 30
+      assert fv.points == 60
+      assert fv.booster?
+    end
+
+    test "breakdown is nil when the fixture has no scored result yet" do
+      fixture = %Fixture{
+        id: 1,
+        round_id: 1,
+        status: :scheduled,
+        kickoff_at: dt(3600)
+      }
+
+      pred = %Prediction{fixture_id: 1, home_goals: 1, away_goals: 1, booster: false}
+      rounds = [round_with(1, :group, [fixture])]
+
+      view =
+        Dashboard.build(
+          rounds,
+          %{1 => pred},
+          %{entry: nil, rank: 1, of: 1},
+          ~U[2026-06-15 12:00:00Z]
+        )
+
+      fv = hd(hd(view.rounds).fixtures)
+
+      assert fv.breakdown == nil
+      assert fv.risky_pct == nil
+      assert fv.points == nil
+    end
   end
 
   test "build with no standings entry yields zeroes, never crashes" do

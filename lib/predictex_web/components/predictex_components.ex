@@ -250,6 +250,38 @@ defmodule PredictexWeb.PredictexComponents do
         </span>
       </div>
 
+      <%!-- per-fixture scoring breakdown (predictex-4ez): one chip per line that earned --%>
+      <%!-- points. On a boosted fixture the chips are base values, so a ×2 badge keeps --%>
+      <%!-- them reconciling with the doubled headline above. --%>
+      <div
+        :if={@pred && @done? && @fx.breakdown not in [nil, []]}
+        class="mt-2 flex flex-wrap items-center justify-center gap-1"
+      >
+        <span
+          :for={chip <- @fx.breakdown}
+          class={[
+            "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold",
+            chip_tone(chip.tone)
+          ]}
+        >
+          {chip.label} <b class="font-score">+{chip.pts}</b>
+        </span>
+        <span
+          :if={@fx.booster?}
+          class="inline-flex items-center rounded-md bg-accent px-2 py-0.5 text-[10px] font-extrabold text-accent-content"
+        >
+          ×2
+        </span>
+      </div>
+
+      <%!-- risky pick paid off — the underdog call landed (predictex-4ez) --%>
+      <div
+        :if={@pred && @done? && not is_nil(@fx.risky_pct)}
+        class="mt-2 rounded-lg bg-accent/10 px-2.5 py-1.5 text-center text-[10px] font-semibold text-accent"
+      >
+        ⚡ Risky pick paid off — only {@fx.risky_pct}% backed it
+      </div>
+
       <%!-- no pick imported --%>
       <div :if={@no_pick?} class="mt-3 text-center text-xs font-bold text-error">
         ⚠ No pick imported yet
