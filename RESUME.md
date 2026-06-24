@@ -100,7 +100,78 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-24)
+## ⏵ Continue here (2026-06-25) — native KO entry shipped to `main` (UNDEPLOYED); next = feature-flag the full feature
+
+Cross-machine pickup on the new Omarchy box. Set up the toolchain (mise erlang 28.5 / elixir
+1.20.1-otp-28), deps, a disposable Docker Postgres (`predictex-dev-pg`), seeded dev DB — then advanced
+**`predictex-2ww` (native in-app KO predictions)** sub-goal (a) and refined the entry UX live.
+
+**Pushed to `main` (3 commits, `fdcac41..a1e5654`) — NOT deployed (no tag):**
+- `454c1fa` **spec** — `docs/superpowers/specs/2026-06-24-knockout-preview-dev-task-design.md` (filename dated
+  24 Jun; authored just before midnight).
+- `8f1c427` **`mix predictex.preview_knockout`** — dev/test-only task: settles the first KO round's predecessor
+  (last group round) via the real `Tournament.update_fixture/2` admin path so `round_open?(R32)` flips locally
+  and the native form can be eyeballed before 28 Jun. Idempotent, fails loud, 5 TDD tests. Run:
+  `mise exec -- mix predictex.preview_knockout` then `mise exec -- mix phx.server`.
+- `a1e5654` **native KO entry UX** — on the editable `/predictions` KO form: speedy single-digit goal entry
+  (0-9, no spinners, auto-advance home→away→next card, backspace steps back; server bound `Prediction` goals
+  ≤ 9), 4-up responsive grid (matches the read-only my-picks grid), first-scorer + booster as **image toggle
+  buttons** (flags / ⚡, pure-toggle, booster round-exclusive) driven by one colocated `RoundEntry` hook
+  writing **sr-only** inputs (preserves the `phx-submit` field names → existing save tests pass), mobile polish
+  (44px targets, numeric keypad, GBoard-reliable input-event backspace, no keyboard auto-pop on touch).
+  **Verified desktop + real phone over Tailscale; user signed off "UX is fine."** 519 tests green.
+
+**Current gating:** the native form is controlled ONLY by `editable_round?/1 → round_open?/1` (auto-opens
+28 Jun). There is **no feature flag yet** — that is the next deliverable (below) so the full feature can be
+dark-shipped + rolled out to admins first.
+
+**⚠️ Machine caveats (this Omarchy box):** `lefthook` NOT installed → commit gate not auto-enforced (ran
+`mix precommit` manually before each commit — install lefthook to restore). `bd` build lacks CGO → Dolt
+unusable, CLI wedged; read `issues.jsonl` directly and **could NOT update beads here** (run the commands in
+"★ BEADS" below on the Dolt machine). Disposable Docker Postgres `predictex-dev-pg` + dev server may still be up.
+
+### ★ NEXT — deliver the full native-KO feature behind a feature flag (`predictex-2ww`)
+
+Ship the complete native KO game so it can be **dark-shipped and rolled out in stages** (off → admins → all
+members), decoupled from the automatic 28-Jun `round_open?` cutover. Use **FunWithFlags** (the repo's retained
+dark-ship mechanism — dep + `/admin/feature-flags` dashboard; `:match_replay`/`:live_buzz` were the prior
+users). Flag: **`:native_ko_entry`**. Design is settled — go straight to `writing-plans`/TDD.
+
+1. **Flag + admins group gate.** Implement `FunWithFlags.Group` for `Player` so `:admins` resolves to
+   `player.is_admin`, enabling "enable for admins first" without a redeploy.
+2. **Gate the render** — `editable_round?/1` (`my_predictions_live.ex`) becomes
+   `FunWithFlags.enabled?(:native_ko_entry, for: current_player) AND stage == :knockout AND round_open?`.
+   Flag off → read-only FIFA-import grid for everyone (game dark); on → native entry. Thread the current player
+   in via the socket's `current_scope`.
+3. **Gate the write path too (defense in depth)** — `save_round` handler / `Predictions.save_round_predictions/4`
+   must reject when the flag is off for that actor, so crafted params can't bypass a dark flag. Compose with the
+   existing round-membership + lockout write-auth at the `parse_pick_rows/2` boundary (arch #4).
+4. **Tests (TDD)** — flag off × {render hidden, write rejected} and flag on × {render shown, write saved}.
+   ⚠️ Use the `on_exit` `FunWithFlags.Store.Cache.flush/0` isolation, NOT a `config/test.exs` `:cache` override
+   — the compile-env gotcha (see the v0.11.11 note below) passes locally but fails CI.
+5. **Phase 2 gaps (sequence after the flag):** `cij` (per-fixture live/recap gate WITHIN an open KO round —
+   today a uniform input grid even for kicked-off fixtures; write already safe, cosmetic), `i9k` (KO
+   first-scorer import), deferred **player-picker** (squad rosters absent pre-match — needs a squad-endpoint
+   spike or free-text fallback).
+6. **Rollout:** deploy with `:native_ko_entry` OFF → `FunWithFlags.enable(:native_ko_entry, for_group: :admins)`
+   → verify on the real 28-Jun bracket as an admin → `FunWithFlags.enable(:native_ko_entry)` for all. Kill
+   switch = disable the flag (no redeploy) — the lever the contracted `:live_buzz` gave up.
+
+Local loop (built this session): `mix predictex.preview_knockout` opens R32 in dev so you can exercise the flag
++ form without waiting for 28 Jun. Phone over Tailscale: `socat TCP-LISTEN:4001,fork,reuseaddr
+TCP:127.0.0.1:4000` then `http://<tailscale-ip>:4001` (ufw allows the `tailscale0` interface; phone needs
+Tailscale running). `tailscale serve` needs root here, so socat is the path.
+
+### ★ BEADS — run on the Dolt-capable machine (couldn't update from the no-CGO Omarchy box)
+```
+bd update predictex-2ww --notes "Sub-goal (a) DONE: mix predictex.preview_knockout dev task shipped (8f1c427) — opens R32 locally pre-28-Jun. Native KO entry UX refined + signed off (a1e5654): speedy 0-9 goal entry w/ auto-advance, 4-up grid, image toggle buttons (first-scorer/booster), mobile-ready. On main, undeployed. NEXT: gate behind FunWithFlags :native_ko_entry for staged rollout — see RESUME 2026-06-25 'NEXT'."
+bd create --title="Gate native KO entry behind :native_ko_entry feature flag" --type=feature --priority=2 --description="Dark-ship the native KO game: FunWithFlags :native_ko_entry + Player :admins group gate; gate editable_round? render AND save_round_predictions write (defense in depth); TDD with on_exit cache-flush isolation (NOT config/test.exs override). Roll out off->admins->all. See RESUME 2026-06-25 'NEXT'."
+```
+Then `bd sync`.
+
+---
+
+## ⏵ Continue here (2026-06-24) — prior session (4ez/2mh eyeball reminders below still valid)
 
 Deployed tag is **`v0.11.16`** (see "Live right now") — **shipped `predictex-4ez` then `predictex-2mh` this
 session**, both deployed clean (no migration, `/health` 200, anon `/` 200; pre-deploy gate green; live-match
@@ -118,10 +189,10 @@ The next pivotal date is still **28 Jun (R32 starts)** — the KO-cutover items 
 
 ### ★ ACTIVE THREAD (cross-machine handoff 2026-06-24) — "go fully native in-app for the knockouts" (`predictex-2ww`)
 
-**Status: brainstorm just started, then paused to transfer machines. No code written; nothing stranded — `main`
-is pushed + up to date with origin, so a `git pull` on the other machine has everything. (`.remember/` is
-**gitignored**, so this RESUME block is the handoff — don't look for context in `.remember`.) Resume by picking
-a sub-goal below.**
+**Status (UPDATED 2026-06-25): RESOLVED — sub-goal (a) was chosen and DELIVERED.** Preview task + native KO
+entry UX shipped to `main` (see the 2026-06-25 block at the top). The brainstorm question below is settled; the
+live next step is "feature-flag the full feature" (2026-06-25 ★ NEXT). The (b)/(c) options remain valid future
+directions. (`.remember/` is **gitignored**, so this RESUME block is the handoff — don't look in `.remember`.)
 
 **The trigger:** user observed "I'm not seeing the ability to enter predictions." **Diagnosis (confirmed in
 code, not a bug):** native KO entry is already BUILT + DEPLOYED (Phase 1) but **gated invisible until ~28 Jun.**
@@ -147,14 +218,13 @@ input grid even for already-kicked-off KO fixtures; write is safe, cosmetic), `i
 deferred **player-picker** (spike verdict: squad rosters ABSENT pre-match from FIFA `/detail` → needs a
 dedicated squad-endpoint spike or a free-text fallback; scoring already gates the first-player component).
 
-**DECISION PENDING — pick one to resume (this was the unanswered brainstorm question):**
-- **(a) Make native KO entry testable NOW** (before 28 Jun) — a preview path / seed test data / or rethink the
-  gate, so it's verified before match day instead of discovered live. *Directly addresses the "can't see entry" pain.*
+**DECISION (RESOLVED 2026-06-25):**
+- **(a) Make native KO entry testable NOW — ✅ CHOSEN + DONE.** Built `mix predictex.preview_knockout` (opens
+  R32 in dev pre-28-Jun) and used it to refine + sign off the native entry UX. Shipped to `main` (see top block).
 - **(b) Build the Phase 2 gaps** — `cij` per-fixture gate, then `i9k` / player-picker. Design exists; execution.
+  STILL OPEN — sequenced after the feature flag (2026-06-25 ★ NEXT, step 5).
 - **(c) Reconsider the gate/UX** — should R32 open as soon as the bracket is known rather than at full group
-  completion? A design conversation about the entry model itself.
-- Resume protocol: re-invoke the brainstorming skill (it was active when paused) once a sub-goal is chosen, OR
-  go straight to `writing-plans` for (b) since its design is already locked.
+  completion? A design conversation about the entry model itself. STILL OPEN (future direction).
 
 > ✅ **Resolved this session — the R32 "read-only" screenshot is correct-by-design, not a bug.** `/predictions`
 > gates the editable native KO form on `editable_round?/1 → Tournament.round_open?/1`, and a knockout round
