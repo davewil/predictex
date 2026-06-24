@@ -12,7 +12,17 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.15` (deployed + verified 2026-06-24: Deploy success, no migration,
+- **Latest deployed tag:** `v0.11.16` (deployed + verified 2026-06-24 18:21 UTC: Deploy success, no migration,
+  `/health` 200, anon `/` 200; tagged clear of the 20:00 capture window) — **`predictex-2mh` (CLOSED)**:
+  prediction writes now broadcast `:fixtures_changed`. Only the result-settle paths (Ingest, FifaFallback,
+  LiveScore) emitted the coarse `Tournament.broadcast_change/0` signal; the four prediction writers
+  (`create_prediction`, `admin_upsert_prediction`, `admin_save_round_predictions`, `save_round_predictions`)
+  did not — so an admin entering/importing a prediction on an **already-completed** fixture (`admin_upsert`
+  has no lockout; import writes past rounds) changed standings while open `/predictions` sessions stayed stale
+  until the next settle. A private `broadcast_on_success/1` wraps all four; only `{:ok, _}` broadcasts
+  (failed/locked writes don't). Found while scoping `0ft`/`a4j` (both DEFERRED — see below); the real win was
+  this latent staleness fix. TDD: 5 tests; 512 green.
+- **Prior deployed tag:** `v0.11.15` (deployed + verified 2026-06-24: Deploy success, no migration,
   `/health` 200, anon `/` 200) — **`predictex-4ez` (CLOSED)**: per-fixture scoring breakdown chips +
   risky-pick banner on the FixtureCard. `Scoring.score/3` already exposed `:components`; `Dashboard.build/4`
   was projecting it down to just `fixture_total` at the boundary — now it carries the full `result` through
@@ -92,12 +102,19 @@ the app scores them against real results and ranks a leaderboard.
 
 ## ⏵ Continue here (2026-06-24)
 
-Deployed tag is **`v0.11.15`** (see "Live right now") — **shipped `predictex-4ez` this session** (per-fixture
-scoring breakdown + risky banner on the FixtureCard). `main` is pushed and up to date with origin; the tag
-deployed clean (Deploy success, no migration, `/health` 200, anon `/` 200, verified 16:38 UTC; pre-deploy gate
-green; live-match safety confirmed clear before tagging). **One eyeball left for 4ez:** confirm the breakdown
-chips + risky banner render on the auth-gated `/predictions` for a real SETTLED fixture (CI can't cover the
-authed render). The next pivotal date is still **28 Jun (R32 starts)** — the KO-cutover items verify themselves then.
+Deployed tag is **`v0.11.16`** (see "Live right now") — **shipped `predictex-4ez` then `predictex-2mh` this
+session**, both deployed clean (no migration, `/health` 200, anon `/` 200; pre-deploy gate green; live-match
+safety confirmed clear before each tag). `main` is pushed and up to date with origin.
+- **`4ez`** (v0.11.15): per-fixture scoring breakdown chips + risky banner on the FixtureCard. **One eyeball
+  left:** confirm the chips + banner render on the auth-gated `/predictions` for a real SETTLED fixture (CI
+  can't cover the authed render).
+- **`2mh`** (v0.11.16): prediction writes broadcast `:fixtures_changed` (latent staleness fix — open dashboards
+  now re-pull when an admin enters/imports a prediction). Found while scoping `0ft`/`a4j`, which are now
+  **DEFERRED** (both premature per their own bead text; revisit triggers + safe-approach notes recorded on
+  each bead). **Eyeball (optional):** open `/predictions` in one session, admin-enter a pick in another → the
+  first updates without reload.
+
+The next pivotal date is still **28 Jun (R32 starts)** — the KO-cutover items verify themselves then.
 
 > ✅ **Resolved this session — the R32 "read-only" screenshot is correct-by-design, not a bug.** `/predictions`
 > gates the editable native KO form on `editable_round?/1 → Tournament.round_open?/1`, and a knockout round
@@ -238,10 +255,11 @@ bracket resolution. Next session picks from the backlog below.
     Cards remain in `predictex-bdq`.
 
 **▶ NEXT — start here next session:** see the **"⏵ Continue here"** block at the top — it's the current source
-of truth. Headline: everything is deployed (`v0.11.15`); the **28 Jun knockout cutover** is the focus (verify
+of truth. Headline: everything is deployed (`v0.11.16`); the **28 Jun knockout cutover** is the focus (verify
 `hco` WS1 self-arms `32/32` + first-KO capture; verify Phase 1 native R32 entry renders). Backlog below.
 
-**Recently CLOSED:** `4ez` (per-fixture breakdown + risky banner, deployed v0.11.15 2026-06-24) ·
+**Recently CLOSED:** `2mh` (prediction writes broadcast `:fixtures_changed`, deployed v0.11.16 2026-06-24) ·
+`4ez` (per-fixture breakdown + risky banner, deployed v0.11.15 2026-06-24) ·
 `c9s` (flags golden-file snapshot, 2026-06-23) · `dmh` (async-safety / 2 root causes,
 2026-06-23) · `g8m` (KO no-dup, 2026-06-23) · `ius`/`iy1` (weather capture + result fallback, v0.11.13) ·
 `kcx`/`i1s`/`p4o` (2026-06-22). Specs/plans under `docs/superpowers/` if detail is needed.
@@ -251,10 +269,12 @@ of truth. Headline: everything is deployed (`v0.11.15`); the **28 Jun knockout c
    slot fallback). WS2/WS3 ✅; `g8m` closed. **Verify on 28 Jun:** `KO fifa_match_id: 32/32` then first-KO capture
    through ET/pens, `is_live` clears → close `hco`.
 
-2. **Other backlog (`bd ready`):** `cij`/`i9k` (KO Phase 2), `0ft` (memoize ranking in snapshot), `a4j`
-   (cache `Standings.leaderboard/0`), `bl8` (Live.Updater rescue), `l3n` (rfm capture polish), `uyf` (P4,
-   knockout-ET goal filtering — gated on `hco`), `4ya` (P4, capture durability — see ADR 0001), `3kv`/perf
-   items. (`4ez` CLOSED + deployed v0.11.15 this session; `c9s` + `dmh` CLOSED previously.)
+2. **Other backlog (`bd ready`):** `cij`/`i9k` (KO Phase 2), `bl8` (Live.Updater rescue), `l3n` (rfm capture
+   polish), `uyf` (P4, knockout-ET goal filtering — gated on `hco`), `4ya` (P4, capture durability — see ADR
+   0001), `3kv`/perf items. (`4ez` + `2mh` CLOSED + deployed this session; `c9s` + `dmh` CLOSED previously.)
+   - **DEFERRED this session:** `0ft` (memoize ranking in snapshot) + `a4j` (cache `Standings.leaderboard/0`) —
+     both premature per their own bead text at ~15-player scale; revisit triggers + safe-approach notes recorded
+     on each bead (`bd show predictex-0ft` / `predictex-a4j`). `bd undefer <id>` to restore when a trigger fires.
 
 **Workflow rule (this session, durable):** commit autonomously when green; **push and tag/push (deploy) are
 the user's explicit call** — never auto-push. Authoritative in CLAUDE.md → "Conventions & Patterns → Commit
