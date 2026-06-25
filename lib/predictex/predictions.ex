@@ -136,7 +136,17 @@ defmodule Predictex.Predictions do
   prediction on a fixture from another round or a non-existent fixture. The existing
   `locked?(nil, _now)` defensive clause is now unreachable from this path.
   """
-  def save_round_predictions(player_id, round_id, rows, now \\ DateTime.utc_now())
+  def save_round_predictions(player_id, round_id, rows, enabled?, now \\ DateTime.utc_now())
+
+  # Write-path feature gate (defense in depth, predictex-5q6): when `:native_ko_entry` is
+  # off for the actor, reject before any DB work — a crafted save_round payload can't bypass
+  # a dark flag even if the LiveView render guard is removed. The caller resolves the flag;
+  # this context stays FunWithFlags-agnostic and unit-testable. Composes with the
+  # round-membership + lockout write-auth below.
+  def save_round_predictions(_player_id, _round_id, _rows, false, _now),
+    do: {:error, :feature_disabled}
+
+  def save_round_predictions(player_id, round_id, rows, true, now)
       when is_list(rows) do
     fixtures = Map.new(Repo.all(from f in Fixture, where: f.round_id == ^round_id), &{&1.id, &1})
 

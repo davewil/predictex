@@ -153,3 +153,17 @@ defmodule Predictex.Accounts.Player do
     false
   end
 end
+
+defimpl FunWithFlags.Group, for: Predictex.Accounts.Player do
+  @moduledoc """
+  Group membership for feature-flag gating. Lets a flag be enabled for the `:admins`
+  group (`FunWithFlags.enable(flag, for_group: :admins)`) so it resolves per player off
+  `is_admin` — the basis for the "enable for admins first" staged rollout of
+  `:native_ko_entry` (predictex-5q6) without a redeploy.
+
+  FunWithFlags normalizes group names to strings internally, so the clause matches both
+  `:admins` and `"admins"`. Every other (player, group) pair is a non-member.
+  """
+  def in?(%{is_admin: true}, group) when group in [:admins, "admins"], do: true
+  def in?(_player, _group), do: false
+end

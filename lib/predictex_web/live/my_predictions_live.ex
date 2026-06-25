@@ -47,7 +47,7 @@ defmodule PredictexWeb.MyPredictionsLive do
     # Defense-in-depth guard: only proceed if the active round is an editable open-knockout
     # round. Forged save_round events targeting group rounds or closed knockout rounds are
     # silently dropped before any round_id or row processing occurs.
-    if editable_round?(active) do
+    if editable_round?(active, socket.assigns.current_scope.player) do
       do_save_round(params, active, socket)
     else
       {:noreply, socket}
@@ -55,14 +55,23 @@ defmodule PredictexWeb.MyPredictionsLive do
   end
 
   defp do_save_round(params, active, socket) do
-    player_id = socket.assigns.current_scope.player.id
+    player = socket.assigns.current_scope.player
+    player_id = player.id
     round_id = active.round.id
 
     # The prediction-intake boundary (pure) parses params and owns the booster-on-blank
     # invariant; this view just routes the validated rows to persistence and renders the tag.
     case Predictions.parse_pick_rows(params["picks"] || %{}, params["booster_fixture_id"]) do
       {:ok, rows} ->
-        case Predictions.save_round_predictions(player_id, round_id, rows) do
+        # Resolve the flag and pass it as an independent write-path gate (defense in depth):
+        # save_round_predictions/4 rejects when the flag is off for this actor, so a crafted
+        # save_round event can't bypass a dark flag even if the render guard above is changed.
+        case Predictions.save_round_predictions(
+               player_id,
+               round_id,
+               rows,
+               native_ko_enabled?(player)
+             ) do
           {:ok, _results} ->
             {:noreply, socket |> refresh() |> put_flash(:info, "Saved")}
 
@@ -116,7 +125,7 @@ defmodule PredictexWeb.MyPredictionsLive do
     assigns =
       assigns
       |> assign(:active, active)
-      |> assign(:editable_round?, editable_round?(active))
+      |> assign(:editable_round?, editable_round?(active, assigns.current_scope.player))
 
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} max_width="max-w-6xl">
@@ -451,10 +460,19 @@ defmodule PredictexWeb.MyPredictionsLive do
   # A round is editable in-place iff it is a knockout round AND currently open for predictions
   # (i.e. its predecessor round is fully completed). Group rounds are read-only here — they
   # are entered via the FIFA import or admin flows.
-  defp editable_round?(%{round: %{stage: :knockout} = round}),
-    do: Tournament.round_open?(round)
+  # A knockout round's native entry form renders only when the :native_ko_entry flag is on
+  # for this player AND the round is open (predecessor fully completed). The flag decouples
+  # the staged rollout (off → admins → all) from the automatic 28-Jun round_open? cutover
+  # (predictex-5q6). Flag off → read-only FIFA-import grid for everyone (game dark).
+  defp editable_round?(%{round: %{stage: :knockout} = round}, player),
+    do: native_ko_enabled?(player) and Tournament.round_open?(round)
 
-  defp editable_round?(_), do: false
+  defp editable_round?(_, _player), do: false
+
+  # Single source for the flag resolution — used by the render gate and the write gate so
+  # the two defense-in-depth layers can't drift. The :admins group resolves off is_admin
+  # (see the FunWithFlags.Group impl for Player).
+  defp native_ko_enabled?(player), do: FunWithFlags.enabled?(:native_ko_entry, for: player)
 
   # --- native KO entry: toggle-button state (the JS hook drives these from the rendered values) ---
 

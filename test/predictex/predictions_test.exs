@@ -245,14 +245,14 @@ defmodule Predictex.PredictionsTest do
 
     test "saves picks for unlocked fixtures", %{round: round, player: player, open: open} do
       rows = [%{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: false}]
-      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[open.id] == :upserted
       assert Predictions.get_player_fixture_prediction(player.id, open.id).home_goals == 2
     end
 
     test "refuses to write a locked fixture", %{round: round, player: player, locked: locked} do
       rows = [%{fixture_id: locked.id, home_goals: 9, away_goals: 9, booster: false}]
-      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[locked.id] == :locked
       assert Predictions.get_player_fixture_prediction(player.id, locked.id) == nil
     end
@@ -274,7 +274,7 @@ defmodule Predictex.PredictionsTest do
         })
 
       rows = [%{fixture_id: open.id, home_goals: 0, away_goals: 0, booster: false}]
-      assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows, true)
 
       # The locked fixture keeps its booster — the member can't move it.
       assert Predictions.get_player_fixture_prediction(player.id, locked.id).booster == true
@@ -294,7 +294,7 @@ defmodule Predictex.PredictionsTest do
 
       rows = [%{fixture_id: foreign_fixture.id, home_goals: 2, away_goals: 1, booster: false}]
 
-      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[foreign_fixture.id] == :unknown
       assert Predictions.get_player_fixture_prediction(player.id, foreign_fixture.id) == nil
     end
@@ -307,7 +307,7 @@ defmodule Predictex.PredictionsTest do
 
       rows = [%{fixture_id: nonexistent_id, home_goals: 2, away_goals: 1, booster: false}]
 
-      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[nonexistent_id] == :unknown
       assert Predictions.get_player_fixture_prediction(player.id, nonexistent_id) == nil
     end
@@ -318,9 +318,25 @@ defmodule Predictex.PredictionsTest do
       open: open
     } do
       rows = [%{fixture_id: open.id, home_goals: 3, away_goals: 0, booster: false}]
-      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[open.id] == :upserted
       assert Predictions.get_player_fixture_prediction(player.id, open.id).home_goals == 3
+    end
+
+    # Defense-in-depth write gate (predictex-5q6): with the :native_ko_entry flag resolved
+    # off for the actor, the write is rejected before any DB work — independent of the
+    # LiveView render guard, so a crafted save_round event can't bypass a dark flag.
+    test "rejects the whole write when the feature gate is off (no DB writes)", %{
+      round: round,
+      player: player,
+      open: open
+    } do
+      rows = [%{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: false}]
+
+      assert {:error, :feature_disabled} =
+               Predictions.save_round_predictions(player.id, round.id, rows, false)
+
+      assert Predictions.get_player_fixture_prediction(player.id, open.id) == nil
     end
   end
 
@@ -396,7 +412,7 @@ defmodule Predictex.PredictionsTest do
       Tournament.subscribe_changes()
 
       rows = [%{fixture_id: f.id, home_goals: 2, away_goals: 0, booster: false}]
-      assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows)
+      assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows, true)
 
       assert_received :fixtures_changed
     end

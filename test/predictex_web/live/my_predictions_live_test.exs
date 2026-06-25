@@ -25,6 +25,19 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     %{round: round}
   end
 
+  # Tests tagged :native_ko exercise the editable knockout form, which is gated behind the
+  # :native_ko_entry FunWithFlags flag (predictex-5q6). Enable it for those; the DB write
+  # rolls back with the sandbox txn and the ETS cache is flushed in on_exit so the enabled
+  # state can't leak into later tests (the compile-env-safe isolation — see config/test.exs).
+  setup tags do
+    if tags[:native_ko] do
+      FunWithFlags.enable(:native_ko_entry)
+      on_exit(fn -> FunWithFlags.Store.Cache.flush() end)
+    end
+
+    :ok
+  end
+
   test "redirects to login when logged out", %{conn: conn} do
     assert {:error, {:redirect, %{to: "/players/log-in"}}} = live(conn, ~p"/predictions")
   end
@@ -290,6 +303,7 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
 
   # --- knockout native entry (predictex knockout-game Phase 1, Task 4) ---
 
+  @tag :native_ko
   test "member enters native knockout picks via the editable form", %{conn: conn, round: round} do
     player = player_fixture(%{display_name: "KoPlayer"})
 
@@ -373,6 +387,58 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert pred.booster == true
   end
 
+  test "flag off: an OPEN knockout round stays read-only (native form dark-shipped)", %{
+    conn: conn,
+    round: round
+  } do
+    # predictex-5q6 dark-ship gate: even with the knockout round fully open (predecessor
+    # complete → round_open? true), the editable native form must NOT render while the
+    # :native_ko_entry flag is off (this test is deliberately UNtagged → flag off). Members
+    # see the read-only FIFA-import grid until the flag is enabled for them.
+    player = player_fixture(%{display_name: "FlagOff"})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    # Close the setup round (ordinal 1) so it doesn't steal "active".
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    # Predecessor (ordinal 3) complete → the knockout round at ordinal 4 IS open.
+    {:ok, pred_round} =
+      Tournament.create_round(%{name: "Matchday 3", stage: :group, ordinal: 3})
+
+    _done3 =
+      fixture!(pred_round, %{
+        team1: "Brazil",
+        team2: "Argentina",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 2,
+        away_goals: 1
+      })
+
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+
+    _ko_fx = fixture!(ko_round, %{team1: "England", team2: "Germany", kickoff_at: future})
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    html = lv |> element("button", "Round of 16") |> render_click()
+
+    # Open round, but flag off → no editable form; the read-only grid (teams) renders instead.
+    refute html =~ ~s(id="round-entry-4")
+    assert html =~ "England"
+    assert html =~ "Germany"
+  end
+
+  @tag :native_ko
   test "knockout round flips read-only → editable the moment its predecessor completes (28 Jun cutover)",
        %{conn: conn, round: round} do
     # The real 28-Jun cutover, proven in CI instead of eyeballed live: a knockout round is
@@ -462,6 +528,7 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert pred.booster == true
   end
 
+  @tag :native_ko
   test "booster on blank-score fixture shows error flash and saves nothing", %{
     conn: conn,
     round: round
