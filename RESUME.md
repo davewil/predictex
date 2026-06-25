@@ -100,7 +100,47 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-25) — native KO entry shipped to `main` (UNDEPLOYED); next = feature-flag the full feature
+## ⏵ Continue here (2026-06-25, later) — `:native_ko_entry` feature flag IMPLEMENTED (committed local `19e99de`, NOT pushed); next = push + staged rollout
+
+On the **Mac** (lefthook + bd + mise all present — the Omarchy caveats below do NOT apply here).
+Delivered **`predictex-5q6`** — gated the native KO game behind a FunWithFlags flag so it dark-ships
+and rolls out off → admins → all, decoupled from the automatic 28-Jun `round_open?` cutover.
+
+**Committed to `main` LOCAL (`19e99de`), NOT pushed / NOT deployed — gate green (523 tests, credo clean):**
+- **`FunWithFlags.Group` for `Player`** (`player.ex`): `:admins` resolves off `is_admin` (matches both
+  `:admins` and `"admins"` since FWF normalizes group names to strings). Group-only is sufficient — no
+  Actor impl needed because no per-actor gates are used; `player_flags_test` proves `enabled?(for: player)`
+  doesn't crash without Actor.
+- **Render gate** (`my_predictions_live.ex`): `editable_round?/2` now ANDs
+  `FunWithFlags.enabled?(:native_ko_entry, for: player)` with knockout + `round_open?`. Flag off →
+  read-only FIFA-import grid for everyone. `native_ko_enabled?/1` is the single flag-check source.
+- **Independent write-path gate** (defense in depth): `Predictions.save_round_predictions/5` takes an
+  `enabled?` boolean and returns `{:error, :feature_disabled}` before any DB work. The LiveView resolves
+  the flag and passes it down; the context stays FunWithFlags-agnostic. Composes with the existing
+  round-membership + lockout write-auth.
+- **TDD:** `player_flags_test.exs` (direct Group + `for_group: :admins` resolution; **`async: false`** to
+  isolate the global FWF ETS cache from `MyPredictionsLiveTest`); flag-off render stays read-only on an
+  OPEN KO round; the 3 editable-KO tests now `@tag :native_ko` (enable + `Cache.flush/0` `on_exit` — the
+  compile-env-safe isolation, NOT a `config/test.exs` `:cache` override); context-level disabled rejection.
+- **No migration** (flag store exists from `:match_replay`). **Default off = game dark.**
+
+**▶ NEXT (deploy-time, the user's call — do NOT auto-push/deploy):**
+1. **Push `main`** (runs CI Quality), then **tag-deploy** when the user says so (no match live — see DEPLOY RULE).
+2. **Staged rollout (no redeploy):** `rpc 'FunWithFlags.enable(:native_ko_entry, for_group: :admins)'`
+   → log in as an admin and **verify the native R32 form renders on the real 28-Jun bracket** →
+   `rpc 'FunWithFlags.enable(:native_ko_entry)'` for all. Kill switch = `FunWithFlags.disable(:native_ko_entry)`.
+3. **Phase 2 gaps (after the flag):** `cij` (per-fixture live/recap gate within an open KO round),
+   `i9k` (KO first-scorer import), deferred player-picker (squad-endpoint spike / free-text fallback).
+
+> ⚠️ **Dev-eyeball gotcha (NEW):** `mix predictex.preview_knockout` + `mix phx.server` now shows the
+> **read-only** grid even after the predecessor settles — correct, because `editable_round?/2` also gates
+> on the flag and it's **unset (off) in the dev DB**. To eyeball the native form locally: `iex -S mix phx.server`
+> then `FunWithFlags.enable(:native_ko_entry)` (or `FunWithFlags.enable(:native_ko_entry, for_group: :admins)`
+> + log in as an admin to exercise the group path).
+
+---
+
+## ⏵ Prior session (2026-06-25) — native KO entry shipped to `main` (UNDEPLOYED)
 
 Cross-machine pickup on the new Omarchy box. Set up the toolchain (mise erlang 28.5 / elixir
 1.20.1-otp-28), deps, a disposable Docker Postgres (`predictex-dev-pg`), seeded dev DB — then advanced
@@ -130,7 +170,12 @@ dark-shipped + rolled out to admins first.
 unusable, CLI wedged; read `issues.jsonl` directly and **could NOT update beads here** (run the commands in
 "★ BEADS" below on the Dolt machine). Disposable Docker Postgres `predictex-dev-pg` + dev server may still be up.
 
-### ★ NEXT — deliver the full native-KO feature behind a feature flag (`predictex-2ww`)
+### ★ DONE (delivered in `19e99de`, see the top block) — the feature-flag delivery plan (`predictex-5q6`)
+
+> ✅ Steps 1–4 below are **implemented + committed local** (`19e99de`). The rollout (step 6) is the
+> deploy-time NEXT in the top block. Step 5 (Phase 2 gaps) is still open. Kept here as the executed spec.
+
+#### Original plan — deliver the full native-KO feature behind a feature flag (`predictex-2ww`/`5q6`)
 
 Ship the complete native KO game so it can be **dark-shipped and rolled out in stages** (off → admins → all
 members), decoupled from the automatic 28-Jun `round_open?` cutover. Use **FunWithFlags** (the repo's retained
