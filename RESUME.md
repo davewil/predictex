@@ -12,7 +12,16 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.16` (deployed + verified 2026-06-24 18:21 UTC: Deploy success, no migration,
+- **Latest deployed tag:** `v0.11.17` (deployed + verified 2026-06-25 14:13 UTC: Deploy success, no migration,
+  `/health` 200, anon `/` 200, `native_ko_entry` resolves `false` — ships OFF, game dark) — **`predictex-5q6`**:
+  native KO entry gated behind the `:native_ko_entry` FunWithFlags flag. Render gate (`editable_round?/2`) +
+  independent write-path gate (`save_round_predictions/5` → `{:error, :feature_disabled}`) both check
+  `FunWithFlags.enabled?(:native_ko_entry, for: player)`; `FunWithFlags.Group` for `Player` resolves `:admins`
+  off `is_admin` for staged rollout. No migration (flag store exists from `:match_replay`). **▶ REMAINING =
+  operational rollout (user's call):** `rpc 'FunWithFlags.enable(:native_ko_entry, for_group: :admins)'` →
+  verify the native R32 form as an admin on the **28-Jun** bracket → `rpc 'FunWithFlags.enable(:native_ko_entry)'`
+  for all. Kill switch = `disable`, no redeploy.
+- **Prior deployed tag:** `v0.11.16` (deployed + verified 2026-06-24 18:21 UTC: Deploy success, no migration,
   `/health` 200, anon `/` 200; tagged clear of the 20:00 capture window) — **`predictex-2mh` (CLOSED)**:
   prediction writes now broadcast `:fixtures_changed`. Only the result-settle paths (Ingest, FifaFallback,
   LiveScore) emitted the coarse `Tournament.broadcast_change/0` signal; the four prediction writers
@@ -100,13 +109,19 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-25, later) — `:native_ko_entry` feature flag IMPLEMENTED (committed local `19e99de`, NOT pushed); next = push + staged rollout
+## ⏵ Continue here (2026-06-25, later) — `:native_ko_entry` feature flag DEPLOYED (`v0.11.17`, ships OFF); next = operational rollout (admins → all)
 
 On the **Mac** (lefthook + bd + mise all present — the Omarchy caveats below do NOT apply here).
-Delivered **`predictex-5q6`** — gated the native KO game behind a FunWithFlags flag so it dark-ships
-and rolls out off → admins → all, decoupled from the automatic 28-Jun `round_open?` cutover.
+Delivered + **deployed** **`predictex-5q6`** (`v0.11.17`) — gated the native KO game behind a FunWithFlags
+flag so it dark-ships and rolls out off → admins → all, decoupled from the automatic 28-Jun `round_open?`
+cutover. Pre-deploy green, no match live at tag time, `/health` 200, `native_ko_entry` ships `false` (dark).
 
-**Committed to `main` LOCAL (`19e99de`), NOT pushed / NOT deployed — gate green (523 tests, credo clean):**
+**▶ ONLY REMAINING = operational rollout (no code, no redeploy — the user's call):**
+`rpc 'FunWithFlags.enable(:native_ko_entry, for_group: :admins)'` → log in as an admin and verify the native
+R32 form renders on the real **28-Jun** bracket → `rpc 'FunWithFlags.enable(:native_ko_entry)'` for all.
+Kill switch = `rpc 'FunWithFlags.disable(:native_ko_entry)'`.
+
+**Shipped in `v0.11.17` (commit `19e99de`) — gate green (523 tests, credo clean), deployed + verified:**
 - **`FunWithFlags.Group` for `Player`** (`player.ex`): `:admins` resolves off `is_admin` (matches both
   `:admins` and `"admins"` since FWF normalizes group names to strings). Group-only is sufficient — no
   Actor impl needed because no per-actor gates are used; `player_flags_test` proves `enabled?(for: player)`
@@ -124,13 +139,9 @@ and rolls out off → admins → all, decoupled from the automatic 28-Jun `round
   compile-env-safe isolation, NOT a `config/test.exs` `:cache` override); context-level disabled rejection.
 - **No migration** (flag store exists from `:match_replay`). **Default off = game dark.**
 
-**▶ NEXT (deploy-time, the user's call — do NOT auto-push/deploy):**
-1. **Push `main`** (runs CI Quality), then **tag-deploy** when the user says so (no match live — see DEPLOY RULE).
-2. **Staged rollout (no redeploy):** `rpc 'FunWithFlags.enable(:native_ko_entry, for_group: :admins)'`
-   → log in as an admin and **verify the native R32 form renders on the real 28-Jun bracket** →
-   `rpc 'FunWithFlags.enable(:native_ko_entry)'` for all. Kill switch = `FunWithFlags.disable(:native_ko_entry)`.
-3. **Phase 2 gaps (after the flag):** `cij` (per-fixture live/recap gate within an open KO round),
-   `i9k` (KO first-scorer import), deferred player-picker (squad-endpoint spike / free-text fallback).
+**▶ NEXT — pushed + deployed (`v0.11.17`). Remaining is the rollout (top of block) + Phase 2 gaps:**
+`cij` (per-fixture live/recap gate within an open KO round), `i9k` (KO first-scorer import), deferred
+player-picker (squad-endpoint spike / free-text fallback) — all sequence after the rollout.
 
 > ⚠️ **Dev-eyeball gotcha (NEW):** `mix predictex.preview_knockout` + `mix phx.server` now shows the
 > **read-only** grid even after the predecessor settles — correct, because `editable_round?/2` also gates
