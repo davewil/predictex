@@ -3,9 +3,10 @@ defmodule PredictexWeb.MyPredictionsLive do
   A member's personal dashboard: their picks, per-fixture scoring, and league rank.
 
   Group-stage picks are imported via the FIFA import flow or entered by an admin.
-  Native prediction entry is available here for open knockout rounds (the round chips
-  show an editable scoreline + first-team + booster form for any knockout round whose
-  predecessor is fully completed).
+  Native prediction entry is available here for knockout rounds when the :native_ko_entry
+  flag is on for this player. Each fixture is gated individually via
+  `Predictions.fixture_entry_state/2`: :editable (real teams, pre-kickoff), :locked
+  (kicked off), or :pending (placeholder teams — bracket not yet resolved).
   """
   use PredictexWeb, :live_view
 
@@ -44,10 +45,10 @@ defmodule PredictexWeb.MyPredictionsLive do
   def handle_event("save_round", params, socket) do
     active = active_round(socket.assigns.dash, socket.assigns.active_ordinal)
 
-    # Defense-in-depth guard: only proceed if the active round is an editable open-knockout
-    # round. Forged save_round events targeting group rounds or closed knockout rounds are
+    # Defense-in-depth guard: only proceed if the active round is a knockout round with
+    # the native_ko_entry flag on. Forged save_round events targeting group rounds are
     # silently dropped before any round_id or row processing occurs.
-    if editable_round?(active, socket.assigns.current_scope.player) do
+    if native_ko_round?(active, socket.assigns.current_scope.player) do
       do_save_round(params, active, socket)
     else
       {:noreply, socket}
@@ -133,7 +134,8 @@ defmodule PredictexWeb.MyPredictionsLive do
     assigns =
       assigns
       |> assign(:active, active)
-      |> assign(:editable_round?, editable_round?(active, assigns.current_scope.player))
+      |> assign(:native_ko_round?, native_ko_round?(active, assigns.current_scope.player))
+      |> assign(:fixture_states, fixture_states(active, assigns.now))
 
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} max_width="max-w-6xl">
@@ -220,9 +222,9 @@ defmodule PredictexWeb.MyPredictionsLive do
           </span>
         </div>
 
-        <%!-- Editable form for open knockout rounds (native KO entry) --%>
+        <%!-- Editable form for knockout rounds (native KO entry, predictex-80k) --%>
         <.form
-          :if={@active && @editable_round?}
+          :if={@active && @native_ko_round?}
           id={"round-entry-#{@active.round.ordinal}"}
           for={%{}}
           phx-submit="save_round"
@@ -238,96 +240,120 @@ defmodule PredictexWeb.MyPredictionsLive do
             data-booster-input
           />
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <div
-              :for={fx <- @active.fixtures}
-              data-fixture-card
-              class="rounded-box bg-base-100 border border-base-content/10 p-3 shadow"
-            >
-              <div class="flex items-center justify-between gap-2">
-                <span class="flex items-center gap-1 text-sm font-bold min-w-0">
-                  {Flags.flag(fx.fixture.team1)} <span class="truncate">{fx.fixture.team1}</span>
-                </span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[0-9]"
-                  maxlength="1"
-                  data-goal-input
-                  class="input input-bordered font-score w-14 text-center shrink-0"
-                  name={"picks[#{fx.fixture.id}][home_goals]"}
-                  value={fx.prediction && fx.prediction.home_goals}
-                  placeholder="—"
-                />
-              </div>
-              <div class="flex items-center justify-between gap-2 mt-1">
-                <span class="flex items-center gap-1 text-sm font-bold min-w-0">
-                  {Flags.flag(fx.fixture.team2)} <span class="truncate">{fx.fixture.team2}</span>
-                </span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  pattern="[0-9]"
-                  maxlength="1"
-                  data-goal-input
-                  class="input input-bordered font-score w-14 text-center shrink-0"
-                  name={"picks[#{fx.fixture.id}][away_goals]"}
-                  value={fx.prediction && fx.prediction.away_goals}
-                  placeholder="—"
-                />
-              </div>
-              <div class="mt-2 space-y-2 border-t border-base-content/10 pt-2">
+            <div :for={fx <- @active.fixtures} class="contents">
+              <div
+                :if={@fixture_states[fx.fixture.id] == :editable}
+                data-fixture-card
+                class="rounded-box bg-base-100 border border-base-content/10 p-3 shadow"
+              >
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-xs font-semibold text-base-content/60">First scorer</span>
-                  <div class="flex items-center gap-1">
-                    <input
-                      type="text"
-                      class="sr-only"
-                      tabindex="-1"
-                      aria-hidden="true"
-                      name={"picks[#{fx.fixture.id}][first_scorer_side]"}
-                      value={scorer_value(fx)}
-                      data-scorer-input
-                    />
-                    <button
-                      type="button"
-                      data-scorer-btn
-                      data-side="home"
-                      aria-pressed={to_string(scorer_pressed?(fx, :home))}
-                      title={"First scorer: #{fx.fixture.team1}"}
-                      class={"min-w-11 #{toggle_btn_class(scorer_pressed?(fx, :home))}"}
-                    >
-                      {Flags.flag(fx.fixture.team1)}
-                    </button>
-                    <button
-                      type="button"
-                      data-scorer-btn
-                      data-side="away"
-                      aria-pressed={to_string(scorer_pressed?(fx, :away))}
-                      title={"First scorer: #{fx.fixture.team2}"}
-                      class={"min-w-11 #{toggle_btn_class(scorer_pressed?(fx, :away))}"}
-                    >
-                      {Flags.flag(fx.fixture.team2)}
-                    </button>
-                  </div>
+                  <span class="flex items-center gap-1 text-sm font-bold min-w-0">
+                    {Flags.flag(fx.fixture.team1)} <span class="truncate">{fx.fixture.team1}</span>
+                  </span>
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    maxlength="1"
+                    data-goal-input
+                    class="input input-bordered font-score w-14 text-center shrink-0"
+                    name={"picks[#{fx.fixture.id}][home_goals]"}
+                    value={fx.prediction && fx.prediction.home_goals}
+                    placeholder="—"
+                  />
                 </div>
-                <button
-                  type="button"
-                  data-booster-btn
-                  data-fixture={fx.fixture.id}
-                  aria-pressed={to_string(fx.booster?)}
-                  class={"w-full #{toggle_btn_class(fx.booster?)}"}
-                >
-                  ⚡ Booster
-                </button>
+                <div class="flex items-center justify-between gap-2 mt-1">
+                  <span class="flex items-center gap-1 text-sm font-bold min-w-0">
+                    {Flags.flag(fx.fixture.team2)} <span class="truncate">{fx.fixture.team2}</span>
+                  </span>
+                  <input
+                    type="text"
+                    inputmode="numeric"
+                    pattern="[0-9]"
+                    maxlength="1"
+                    data-goal-input
+                    class="input input-bordered font-score w-14 text-center shrink-0"
+                    name={"picks[#{fx.fixture.id}][away_goals]"}
+                    value={fx.prediction && fx.prediction.away_goals}
+                    placeholder="—"
+                  />
+                </div>
+                <div class="mt-2 space-y-2 border-t border-base-content/10 pt-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-base-content/60">First scorer</span>
+                    <div class="flex items-center gap-1">
+                      <input
+                        type="text"
+                        class="sr-only"
+                        tabindex="-1"
+                        aria-hidden="true"
+                        name={"picks[#{fx.fixture.id}][first_scorer_side]"}
+                        value={scorer_value(fx)}
+                        data-scorer-input
+                      />
+                      <button
+                        type="button"
+                        data-scorer-btn
+                        data-side="home"
+                        aria-pressed={to_string(scorer_pressed?(fx, :home))}
+                        title={"First scorer: #{fx.fixture.team1}"}
+                        class={"min-w-11 #{toggle_btn_class(scorer_pressed?(fx, :home))}"}
+                      >
+                        {Flags.flag(fx.fixture.team1)}
+                      </button>
+                      <button
+                        type="button"
+                        data-scorer-btn
+                        data-side="away"
+                        aria-pressed={to_string(scorer_pressed?(fx, :away))}
+                        title={"First scorer: #{fx.fixture.team2}"}
+                        class={"min-w-11 #{toggle_btn_class(scorer_pressed?(fx, :away))}"}
+                      >
+                        {Flags.flag(fx.fixture.team2)}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    data-booster-btn
+                    data-fixture={fx.fixture.id}
+                    aria-pressed={to_string(fx.booster?)}
+                    class={"w-full #{toggle_btn_class(fx.booster?)}"}
+                  >
+                    ⚡ Booster
+                  </button>
+                </div>
+              </div>
+
+              <.fixture_card
+                :if={@fixture_states[fx.fixture.id] == :locked}
+                fx={fx}
+                stage={@active.round.stage}
+                fifa_url={@fifa_url}
+                live_cta?={Predictions.cta_window?(fx.fixture, @now)}
+                live_path={~p"/fixtures/#{fx.fixture.id}"}
+                tz={@tz}
+              />
+
+              <div
+                :if={@fixture_states[fx.fixture.id] == :pending}
+                class="rounded-box bg-base-200 border border-base-content/10 p-3 text-sm"
+              >
+                <p class="font-semibold">
+                  {Flags.flag(fx.fixture.team1)} {fx.fixture.team1}
+                  <span class="opacity-60">v</span>
+                  {Flags.flag(fx.fixture.team2)} {fx.fixture.team2}
+                </p>
+                <p class="opacity-70">⏳ awaiting teams</p>
               </div>
             </div>
           </div>
           <button type="submit" class="btn btn-primary mt-4">Save picks</button>
         </.form>
 
-        <%!-- Read-only fixture grid for group rounds and locked knockout rounds --%>
+        <%!-- Read-only fixture grid for group rounds and flag-off knockout rounds --%>
         <div
-          :if={@active && not @editable_round?}
+          :if={@active && not @native_ko_round?}
           class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
           <.fixture_card
@@ -465,17 +491,18 @@ defmodule PredictexWeb.MyPredictionsLive do
   defp active_round(dash, ordinal),
     do: Enum.find(dash.rounds, &(&1.round.ordinal == ordinal))
 
-  # A round is editable in-place iff it is a knockout round AND currently open for predictions
-  # (i.e. its predecessor round is fully completed). Group rounds are read-only here — they
-  # are entered via the FIFA import or admin flows.
-  # A knockout round's native entry form renders only when the :native_ko_entry flag is on
-  # for this player AND the round is open (predecessor fully completed). The flag decouples
-  # the staged rollout (off → admins → all) from the automatic 28-Jun round_open? cutover
-  # (predictex-5q6). Flag off → read-only FIFA-import grid for everyone (game dark).
-  defp editable_round?(%{round: %{stage: :knockout} = round}, player),
-    do: native_ko_enabled?(player) and Tournament.round_open?(round)
+  # A knockout round shows the native entry view when the flag is on for this player. Individual
+  # fixtures are then gated per-fixture (Predictions.fixture_entry_state/2) — predictex-80k.
+  defp native_ko_round?(%{round: %{stage: :knockout}}, player), do: native_ko_enabled?(player)
+  defp native_ko_round?(_, _player), do: false
 
-  defp editable_round?(_, _player), do: false
+  defp fixture_states(%{fixtures: fixtures}, now),
+    do:
+      Map.new(fixtures, fn fx ->
+        {fx.fixture.id, Predictions.fixture_entry_state(fx.fixture, now)}
+      end)
+
+  defp fixture_states(_active, _now), do: %{}
 
   # Single source for the flag resolution — used by the render gate and the write gate so
   # the two defense-in-depth layers can't drift. The :admins group resolves off is_admin

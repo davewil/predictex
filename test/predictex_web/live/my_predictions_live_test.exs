@@ -439,17 +439,15 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
   end
 
   @tag :native_ko
-  test "knockout round flips read-only → editable the moment its predecessor completes (28 Jun cutover)",
-       %{conn: conn, round: round} do
-    # The real 28-Jun cutover, proven in CI instead of eyeballed live: a knockout round is
-    # closed (read-only FIFA-import grid) while the group stage is mid-flight, and flips to the
-    # editable native form the instant the last group fixture settles. This is the transition
-    # the other KO tests skip — they start from an already-open round.
-    player = player_fixture(%{display_name: "Cutover"})
+  test "a knockout fixture flips read-only → editable the moment ITS teams resolve", %{
+    conn: conn,
+    round: round
+  } do
+    player = player_fixture(%{display_name: "PerFixture"})
     past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
     future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
 
-    # Close the setup round (ordinal 1) so it doesn't steal "active".
+    # Close ordinal 1 so it doesn't steal "active".
     _done1 =
       fixture!(round, %{
         team1: "France",
@@ -460,72 +458,59 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
         away_goals: 0
       })
 
-    # Predecessor (ordinal 3) starts INCOMPLETE — one still-scheduled fixture. This mirrors
-    # the world before 28 Jun: the group stage is unfinished, so R32 is correctly closed.
-    {:ok, pred_round} =
-      Tournament.create_round(%{name: "Matchday 3", stage: :group, ordinal: 3})
-
-    pred_fx =
-      fixture!(pred_round, %{
-        team1: "Brazil",
-        team2: "Argentina",
-        kickoff_at: future,
-        status: :scheduled
-      })
-
-    # Knockout round (ordinal 4): round_open? iff ordinal 3 is complete.
     {:ok, ko_round} =
-      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+      Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 4})
 
-    ko_fx =
-      fixture!(ko_round, %{team1: "England", team2: "Germany", kickoff_at: future})
+    # Starts with placeholder teams → :pending → read-only "awaiting teams".
+    ko_fx = fixture!(ko_round, %{team1: "1A", team2: "2B", kickoff_at: future})
 
     {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    html = lv |> element("button", "Round of 32") |> render_click()
+    refute html =~ ~s(name="picks[#{ko_fx.id}][home_goals]")
+    assert html =~ "awaiting teams"
 
-    # Before the predecessor completes: the knockout round is closed → read-only grid, no
-    # native entry form. (This is the expected 2026-06-23 screenshot state, by design.)
-    html = lv |> element("button", "Round of 16") |> render_click()
-    refute html =~ ~s(id="round-entry-4")
-    assert html =~ "England"
-    assert html =~ "Germany"
-
-    # The last group fixture settles — exactly what Workers.ResultSync does as the group
-    # stage ends — and broadcasts the change (same call ResultSync makes post-commit).
-    pred_fx
-    |> Ecto.Changeset.change(%{status: :completed, home_goals: 2, away_goals: 1})
-    |> Predictex.Repo.update!()
-
+    # FIFA/openfootball resolve the bracket: the fixture's own teams become real names.
+    ko_fx |> Ecto.Changeset.change(%{team1: "Brazil", team2: "Japan"}) |> Predictex.Repo.update!()
     Tournament.broadcast_change()
     html = render(lv)
 
-    # The same knockout round now renders the editable native entry form — the gate flipped
-    # open over the live socket, no remount.
-    assert html =~ ~s(id="round-entry-4")
-    assert html =~ "England"
-    assert html =~ "Germany"
+    # The same fixture now renders editable inputs — gated on ITS resolution, not the whole round.
+    assert html =~ ~s(name="picks[#{ko_fx.id}][home_goals]")
+    assert html =~ "Brazil"
+  end
 
-    # …and a save through the newly-opened form persists, so the cutover is fully usable.
-    html =
-      lv
-      |> form("#round-entry-4", %{
-        "picks" => %{
-          "#{ko_fx.id}" => %{
-            "home_goals" => "3",
-            "away_goals" => "0",
-            "first_scorer_side" => "home"
-          }
-        },
-        "booster_fixture_id" => "#{ko_fx.id}"
+  @tag :native_ko
+  test "the R32 tab is a per-fixture mix: editable, locked, pending", %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "Mix"})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
       })
-      |> render_submit()
 
-    assert html =~ "Saved"
+    {:ok, ko} = Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 4})
+    editable = fixture!(ko, %{team1: "Brazil", team2: "Japan", kickoff_at: future})
+    locked = fixture!(ko, %{team1: "Spain", team2: "Italy", kickoff_at: past})
+    pending = fixture!(ko, %{team1: "Germany", team2: "3A/B/C/D/F", kickoff_at: future})
 
-    pred = Predictions.get_player_fixture_prediction(player.id, ko_fx.id)
-    assert pred.home_goals == 3
-    assert pred.away_goals == 0
-    assert pred.first_scorer_side == :home
-    assert pred.booster == true
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    html = lv |> element("button", "Round of 32") |> render_click()
+
+    # editable: inputs
+    assert html =~ ~s(name="picks[#{editable.id}][home_goals]")
+    # locked: no inputs
+    refute html =~ ~s(name="picks[#{locked.id}][home_goals]")
+    # pending: no inputs
+    refute html =~ ~s(name="picks[#{pending.id}][home_goals]")
+    # pending card label
+    assert html =~ "awaiting teams"
   end
 
   @tag :native_ko
