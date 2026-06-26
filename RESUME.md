@@ -12,7 +12,18 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.17` (deployed + verified 2026-06-25 14:13 UTC: Deploy success, no migration,
+- **Latest deployed tag:** `v0.11.18` (deployed + verified 2026-06-26 ~18:01 UTC: Deploy success in 3m44s,
+  **no migration**, `/health` 200, anon `/` 200, valid TLS, **`/bracket` renders** "As it stands"/"Round of
+  32"/group tables) — bundles **`predictex-80k`** (per-fixture native R32 KO unlock — native KO entry now
+  gated PER FIXTURE not per round; `round_open?` retired; `:editable` when flag-on + both teams resolved +
+  kickoff future, `:locked` read-only + `/fixtures` CTA when kicked-off, `:pending` "⏳ awaiting teams" when a
+  slot is still a placeholder; booster commit-at-kickoff `{:error,:booster_locked}`; shared
+  `Knockout.resolved_team?/1` is the single resolution truth across `Bracket` + write path) **+ `predictex-7qu`**
+  (public `/bracket` "as it stands" projected R32 page). **▶ REMAINING = flag rollout (user's call, ops/no-code):**
+  the game is still DARK for members — `:native_ko_entry` is enabled only for the `:admins` group. Roll out with
+  `rpc 'FunWithFlags.enable(:native_ko_entry)'` for ALL members → resolved R32 matches become predictable
+  FIFA-style. Kill switch = `rpc 'FunWithFlags.disable(:native_ko_entry)'`, no redeploy.
+- **Prior deployed tag:** `v0.11.17` (deployed + verified 2026-06-25 14:13 UTC: Deploy success, no migration,
   `/health` 200, anon `/` 200, `native_ko_entry` resolves `false` — ships OFF, game dark) — **`predictex-5q6`**:
   native KO entry gated behind the `:native_ko_entry` FunWithFlags flag. Render gate (`editable_round?/2`) +
   independent write-path gate (`save_round_predictions/5` → `{:error, :feature_disabled}`) both check
@@ -109,23 +120,25 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-26) — NEXT SESSION: DEPLOY (tag) `80k`+`7qu`, then roll out the flag to all members
+## ⏵ Continue here (2026-06-26) — NEXT: roll out the `:native_ko_entry` flag to all members (ops, no code)
 
-`predictex-80k` (per-fixture R32 unlock) shipped to `main` this session and **is PUSHED** (origin/main HEAD
-`15438d2`). Everything below is **committed + pushed but UNDEPLOYED** (latest deployed tag is still
-`v0.11.17`). The single live next step is a **deploy**, which is the user's explicit call.
+`predictex-80k` + `7qu` are **DEPLOYED + verified** as `v0.11.18` (see "Live right now"). The single live next
+step is the **flag rollout** — the game is still DARK for members (flag enabled only for `:admins`).
 
-### ▶ START HERE: deploy the per-fixture native R32 game, then roll out the flag
-`80k` + `7qu` are both on origin/main, undeployed. To ship:
-1. **Pre-deploy gate** (mid-capture check first — no match live): `scripts/pre-deploy` (mix precommit +
-   sobelow + docker build + boot smoke). 547 tests green locally already.
-2. **Tag + deploy** (user's call): `git tag v0.11.18 && git push origin v0.11.18`. Bundles `80k` (per-fixture
-   KO unlock) **and** `7qu` (public `/bracket` page) — both rode `main` since the last tag.
-3. **Verify** post-deploy: Deploy success, **no migration** (80k + 7qu are both additive — no `priv/repo`
-   changes), `/health` 200, anon `/` 200, `/bracket` renders, `native_ko_entry` still admin-group-gated.
-4. **Roll out the flag** (ops, no code, user's call): `rpc 'FunWithFlags.enable(:native_ko_entry)'` for ALL
-   members — now they get the FIFA-style per-match unlock (resolved R32 matches predictable as teams land,
-   not a whole-round flip). Kill switch = `rpc 'FunWithFlags.disable(:native_ko_entry)'`, no redeploy.
+### ▶ START HERE: enable the flag for all members (user's call, ops/no-code)
+The per-fixture native R32 game is live in prod but gated to admins. To open it to the league:
+1. **(Optional) admin smoke-check first:** as an admin, open `/predictions` → R32 tab once a match's teams
+   resolve (FIFA/openfootball resolves them ~15-min cadence as group results land) → confirm the native
+   `:editable` card renders + a pick saves. R32 fixtures stay `:pending` ("⏳ awaiting teams") until their
+   teams resolve, so eyeball after the first R32 pairings are known.
+2. **Roll out to everyone:** `rpc 'FunWithFlags.enable(:native_ko_entry)'` → all members get the FIFA-style
+   per-match unlock (each resolved R32 match becomes predictable the moment its teams land, not a whole-round
+   flip). **Kill switch** = `rpc 'FunWithFlags.disable(:native_ko_entry)'`, no redeploy.
+3. **28-Jun watch (unchanged):** `predictex-hco` WS1 self-arms — confirm `KO fifa_match_id: 32/32` once FIFA
+   publishes the bracket, then first KO capture through ET/pens with `is_live` clearing (closes `hco`).
+
+> **NOTE:** 2 group matches kick off 20:00 (26 Jun) — `v0.11.18` was tagged/deployed BEFORE kickoff (no
+> mid-capture frame loss). Don't tag again while either is capturing.
 
 > **What 80k changed (shipped):** native KO entry is now gated **per fixture**, not per round. `round_open?`
 > is **retired**. A knockout fixture is `:editable` when the flag is on AND both teams are resolved (real
@@ -139,7 +152,9 @@ the app scores them against real results and ranks a leaderboard.
 - **`predictex-80k` SHIPPED + pushed (CLOSED)** — per-fixture native R32 unlock. 5 commits
   `a905510..1950e28` (`142b090`,`fc8fdd9`,`f210041`,`bd4600f`,`1950e28`), subagent-driven 5-task TDD, every
   task spec-✅/Approved, **opus final whole-branch review = Ready to merge** (no Critical/Important; all
-  cross-task seams verified). 547 tests green, full gate clean. **UNDEPLOYED** (deploy = START HERE above).
+  cross-task seams verified). 547 tests green, full gate clean. **DEPLOYED + verified as `v0.11.18`** (bundled
+  with `7qu`; pre-deploy gate green, deploy 3m44s, no migration, `/health`+`/`+`/bracket` all 200). Flag
+  rollout to all members is the one remaining step (START HERE above).
   4 Minor follow-ups filed (`94u` `:pending` card shows raw placeholder not friendly label; `cfi` booster
   guard runs a SELECT on no-booster saves; `34w` test doc-rot (stale `round_open?` comments + dead
   predecessor scaffolding); `57t` `bracket.ex` `@third` dead captures) — all P4. `cij` **narrowed** (its
