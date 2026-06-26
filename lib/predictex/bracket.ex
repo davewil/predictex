@@ -10,15 +10,17 @@ defmodule Predictex.Bracket do
   """
 
   alias Predictex.Bracket.Thirds
-  alias Predictex.{GroupTables, Tournament}
+  alias Predictex.{GroupTables, Knockout, Tournament}
 
   @winner_runner_up ~r/^([12])([A-Z])$/
   @third ~r{^3([A-Z])(?:/([A-Z]))+$}
-  @later_round ~r/^[WL]\d+$/
 
   @doc "Resolve one R32 slot placeholder into a renderable value. Total."
   def resolve_slot(placeholder, group_tables) when is_binary(placeholder) do
     cond do
+      Knockout.resolved_team?(placeholder) ->
+        {:resolved, placeholder}
+
       caps = Regex.run(@winner_runner_up, placeholder) ->
         [_, pos, group] = caps
         resolve_position(group_tables, group, String.to_integer(pos))
@@ -27,11 +29,8 @@ defmodule Predictex.Bracket do
         groups = placeholder |> String.slice(1..-1//1) |> String.split("/")
         {:candidate_set, groups}
 
-      Regex.match?(@later_round, placeholder) ->
-        {:tbd, placeholder}
-
       true ->
-        {:resolved, placeholder}
+        {:tbd, placeholder}
     end
   end
 
