@@ -32,7 +32,7 @@ defmodule PredictexWeb.MyPredictionsLive do
      |> assign(:dash, dash)
      |> assign(:active_ordinal, active)
      |> assign(:now, now)
-     |> assign(:next_match, Dashboard.next_match(dash, now))
+     |> assign(:next_matches, Dashboard.next_matches(dash, now))
      |> assign(:fifa_url, Application.get_env(:predictex, :fifa_predictor_url))}
   end
 
@@ -117,7 +117,7 @@ defmodule PredictexWeb.MyPredictionsLive do
     socket
     |> assign(:now, now)
     |> assign(:dash, dash)
-    |> assign(:next_match, Dashboard.next_match(dash, now))
+    |> assign(:next_matches, Dashboard.next_matches(dash, now))
   end
 
   defp schedule_next_tick(dash, now) do
@@ -145,29 +145,33 @@ defmodule PredictexWeb.MyPredictionsLive do
       </div>
 
       <div :if={@dash.rounds != []} class="space-y-4">
-        <%!-- next-match countdown — soonest upcoming fixture across all rounds (predictex-vg7) --%>
+        <%!-- next-match countdown — every fixture tied at the soonest kickoff (predictex-vg7);
+             the World Cup runs two matches in the same slot, so show them all on one countdown --%>
         <div
-          :if={@next_match}
+          :if={@next_matches != []}
           id="next-match-banner"
           class="flex flex-col items-center gap-1 rounded-box border border-accent/30 bg-accent/10 p-3 text-center"
         >
           <span class="text-[10px] font-extrabold uppercase tracking-wider text-accent">
-            Next match
+            {if length(@next_matches) > 1, do: "Next matches", else: "Next match"}
           </span>
-          <span class="flex items-center gap-2 text-sm font-bold">
-            {@next_match.fixture.team1}
-            <span class="text-base">{Flags.flag(@next_match.fixture.team1)}</span>
+          <span
+            :for={nm <- @next_matches}
+            class="flex items-center gap-2 text-sm font-bold"
+          >
+            {nm.fixture.team1}
+            <span class="text-base">{Flags.flag(nm.fixture.team1)}</span>
             <span class="text-base-content/40">v</span>
-            <span class="text-base">{Flags.flag(@next_match.fixture.team2)}</span>
-            {@next_match.fixture.team2}
+            <span class="text-base">{Flags.flag(nm.fixture.team2)}</span>
+            {nm.fixture.team2}
           </span>
           <span class="text-xs font-semibold text-base-content/70">
             Kicks off
             <time
               id="next-match-countdown"
               phx-hook=".Countdown"
-              data-kickoff={DateTime.to_iso8601(@next_match.fixture.kickoff_at)}
-              datetime={DateTime.to_iso8601(@next_match.fixture.kickoff_at)}
+              data-kickoff={DateTime.to_iso8601(List.first(@next_matches).fixture.kickoff_at)}
+              datetime={DateTime.to_iso8601(List.first(@next_matches).fixture.kickoff_at)}
               class="font-score font-bold tabular-nums text-base-content"
             >
               …

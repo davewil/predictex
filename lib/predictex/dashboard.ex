@@ -84,16 +84,29 @@ defmodule Predictex.Dashboard do
   end
 
   @doc """
-  The soonest upcoming fixture-view across all rounds — the earliest with a future kickoff
-  that has not yet completed — or `nil` if none. Drives the next-match countdown on
-  `/predictions` (predictex-vg7). Pure; the caller supplies `now`.
+  Every upcoming fixture-view tied at the soonest kickoff across all rounds — each fixture
+  with a future kickoff that has not yet completed, sharing the earliest kickoff instant —
+  or `[]` if none. Returns a list (sorted by fixture id for a stable order) because the
+  World Cup routinely runs two matches in the same slot, and the next-match countdown on
+  `/predictions` (predictex-vg7) must show all of them, not just one. Pure; caller supplies `now`.
   """
-  def next_match(dash, now \\ DateTime.utc_now()) do
-    dash.rounds
-    |> Enum.flat_map(& &1.fixtures)
-    |> Enum.filter(&upcoming?(&1, now))
-    |> Enum.sort_by(& &1.fixture.kickoff_at, DateTime)
-    |> List.first()
+  def next_matches(dash, now \\ DateTime.utc_now()) do
+    upcoming =
+      dash.rounds
+      |> Enum.flat_map(& &1.fixtures)
+      |> Enum.filter(&upcoming?(&1, now))
+
+    case upcoming do
+      [] ->
+        []
+
+      _ ->
+        soonest = Enum.min_by(upcoming, & &1.fixture.kickoff_at, DateTime).fixture.kickoff_at
+
+        upcoming
+        |> Enum.filter(&(DateTime.compare(&1.fixture.kickoff_at, soonest) == :eq))
+        |> Enum.sort_by(& &1.fixture.id)
+    end
   end
 
   defp upcoming?(%{status: :completed}, _now), do: false

@@ -93,8 +93,11 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
   test "switching round tabs shows that round's fixtures", %{conn: conn, round: round} do
     {:ok, round2} = Tournament.create_round(%{name: "Matchday 2", stage: :group, ordinal: 2})
     future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+    # round2's fixture kicks off later so it is NOT the soonest — otherwise it would (correctly)
+    # surface in the cross-round next-match banner before the tab switch.
+    later = DateTime.utc_now() |> DateTime.add(2 * 3600, :second) |> DateTime.truncate(:second)
     _f1 = fixture!(round, %{kickoff_at: future})
-    _f2 = fixture!(round2, %{team1: "Japan", team2: "Germany", kickoff_at: future})
+    _f2 = fixture!(round2, %{team1: "Japan", team2: "Germany", kickoff_at: later})
     player = player_fixture(%{display_name: "Dave"})
 
     {:ok, lv, html} = conn |> log_in_player(player) |> live(~p"/predictions")
@@ -219,6 +222,34 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert html =~ "Croatia"
     # the colocated countdown hook is fed the kickoff timestamp to tick against
     assert html =~ ~s(data-kickoff="#{DateTime.to_iso8601(soon)}")
+  end
+
+  test "shows BOTH fixtures when two share the soonest kickoff (Next matches, plural)",
+       %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "TwoNextTester"})
+
+    soon = DateTime.utc_now() |> DateTime.add(2 * 3600, :second) |> DateTime.truncate(:second)
+    later = DateTime.utc_now() |> DateTime.add(5 * 3600, :second) |> DateTime.truncate(:second)
+
+    # Two matches kick off in the same slot — both must appear, not just one.
+    _a = fixture!(round, %{team1: "Norway", team2: "France", kickoff_at: soon})
+    _b = fixture!(round, %{team1: "Brazil", team2: "Japan", kickoff_at: soon})
+    # A later one must NOT appear in the banner (it still renders in the round grid below).
+    _c = fixture!(round, %{team1: "Spain", team2: "Iran", kickoff_at: later})
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    # Scope to the banner element — the round grid renders every fixture, so a whole-page
+    # match would not prove the banner's tied-at-soonest selection.
+    banner = lv |> element("#next-match-banner") |> render()
+    assert banner =~ "Next matches"
+    assert banner =~ "Norway"
+    assert banner =~ "France"
+    assert banner =~ "Brazil"
+    assert banner =~ "Japan"
+    # the soonest kickoff drives the single shared countdown; the later match is excluded
+    assert banner =~ ~s(data-kickoff="#{DateTime.to_iso8601(soon)}")
+    refute banner =~ "Spain"
   end
 
   test "no 'Next match' banner when nothing is upcoming", %{conn: conn, round: round} do
