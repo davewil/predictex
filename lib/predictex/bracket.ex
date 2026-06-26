@@ -21,7 +21,7 @@ defmodule Predictex.Bracket do
         resolve_position(group_tables, group, String.to_integer(pos))
 
       Regex.match?(@third, placeholder) ->
-        groups = placeholder |> String.trim_leading("3") |> String.split("/")
+        groups = placeholder |> String.slice(1..-1//1) |> String.split("/")
         {:candidate_set, groups}
 
       Regex.match?(@later_round, placeholder) ->

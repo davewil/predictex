@@ -37,6 +37,6 @@ defmodule Predictex.BracketTest do
 
   test "is total — a later-round W/L marker and garbage never raise" do
     assert Bracket.resolve_slot("W74", tables()) == {:tbd, "W74"}
-    assert match?({:resolved, _}, Bracket.resolve_slot("", tables()))
+    assert Bracket.resolve_slot("", tables()) == {:resolved, ""}
   end
 end
