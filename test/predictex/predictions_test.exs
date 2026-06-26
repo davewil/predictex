@@ -542,4 +542,51 @@ defmodule Predictex.PredictionsTest do
       assert {:error, :booster_on_blank} = Predictions.validate_pick_rows(rows)
     end
   end
+
+  describe "fixture_entry_state/2 (per-fixture KO entry gate)" do
+    alias Predictex.Tournament.Fixture
+
+    @now ~U[2026-06-28 12:00:00Z]
+
+    test ":pending when either team is still a bracket placeholder" do
+      future = DateTime.add(@now, 3600, :second)
+
+      assert Predictions.fixture_entry_state(
+               %Fixture{team1: "Germany", team2: "3A/B/C/D/F", kickoff_at: future},
+               @now
+             ) == :pending
+
+      assert Predictions.fixture_entry_state(
+               %Fixture{team1: "1C", team2: "Belgium", kickoff_at: future},
+               @now
+             ) == :pending
+    end
+
+    test ":editable when both teams resolved and kickoff is in the future" do
+      future = DateTime.add(@now, 3600, :second)
+
+      assert Predictions.fixture_entry_state(
+               %Fixture{team1: "Brazil", team2: "Japan", kickoff_at: future},
+               @now
+             ) == :editable
+    end
+
+    test ":locked when both teams resolved and kickoff has passed" do
+      past = DateTime.add(@now, -3600, :second)
+
+      assert Predictions.fixture_entry_state(
+               %Fixture{team1: "Brazil", team2: "Japan", kickoff_at: past},
+               @now
+             ) == :locked
+    end
+
+    test ":pending takes precedence over a passed kickoff" do
+      past = DateTime.add(@now, -3600, :second)
+
+      assert Predictions.fixture_entry_state(
+               %Fixture{team1: "1A", team2: "2B", kickoff_at: past},
+               @now
+             ) == :pending
+    end
+  end
 end

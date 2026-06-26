@@ -13,6 +13,7 @@ defmodule Predictex.Predictions do
   alias Predictex.Predictions.Prediction
   alias Predictex.Tournament
   alias Predictex.Tournament.Fixture
+  alias Predictex.Knockout
 
   def list_predictions, do: Repo.all(Prediction)
 
@@ -210,6 +211,24 @@ defmodule Predictex.Predictions do
   def locked?(nil, _now), do: false
   def locked?(%Fixture{kickoff_at: nil}, _now), do: false
   def locked?(%Fixture{kickoff_at: kickoff}, now), do: DateTime.compare(now, kickoff) != :lt
+
+  @doc """
+  Per-fixture native KO entry state at `now` (predictex-80k):
+
+    * `:pending`  — a slot is still a bracket placeholder; can't predict an unknown team
+    * `:locked`   — both teams resolved, kickoff has passed (read-only)
+    * `:editable` — both teams resolved, kickoff in the future
+
+  `:pending` is checked first so an unresolved fixture is never editable even if its scheduled
+  kickoff has somehow passed. Reuses `locked?/2` so the lockout rule has one definition.
+  """
+  def fixture_entry_state(%Fixture{team1: t1, team2: t2} = fixture, now) do
+    cond do
+      not (Knockout.resolved_team?(t1) and Knockout.resolved_team?(t2)) -> :pending
+      locked?(fixture, now) -> :locked
+      true -> :editable
+    end
+  end
 
   # The live drill-down (FixtureLive) CTA opens this long before kickoff.
   @cta_lead_seconds 30 * 60
