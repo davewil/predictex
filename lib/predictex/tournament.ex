@@ -80,6 +80,36 @@ defmodule Predictex.Tournament do
   @doc "Look up a fixture by its stable openfootball match number (knockout only; predictex-g8m)."
   def get_fixture_by_source_num(num), do: Repo.get_by(Fixture, source_num: num)
 
+  @doc "All group-stage fixtures (round `stage: :group`)."
+  def group_stage_fixtures do
+    Repo.all(
+      from f in Fixture,
+        join: r in Round,
+        on: f.round_id == r.id,
+        where: r.stage == :group
+    )
+  end
+
+  @doc """
+  Fixtures of the Round of 32 — the lowest-`ordinal` `:knockout` round — ordered by
+  `source_num`. Returns `[]` when no knockout round exists yet.
+  """
+  def r32_fixtures do
+    r32_id =
+      Repo.one(
+        from r in Round,
+          where: r.stage == :knockout,
+          order_by: [asc: r.ordinal],
+          limit: 1,
+          select: r.id
+      )
+
+    case r32_id do
+      nil -> []
+      id -> Repo.all(from f in Fixture, where: f.round_id == ^id, order_by: [asc: f.source_num])
+    end
+  end
+
   def create_fixture(attrs) do
     %Fixture{} |> Fixture.changeset(attrs) |> Repo.insert()
   end

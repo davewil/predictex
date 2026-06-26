@@ -100,4 +100,28 @@ defmodule Predictex.TournamentTest do
       assert_received :fixtures_changed
     end
   end
+
+  describe "group_stage_fixtures/0 and r32_fixtures/0" do
+    test "partitions group-stage from the first knockout round" do
+      # Insert rounds ascending by ordinal (DataCase deadlock invariant).
+      {:ok, g1} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+      {:ok, r32} = Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 4})
+      {:ok, r16} = Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 5})
+
+      gf = fixture!(g1, %{group: "A"})
+      k_b = fixture!(r32, %{team1: "1A", team2: "2B", source_num: 74})
+      k_a = fixture!(r32, %{team1: "1C", team2: "2D", source_num: 73})
+      _r16f = fixture!(r16, %{team1: "W73", team2: "W74", source_num: 89})
+
+      assert Enum.map(Tournament.group_stage_fixtures(), & &1.id) == [gf.id]
+      # R32 = lowest-ordinal knockout round, ordered by source_num.
+      assert Enum.map(Tournament.r32_fixtures(), & &1.id) == [k_a.id, k_b.id]
+    end
+
+    test "r32_fixtures is empty when there is no knockout round" do
+      {:ok, g1} = Tournament.create_round(%{name: "Matchday 1", stage: :group, ordinal: 1})
+      _gf = fixture!(g1, %{group: "A"})
+      assert Tournament.r32_fixtures() == []
+    end
+  end
 end
