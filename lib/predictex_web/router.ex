@@ -63,6 +63,7 @@ defmodule PredictexWeb.Router do
     live_session :public,
       on_mount: [{PredictexWeb.PlayerAuth, :mount_current_scope}] do
       live "/", LeaderboardLive, :index
+      live "/bracket", BracketLive, :index
     end
   end
 
