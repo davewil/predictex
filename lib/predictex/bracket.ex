@@ -9,6 +9,9 @@ defmodule Predictex.Bracket do
   openfootball/`Workers.KnockoutIds` ingest as `{:resolved, name}` (see the spike).
   """
 
+  alias Predictex.Bracket.Thirds
+  alias Predictex.{GroupTables, Tournament}
+
   @winner_runner_up ~r/^([12])([A-Z])$/
   @third ~r{^3([A-Z])(?:/([A-Z]))+$}
   @later_round ~r/^[WL]\d+$/
@@ -30,6 +33,28 @@ defmodule Predictex.Bracket do
       true ->
         {:resolved, placeholder}
     end
+  end
+
+  @doc "Pure projection: build the bracket view model from group + R32 fixtures."
+  def build(group_fixtures, r32_fixtures) do
+    tables = GroupTables.build(group_fixtures)
+
+    matches =
+      Enum.map(r32_fixtures, fn fx ->
+        %{
+          source_num: fx.source_num,
+          kickoff_at: fx.kickoff_at,
+          home: resolve_slot(fx.team1, tables),
+          away: resolve_slot(fx.team2, tables)
+        }
+      end)
+
+    %{matches: matches, group_tables: tables, thirds: Thirds.ranked(tables)}
+  end
+
+  @doc "Gather edge: load the fixtures and build the projection."
+  def view do
+    build(Tournament.group_stage_fixtures(), Tournament.r32_fixtures())
   end
 
   defp resolve_position(group_tables, group, position) do

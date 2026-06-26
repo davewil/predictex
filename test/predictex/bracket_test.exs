@@ -39,4 +39,43 @@ defmodule Predictex.BracketTest do
     assert Bracket.resolve_slot("W74", tables()) == {:tbd, "W74"}
     assert Bracket.resolve_slot("", tables()) == {:resolved, ""}
   end
+
+  describe "build/2" do
+    test "assembles R32 matches, group tables and the thirds panel" do
+      group_fixtures = [
+        %{
+          group: "C",
+          team1: "Croatia",
+          team2: "Belgium",
+          home_goals: 2,
+          away_goals: 0,
+          status: :completed
+        },
+        %{
+          group: "F",
+          team1: "Brazil",
+          team2: "Serbia",
+          home_goals: 1,
+          away_goals: 0,
+          status: :completed
+        }
+      ]
+
+      r32_fixtures = [
+        %{source_num: 76, kickoff_at: nil, team1: "1C", team2: "3A/B/C/D/F"},
+        %{source_num: 77, kickoff_at: nil, team1: "Germany", team2: "2F"}
+      ]
+
+      %{matches: matches, group_tables: tables, thirds: thirds} =
+        Predictex.Bracket.build(group_fixtures, r32_fixtures)
+
+      assert [m76, m77] = matches
+      assert m76.home == {:exact, "Croatia"}
+      assert m76.away == {:candidate_set, ~w(A B C D F)}
+      assert m77.home == {:resolved, "Germany"}
+      assert m77.away == {:exact, "Serbia"}
+      assert Map.has_key?(tables, "C")
+      assert %{entries: _, cutoff_provisional?: _} = thirds
+    end
+  end
 end
