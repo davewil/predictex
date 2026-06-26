@@ -1,8 +1,8 @@
 defmodule Predictex.Tournament.Round do
   @moduledoc """
-  One of the 8 game rounds (`docs/rules.md` §4). Group rounds open for predictions
-  immediately; a knockout round opens once every fixture in the previous round is
-  completed — see `Predictex.Tournament.round_open?/1`.
+  One of the 8 game rounds (`docs/rules.md` §4). Knockout fixtures open per-fixture
+  once both team slots are resolved and kickoff is in the future — see
+  `Predictex.Knockout.resolved_team?/1` and `Predictex.Predictions.fixture_entry_state/2`.
   """
   use Ecto.Schema
   import Ecto.Changeset

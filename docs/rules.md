@@ -41,8 +41,8 @@ Players compete against friends and millions of users worldwide.
 **Availability rules:**
 
 - All **three Group Stage Rounds** can be predicted right away.
-- Each **Knockout Stage Round** only opens for predictions once **all fixtures from
-  the previous Round have been completed**.
+- Each **Knockout Stage fixture** opens for predictions once **both teams are known**
+  (the bracket has resolved that fixture's two slots) **and kickoff is in the future**.
 
 ## 5. Booster 2X
 

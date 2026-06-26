@@ -2,9 +2,9 @@ defmodule Predictex.Tournament do
   @moduledoc """
   Context for the tournament structure: rounds and fixtures.
 
-  `round_open?/1` encodes the availability rule from `docs/rules.md` §4 — group
-  rounds are open immediately; a knockout round opens once every fixture in the
-  previous round is completed.
+  Knockout fixture availability follows the per-fixture rule in `docs/rules.md` §4:
+  a fixture is editable once both team slots are resolved and kickoff is in the future.
+  See `Predictex.Knockout.resolved_team?/1` and `Predictex.Predictions.fixture_entry_state/2`.
   """
   import Ecto.Query, warn: false
 
@@ -37,28 +37,6 @@ defmodule Predictex.Tournament do
 
   def create_round(attrs) do
     %Round{} |> Round.changeset(attrs) |> Repo.insert()
-  end
-
-  @doc "Whether a round is currently open for predictions."
-  def round_open?(%Round{stage: :group}), do: true
-
-  def round_open?(%Round{stage: :knockout, ordinal: ordinal}) do
-    case get_round_by_ordinal(ordinal - 1) do
-      nil -> false
-      previous -> round_complete?(previous)
-    end
-  end
-
-  @doc "Whether every fixture in a round has been completed (and the round has fixtures)."
-  def round_complete?(%Round{id: round_id}) do
-    counts =
-      Repo.one(
-        from f in Fixture,
-          where: f.round_id == ^round_id,
-          select: %{total: count(f.id), completed: count(f.id) |> filter(f.status == :completed)}
-      )
-
-    counts.total > 0 and counts.total == counts.completed
   end
 
   # --- fixtures ---

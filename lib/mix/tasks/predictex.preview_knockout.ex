@@ -1,12 +1,10 @@
 defmodule Mix.Tasks.Predictex.PreviewKnockout do
-  @shortdoc "Open the first knockout round locally so the native R32 entry form can be eyeballed (dev/test only)"
+  @shortdoc "Resolve real team names onto the first two unresolved R32 fixtures (dev/test only)"
 
   @moduledoc """
-  Settle the predecessor (last group) round in the LOCAL dev DB so the first
-  knockout round's prediction gate opens, letting you click through the real
-  native R32 entry form (scoreline + first-team + booster) before the live
-  cutover. Settles via the genuine admin write path (`Tournament.update_fixture/2`),
-  not a hand-stamped status.
+  Resolve real team names onto the first two unresolved fixtures of the first knockout round
+  in the LOCAL dev DB, so those fixtures show EDITABLE entry cards locally (predictex-80k).
+  Writes via the genuine admin path (`Tournament.update_fixture/2`), not hand-stamped data.
 
       mise exec -- mix predictex.preview_knockout
       mise exec -- mix phx.server      # then log in -> /predictions -> R32 tab
@@ -15,17 +13,18 @@ defmodule Mix.Tasks.Predictex.PreviewKnockout do
 
     * Dev/test only — refuses to run under `MIX_ENV=prod` (and mix tasks aren't
       shipped in the release anyway).
-    * Idempotent — already-completed predecessor fixtures are skipped.
-    * R32 fixtures show openfootball PLACEHOLDER team names ("Winner Group A" v
-      "Runner-up Group B") until the bracket resolves, so this previews form
-      MECHANICS/layout, not real matchups/flags.
+    * Idempotent — fixtures already fully resolved are skipped; only the first two
+      unresolved fixtures are targeted.
+    * Uses sample team names ("Brazil" v "Japan", "Croatia" v "Belgium") — this
+      previews form MECHANICS/layout, not real matchups/flags.
     * Reverse with `mix ecto.reset`. Seeds do a live feed fetch, so for an offline
-      reset use `WORLDCUP_JSON=<path> mix ecto.reset`. There is no per-fixture un-settle.
+      reset use `WORLDCUP_JSON=<path> mix ecto.reset`.
   """
   use Mix.Task
 
   import Ecto.Query, warn: false
 
+  alias Predictex.Knockout
   alias Predictex.Repo
   alias Predictex.Tournament
   alias Predictex.Tournament.{Fixture, Round}
@@ -38,20 +37,20 @@ defmodule Mix.Tasks.Predictex.PreviewKnockout do
 
     Mix.Task.run("app.start")
 
-    {:ok, %{round: round, settled_count: n}} = open_first_knockout_round()
+    {:ok, %{round: round, resolved_count: n}} = open_first_knockout_round()
 
     Mix.shell().info("""
-    Settled #{n} fixture(s) in the predecessor (group) round.
-    "#{round.name}" (ordinal #{round.ordinal}) is now OPEN for predictions.
+    Resolved teams onto #{n} fixture(s) in the first knockout round.
+    "#{round.name}" (ordinal #{round.ordinal}) now has EDITABLE cards for the resolved matches.
     Native entry form: http://localhost:4000/predictions  (log in, then select the R32 tab)
-    Note: R32 fixtures show placeholder team names until the bracket resolves — this previews form mechanics, not real matchups.
+    Note: only fixtures with both teams resolved show the editable entry form.
     """)
   end
 
   @doc """
-  Settle the first knockout round's predecessor so the round opens. Returns
-  `{:ok, %{round: round, settled_count: n, already_complete: bool}}`. Pure of IO
-  and `app.start` so it is directly testable.
+  Resolve real team names onto the first knockout round's first two unresolved fixtures, so the
+  per-fixture native entry form shows EDITABLE cards locally (predictex-80k). Returns
+  `{:ok, %{round: round, resolved_count: n}}`. Pure of IO / app.start so it is directly testable.
   """
   def open_first_knockout_round do
     ko =
@@ -60,23 +59,22 @@ defmodule Mix.Tasks.Predictex.PreviewKnockout do
     if is_nil(ko),
       do: Mix.raise("No knockout round found — run `mix ecto.reset` to seed the full schedule")
 
-    predecessor = Tournament.get_round_by_ordinal(ko.ordinal - 1)
+    unresolved =
+      from(f in Fixture, where: f.round_id == ^ko.id, order_by: [asc: f.source_num])
+      |> Repo.all()
+      |> Enum.reject(fn f ->
+        Knockout.resolved_team?(f.team1) and Knockout.resolved_team?(f.team2)
+      end)
+      |> Enum.take(2)
 
-    if is_nil(predecessor),
-      do:
-        Mix.raise(
-          "Predecessor round (ordinal #{ko.ordinal - 1}) not found — run `mix ecto.reset` to seed the full schedule"
-        )
+    sample = [{"Brazil", "Japan"}, {"Croatia", "Belgium"}]
 
-    incomplete =
-      Repo.all(from f in Fixture, where: f.round_id == ^predecessor.id and f.status != :completed)
-
-    Enum.each(incomplete, fn f ->
-      {:ok, _} = Tournament.update_fixture(f, %{status: :completed, home_goals: 1, away_goals: 0})
+    Enum.zip(unresolved, sample)
+    |> Enum.each(fn {f, {t1, t2}} ->
+      {:ok, _} = Tournament.update_fixture(f, %{team1: t1, team2: t2})
     end)
 
     Tournament.broadcast_change()
-
-    {:ok, %{round: ko, settled_count: length(incomplete), already_complete: incomplete == []}}
+    {:ok, %{round: ko, resolved_count: length(unresolved)}}
   end
 end

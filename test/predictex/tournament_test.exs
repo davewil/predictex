@@ -36,27 +36,6 @@ defmodule Predictex.TournamentTest do
     end
   end
 
-  describe "round_open?/1 and round_complete?/1" do
-    test "group rounds are always open" do
-      assert Tournament.round_open?(round!(%{stage: :group, ordinal: 1}))
-    end
-
-    test "a knockout round is closed until the previous round completes" do
-      r4 = round!(%{name: "Round of 32", stage: :knockout, ordinal: 4})
-      r5 = round!(%{name: "Round of 16", stage: :knockout, ordinal: 5})
-      f = fixture!(r4, %{status: :scheduled})
-
-      refute Tournament.round_open?(r5)
-
-      {:ok, _} = Tournament.update_fixture(f, %{status: :completed, home_goals: 1, away_goals: 0})
-      assert Tournament.round_open?(r5)
-    end
-
-    test "round_complete? is false for a round with no fixtures" do
-      refute Tournament.round_complete?(round!(%{ordinal: 2, name: "Round 2"}))
-    end
-  end
-
   describe "fixtures" do
     test "external_ref is unique" do
       r = round!()
