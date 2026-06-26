@@ -58,6 +58,11 @@ defmodule PredictexWeb.BracketLiveTest do
 
     {:ok, lv, _html} = live(conn, ~p"/bracket")
 
+    # Pre-settle: no completed games → alphabetical ranking → Belgium rank 1 → home slot = Belgium.
+    before = lv |> element("#r32-73-home") |> render()
+    assert before =~ "Belgium"
+    refute before =~ "Croatia"
+
     # Settle the group fixture, then broadcast the same signal the settle path emits.
     pred
     |> Ecto.Changeset.change(%{status: :completed, home_goals: 3, away_goals: 0})
@@ -65,8 +70,8 @@ defmodule PredictexWeb.BracketLiveTest do
 
     Tournament.broadcast_change()
 
-    html = render(lv)
-    # Croatia is now the group winner → fills the 1C slot.
-    assert html =~ "Croatia"
+    # Post-settle: Croatia 3-0 win → Croatia rank 1 → home slot flips to Croatia.
+    after_html = lv |> element("#r32-73-home") |> render()
+    assert after_html =~ "Croatia"
   end
 end

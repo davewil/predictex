@@ -50,9 +50,9 @@ defmodule PredictexWeb.BracketLive do
             :for={m <- @matches}
             class="flex items-center justify-between rounded-box bg-base-200 p-3"
           >
-            <span class="font-medium">{slot_label(m.home)}</span>
+            <span id={"r32-#{m.source_num}-home"} class="font-medium">{slot_label(m.home)}</span>
             <span class="px-2 text-sm opacity-60">v</span>
-            <span class="font-medium">{slot_label(m.away)}</span>
+            <span id={"r32-#{m.source_num}-away"} class="font-medium">{slot_label(m.away)}</span>
           </div>
         </section>
 
