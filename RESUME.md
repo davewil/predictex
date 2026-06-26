@@ -109,17 +109,54 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-25, later) — `:native_ko_entry` feature flag DEPLOYED (`v0.11.17`, ships OFF); next = operational rollout (admins → all)
+## ⏵ Continue here (2026-06-26) — NEXT SESSION: execute the `predictex-80k` plan (per-fixture R32 unlock)
 
-On the **Mac** (lefthook + bd + mise all present — the Omarchy caveats below do NOT apply here).
-Delivered + **deployed** **`predictex-5q6`** (`v0.11.17`) — gated the native KO game behind a FunWithFlags
-flag so it dark-ships and rolls out off → admins → all, decoupled from the automatic 28-Jun `round_open?`
-cutover. Pre-deploy green, no match live at tag time, `/health` 200, `native_ko_entry` ships `false` (dark).
+Three threads moved this session; **`main` is ahead of origin by ~16 commits and PUSHED at session end**
+(see `git log origin/main`). The single live next step:
 
-**▶ ONLY REMAINING = operational rollout (no code, no redeploy — the user's call):**
-`rpc 'FunWithFlags.enable(:native_ko_entry, for_group: :admins)'` → log in as an admin and verify the native
-R32 form renders on the real **28-Jun** bracket → `rpc 'FunWithFlags.enable(:native_ko_entry)'` for all.
-Kill switch = `rpc 'FunWithFlags.disable(:native_ko_entry)'`.
+### ▶ START HERE: execute `predictex-80k` (per-fixture native R32 unlock) — spec + plan READY
+FIFA unlocks each R32 match as its teams resolve; predictex's `round_open?` gate opens the whole round only
+at full group completion (~28 Jun). We're switching to a **per-fixture** gate so members predict each match
+the moment its teams resolve. **Design done, advisor-reviewed, plan written — go straight to execution.**
+- Spec: `docs/superpowers/specs/2026-06-26-per-fixture-ko-unlock-design.md`
+- Plan (5 TDD tasks): `docs/superpowers/plans/2026-06-26-per-fixture-ko-unlock.md`
+- Execute via **subagent-driven-development** (the user picked it for `/bracket`; same flow). The plan tasks:
+  (1) `Knockout.resolved_team?/1` + refactor `Bracket` onto it; (2) `Predictions.fixture_entry_state/2`
+  (`:pending|:locked|:editable`); (3) write-path `:pending` partition + commit-at-kickoff `:booster_locked`
+  guard; (4) per-fixture render + `native_ko_round?` gate (replaces the 28-Jun cutover test); (5) cleanup —
+  preview task resolves teams, retire `round_open?/1`, rules.md §4.
+- **Key locked decisions:** booster is **commit-at-kickoff** (movable among editable fixtures, locked to the
+  one you boosted once it kicks off — `{:error, :booster_locked}`, no constraint crash). The shared
+  `resolved_team?/1` lives in a NEUTRAL `Predictex.Knockout` (NOT `Bracket` — the write path must not depend
+  on a read-model). Kicked-off resolved fixture → read-only + the existing `/fixtures` CTA (subsumes `cij`
+  write-safety; cij narrows to inline-recap-only).
+- **Rollout after it lands** (ops, no code): `FunWithFlags.enable(:native_ko_entry)` for all members.
+
+### ✅ DONE this session (all committed; pushed at session end)
+- **`predictex-5q6` DEPLOYED `v0.11.17`** — `:native_ko_entry` flag dark-ships native KO entry (see the
+  "Live right now" block + the detailed block below). **Flag is currently enabled for the `:admins` group
+  in prod** (the user set it via `/admin/feature-flags`; verified admin→true, member→false). Round gate is
+  still `round_open?` (false until ~28 Jun) — 80k changes that to per-fixture.
+- **`predictex-7qu` BUILT (local, NOT deployed)** — public `/bracket` "as it stands" projected R32 page:
+  pure `GroupTables` → `Bracket.Thirds` (best-8-of-12) → total `Bracket` (resolve_slot/build/view) →
+  `BracketLive` on `:fixtures_changed`. Candidate-set thirds (the 495-row FIFA table was spiked + rejected —
+  `docs/superpowers/research/2026-06-25-bracket-thirds-table-spike.md`); exact thirds arrive via the 28-Jun
+  ingest. 8 commits, subagent-driven + opus final review (Ready-with-fixes → the one must-fix, a tautological
+  live-update test, FIXED). 542 tests green. **Follow-ups:** `predictex-v4k` (P3 — bracket renders `{:exact}`
+  even for 0-game/provisionally-tied slots; surface a provisional badge), `predictex-7t7` (P4 minor test/regex).
+- **`predictex-80k` spec + plan written** (the START HERE above).
+
+> Note (`7qu` interaction with `80k`): both consume `Knockout.resolved_team?/1`. `7qu` is built; `80k` Task 1
+> CREATES `Knockout` and refactors `Bracket` onto it — so execute `80k` on top of the current `main`.
+
+---
+
+### `predictex-5q6` detail (DEPLOYED `v0.11.17`) — the flag mechanism `80k` builds on
+**Flag state in prod NOW:** enabled for the `:admins` group (user set it via `/admin/feature-flags`;
+verified admin→`true`, member→`false`, global→`false`). Final rollout to all members is `rpc
+'FunWithFlags.enable(:native_ko_entry)'` — but do that AFTER `80k` lands (per-fixture unlock) so members
+get the FIFA-style per-match experience, not the round-level one. Kill switch =
+`rpc 'FunWithFlags.disable(:native_ko_entry)'`.
 
 **Shipped in `v0.11.17` (commit `19e99de`) — gate green (523 tests, credo clean), deployed + verified:**
 - **`FunWithFlags.Group` for `Player`** (`player.ex`): `:admins` resolves off `is_admin` (matches both
