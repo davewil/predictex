@@ -151,6 +151,18 @@ defmodule Predictex.Predictions do
       when is_list(rows) do
     fixtures = Map.new(Repo.all(from f in Fixture, where: f.round_id == ^round_id), &{&1.id, &1})
 
+    # Commit-at-kickoff booster guard (predictex-80k): if a kicked-off fixture in this round
+    # already holds the booster and the submit sets a booster on a different fixture, reject
+    # cleanly instead of hitting the one-booster-per-round unique index. The member keeps the
+    # committed booster and gets a clear message.
+    if booster_locked_conflict?(player_id, round_id, fixtures, rows, now) do
+      {:error, :booster_locked}
+    else
+      do_save_round_predictions(player_id, round_id, rows, fixtures, now)
+    end
+  end
+
+  defp do_save_round_predictions(player_id, round_id, rows, fixtures, now) do
     # Partition rows by round membership FIRST.
     # Unknown rows (fixture_id not in this round) are rejected immediately as :unknown.
     {known, unknown} = Enum.split_with(rows, &Map.has_key?(fixtures, &1.fixture_id))
@@ -158,22 +170,35 @@ defmodule Predictex.Predictions do
     # Among known rows, split by lockout. Map.fetch! is safe — membership is guaranteed above.
     {locked, open} = Enum.split_with(known, &locked?(Map.fetch!(fixtures, &1.fixture_id), now))
 
-    Repo.transaction(fn ->
-      open_ids = Enum.map(open, & &1.fixture_id)
+    # Among unlocked rows, reject those whose fixture is still a bracket placeholder (:pending):
+    # the UI never offers them; a crafted payload is dropped here (defense in depth).
+    {pending, editable} =
+      Enum.split_with(open, fn row ->
+        fx = Map.fetch!(fixtures, row.fixture_id)
+        not (Knockout.resolved_team?(fx.team1) and Knockout.resolved_team?(fx.team2))
+      end)
 
-      # Clear boosters only among the unlocked fixtures being (re)saved.
+    Repo.transaction(fn ->
+      editable_ids = Enum.map(editable, & &1.fixture_id)
+
+      # Clear boosters only among the editable (unlocked, resolved) fixtures being (re)saved.
       from(p in Prediction,
-        where: p.player_id == ^player_id and p.round_id == ^round_id and p.fixture_id in ^open_ids
+        where:
+          p.player_id == ^player_id and p.round_id == ^round_id and
+            p.fixture_id in ^editable_ids
       )
       |> Repo.update_all(set: [booster: false])
 
       saved =
-        Enum.reduce(open, %{}, fn row, acc ->
+        Enum.reduce(editable, %{}, fn row, acc ->
           Map.put(acc, row.fixture_id, save_round_row(player_id, round_id, row))
         end)
 
       results =
         Enum.reduce(locked, saved, fn row, acc -> Map.put(acc, row.fixture_id, :locked) end)
+
+      results =
+        Enum.reduce(pending, results, fn row, acc -> Map.put(acc, row.fixture_id, :pending) end)
 
       # Mark out-of-round / non-existent fixture ids as :unknown — never written.
       results =
@@ -186,6 +211,22 @@ defmodule Predictex.Predictions do
       end
     end)
     |> broadcast_on_success()
+  end
+
+  # A different fixture already holds the booster AND it has kicked off → the booster is
+  # committed to it for the round; a new booster elsewhere is rejected.
+  defp booster_locked_conflict?(player_id, round_id, fixtures, rows, now) do
+    incoming = Enum.find(rows, & &1.booster)
+
+    committed_id =
+      Repo.one(
+        from p in Prediction,
+          where: p.player_id == ^player_id and p.round_id == ^round_id and p.booster == true,
+          select: p.fixture_id
+      )
+
+    not is_nil(incoming) and not is_nil(committed_id) and incoming.fixture_id != committed_id and
+      locked?(Map.get(fixtures, committed_id), now)
   end
 
   @doc "All players' predictions for one fixture, with the player preloaded (by-fixture admin lens)."

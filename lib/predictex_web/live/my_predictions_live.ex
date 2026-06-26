@@ -75,6 +75,14 @@ defmodule PredictexWeb.MyPredictionsLive do
           {:ok, _results} ->
             {:noreply, socket |> refresh() |> put_flash(:info, "Saved")}
 
+          {:error, :booster_locked} ->
+            {:noreply,
+             put_flash(
+               socket,
+               :error,
+               "Your booster is locked to a match that's already kicked off — it can't be moved this round."
+             )}
+
           {:error, _} ->
             {:noreply, put_flash(socket, :error, "Could not save predictions.")}
         end

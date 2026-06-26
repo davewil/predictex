@@ -338,6 +338,40 @@ defmodule Predictex.PredictionsTest do
 
       assert Predictions.get_player_fixture_prediction(player.id, open.id) == nil
     end
+
+    test "a row for an unresolved (placeholder-team) fixture is rejected as :pending and never written",
+         %{round: round, player: player} do
+      future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+      pending = fixture!(round, %{team1: "1A", team2: "2B", kickoff_at: future})
+      rows = [%{fixture_id: pending.id, home_goals: 2, away_goals: 1, booster: false}]
+
+      assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
+      assert results[pending.id] == :pending
+      assert Predictions.get_player_fixture_prediction(player.id, pending.id) == nil
+    end
+
+    test "rejects :booster_locked when a kicked-off fixture already holds the booster",
+         %{round: round, player: player, open: open, locked: locked} do
+      # Commit the booster to the locked (kicked-off) fixture, as a prior save would have.
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(%{
+          player_id: player.id,
+          fixture_id: locked.id,
+          home_goals: 1,
+          away_goals: 0,
+          booster: true
+        })
+
+      # Now try to boost the still-open fixture.
+      rows = [%{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: true}]
+
+      assert {:error, :booster_locked} =
+               Predictions.save_round_predictions(player.id, round.id, rows, true)
+
+      # The committed booster on the locked fixture survives; nothing was written to `open`.
+      assert Predictions.get_player_fixture_prediction(player.id, locked.id).booster == true
+      assert Predictions.get_player_fixture_prediction(player.id, open.id) == nil
+    end
   end
 
   describe "prediction writes broadcast a coarse fixture-change (live dashboards re-pull)" do
