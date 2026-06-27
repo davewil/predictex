@@ -1,6 +1,7 @@
 defmodule Predictex.Results.IngestTest do
   use Predictex.DataCase, async: true
 
+  alias Predictex.Fifa.KnockoutTeams
   alias Predictex.Results.Ingest
   alias Predictex.Tournament
   alias Predictex.Tournament.Fixture
@@ -212,6 +213,56 @@ defmodule Predictex.Results.IngestTest do
       fx = Tournament.get_fixture_by_ref("2026-06-11 Mexico v South Africa")
       assert fx.status == :completed
       assert fx.kickoff_at == ~U[2026-06-12 02:00:00Z]
+    end
+
+    test "an e5o-resolved knockout team is not reverted to a placeholder by a later openfootball sync (predictex-e5o)" do
+      # End-to-end: e5o fills the slot from FIFA, then openfootball (which still publishes the
+      # placeholder) must NOT clobber it back. Team identity is monotonic: placeholder→real only.
+
+      # Group result seeds the canonical index with "France"'s openfootball-canonical name.
+      {:ok, grp} = Tournament.create_round(%{name: "Group A", stage: :group, ordinal: 1})
+
+      {:ok, _} =
+        Tournament.create_fixture(%{
+          external_ref: "2026-06-20 Brazil v France",
+          team1: "Brazil",
+          team2: "France",
+          status: :completed,
+          home_goals: 1,
+          away_goals: 0,
+          kickoff_at: ~U[2026-06-20 19:00:00Z],
+          round_id: grp.id
+        })
+
+      # openfootball seeds the R32 fixture: team1 resolved (Brazil), team2 a placeholder slot.
+      ko_doc("Brazil", "2B") |> Ingest.plan() |> Ingest.commit()
+      assert Tournament.get_fixture_by_source_num(73).team2 == "2B"
+
+      # e5o fills the placeholder from FIFA's resolved bracket (anchored on Brazil); the FIFA
+      # date slot-matches the fixture's kickoff (ko_doc: "12:00 UTC-7" = 2026-06-28 19:00 UTC).
+      rounds = [
+        %{
+          "stage" => "r32",
+          "tournaments" => [
+            %{
+              "date" => "2026-06-28T19:00:00+00:00",
+              "homeSquadName" => "Brazil",
+              "awaySquadName" => "France"
+            }
+          ]
+        }
+      ]
+
+      assert %{resolved: 1} = KnockoutTeams.assign(rounds)
+      assert Tournament.get_fixture_by_source_num(73).team2 == "France"
+
+      # The next ResultSync STILL carries the placeholder — it must NOT revert the e5o fill.
+      ko_doc("Brazil", "2B") |> Ingest.plan() |> Ingest.commit()
+      assert Tournament.get_fixture_by_source_num(73).team2 == "France"
+
+      # openfootball stays authoritative for a real name: real→real correction still writes through.
+      ko_doc("Brazil", "Belgium") |> Ingest.plan() |> Ingest.commit()
+      assert Tournament.get_fixture_by_source_num(73).team2 == "Belgium"
     end
   end
 

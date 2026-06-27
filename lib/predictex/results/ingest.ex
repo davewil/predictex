@@ -16,6 +16,7 @@ defmodule Predictex.Results.Ingest do
   settles, instead of the changed `external_ref` spawning a duplicate fixture (predictex-g8m).
   """
 
+  alias Predictex.Knockout
   alias Predictex.Repo
   alias Predictex.Results.Openfootball
   alias Predictex.Fifa
@@ -138,7 +139,12 @@ defmodule Predictex.Results.Ingest do
         %Fixture{} |> Fixture.changeset(attrs) |> Repo.insert()
 
       %Fixture{} = existing ->
-        existing |> Fixture.changeset(preserve_settled(existing, attrs)) |> Repo.update()
+        guarded =
+          existing
+          |> preserve_settled(attrs)
+          |> preserve_resolved_teams(existing)
+
+        existing |> Fixture.changeset(guarded) |> Repo.update()
     end
   end
 
@@ -164,4 +170,24 @@ defmodule Predictex.Results.Ingest do
   end
 
   defp preserve_settled(_existing, attrs), do: attrs
+
+  # Team identity is monotonic (predictex-e5o): once a side is a resolved real team, an
+  # openfootball sync that still carries a bracket placeholder for it — e.g. an R32 third-placed
+  # slot the FIFA bracket (`Fifa.KnockoutTeams`) resolved ahead of openfootball — must NOT revert
+  # it. openfootball keeps real→real authority (a real name still writes through); only a
+  # placeholder-over-real downgrade is dropped, so the early FIFA fill sticks.
+  defp preserve_resolved_teams(attrs, %Fixture{} = existing) do
+    attrs
+    |> keep_resolved_team(:team1, existing.team1)
+    |> keep_resolved_team(:team2, existing.team2)
+  end
+
+  defp keep_resolved_team(attrs, key, existing_value) do
+    if Map.has_key?(attrs, key) and Knockout.resolved_team?(existing_value) and
+         not Knockout.resolved_team?(Map.get(attrs, key)) do
+      Map.delete(attrs, key)
+    else
+      attrs
+    end
+  end
 end
