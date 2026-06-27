@@ -12,7 +12,19 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.19` (deployed + verified 2026-06-27 ~13:10 UTC: Deploy success in 3m53s,
+- **Latest deployed tag:** `v0.11.20` (deployed + **verified in prod** 2026-06-27 ~18:30 UTC: Deploy success in
+  3m24s, **no migration**, `/health`+`/`+`/bracket` 200, valid TLS; tagged with no match capturing) —
+  **`predictex-ahi`**: team-identity **no-downgrade guard** in `Ingest`. e5o (v0.11.19) was filling R32
+  placeholder slots from FIFA but the fills **didn't stick** — `Fixture` `@castable` includes `team1/team2`, so
+  every `ResultSync` (15-min) cast openfootball's *still-placeholder* name (`USA team2 "3B/E/F/I/J"`) back over
+  e5o's filled real name (`preserve_settled` only guarded result fields). `preserve_resolved_teams/2` makes team
+  identity **monotonic** (placeholder→real only; openfootball keeps real→real authority). **PROD-VERIFIED:**
+  parsed `/bracket` slot ids — fixture 74 Germany v **Paraguay** + fixture 81 USA v **Bosnia & Herzegovina** both
+  filled and **held 20+ min across ResultSync cycles**. Root cause via systematic-debugging (failing test
+  reproduced the revert); advisor-reviewed. **Known anchored-only limit (visible in prod):** a both-placeholder
+  fixture FIFA has resolved (e.g. fixture 77 France `1I` v Sweden `3rd·C/D/F/G/H`) stays unfilled until
+  openfootball resolves its winner side — deferred enhancement, not a bug.
+- **Prior deployed tag:** `v0.11.19` (deployed + verified 2026-06-27 ~13:10 UTC: Deploy success in 3m53s,
   **no migration**, `/health` 200, anon `/` 200, `/bracket` 200, valid TLS; tagged with no match capturing) —
   bundles **`predictex-e5o`** (FIFA-bracket third-placed R32 resolution) **+ `predictex-kob`** (next-match
   banner fix). **`e5o`:** a new self-arming Oban worker `Workers.KnockoutTeams` (cron `*/10`, stop-before-fetch)
