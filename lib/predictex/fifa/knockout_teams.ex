@@ -15,7 +15,8 @@ defmodule Predictex.Fifa.KnockoutTeams do
   """
 
   alias Predictex.Fifa.Crosswalk
-  alias Predictex.Knockout
+  alias Predictex.{Knockout, Repo, Tournament}
+  alias Predictex.Tournament.Fixture
 
   @ko_stages ~w(r32 r16 qf sf f)
 
@@ -41,6 +42,33 @@ defmodule Predictex.Fifa.KnockoutTeams do
         map_size(fill) > 0 do
       Map.put(fill, :fixture_id, f.id)
     end
+  end
+
+  @doc """
+  Resolve every fillable placeholder knockout slot from `rounds` and persist it. Returns
+  `%{resolved: fixtures_written, sides: name_columns_written, errors: n}` and broadcasts a
+  fixtures-changed signal when anything was written. openfootball reclaims authority on its next
+  sync (two-writer rule).
+  """
+  def assign(rounds) do
+    fixtures = Repo.all(Fixture)
+    by_id = Map.new(fixtures, &{&1.id, &1})
+    idx = canonical_index(Enum.flat_map(fixtures, &[&1.team1, &1.team2]))
+
+    summary =
+      rounds
+      |> plan(fixtures, idx)
+      |> Enum.reduce(%{resolved: 0, sides: 0, errors: 0}, fn fill, acc ->
+        {fid, attrs} = Map.pop(fill, :fixture_id)
+
+        case Tournament.update_fixture(Map.fetch!(by_id, fid), attrs) do
+          {:ok, _} -> %{acc | resolved: acc.resolved + 1, sides: acc.sides + map_size(attrs)}
+          {:error, _} -> %{acc | errors: acc.errors + 1}
+        end
+      end)
+
+    if summary.resolved > 0, do: Tournament.broadcast_change()
+    summary
   end
 
   defp fill_for(f, home, away, idx) do
