@@ -12,7 +12,23 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.18` (deployed + verified 2026-06-26 ~18:01 UTC: Deploy success in 3m44s,
+- **Latest deployed tag:** `v0.11.19` (deployed + verified 2026-06-27 ~13:10 UTC: Deploy success in 3m53s,
+  **no migration**, `/health` 200, anon `/` 200, `/bracket` 200, valid TLS; tagged with no match capturing) —
+  bundles **`predictex-e5o`** (FIFA-bracket third-placed R32 resolution) **+ `predictex-kob`** (next-match
+  banner fix). **`e5o`:** a new self-arming Oban worker `Workers.KnockoutTeams` (cron `*/10`, stop-before-fetch)
+  fills resolved team names into R32 **placeholder** slots from FIFA `rounds.json` ahead of openfootball — e.g.
+  USA's `3B/E/F/I/J` → `Bosnia & Herzegovina` the moment FIFA locks it. **Anchored-only:** fills only a fixture
+  with exactly one placeholder side (the resolved side anchors orientation AND validates the slot match);
+  **no-downgrade** (writes only `team1`/`team2`, only placeholder→real, never overwrites an
+  openfootball-resolved name — openfootball stays authoritative, reclaims on its `source_num`-keyed re-sync).
+  Pure `Fifa.KnockoutTeams` (`canonical_index/1` + `plan/3` slot-match via `Crosswalk.slot_key`, name-normalize
+  via the `Crosswalk` alias table). **`kob`:** `Dashboard.next_matches/2` returns all fixtures tied at the
+  soonest kickoff (was `List.first` — only one of two simultaneous next matches showed); plural "Next matches"
+  banner. 562 tests. **▶ OBSERVE:** within ~10 min of deploy, the worker should fill the resolved thirds —
+  watch `/bracket` flip USA v `3B/E/F/I/J` → USA v Bosnia (server log line `knockout team backfill:`).
+  **▶ STILL REMAINING = flag rollout (user's call):** the native game is **DARK for members** —
+  `:native_ko_entry` is admin-group-only; `rpc 'FunWithFlags.enable(:native_ko_entry)'` opens it to all.
+- **Prior deployed tag:** `v0.11.18` (deployed + verified 2026-06-26 ~18:01 UTC: Deploy success in 3m44s,
   **no migration**, `/health` 200, anon `/` 200, valid TLS, **`/bracket` renders** "As it stands"/"Round of
   32"/group tables) — bundles **`predictex-80k`** (per-fixture native R32 KO unlock — native KO entry now
   gated PER FIXTURE not per round; `round_open?` retired; `:editable` when flag-on + both teams resolved +
@@ -120,10 +136,18 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-26) — NEXT: roll out the `:native_ko_entry` flag to all members (ops, no code)
+## ⏵ Continue here (2026-06-27) — NEXT: roll out the `:native_ko_entry` flag to all members (ops, no code)
 
-`predictex-80k` + `7qu` are **DEPLOYED + verified** as `v0.11.18` (see "Live right now"). The single live next
-step is the **flag rollout** — the game is still DARK for members (flag enabled only for `:admins`).
+`predictex-e5o` (FIFA third-placed resolution) + `kob` (next-match banner) are **DEPLOYED + verified** as
+`v0.11.19`; `80k` + `7qu` shipped earlier in `v0.11.18` (see "Live right now"). Everything is on origin/main and
+deployed. The single live next step is the **flag rollout** — the native game is still DARK for members (flag
+enabled only for `:admins`).
+
+> **e5o post-deploy watch:** the new `Workers.KnockoutTeams` cron (`*/10`) should fill the resolved third-placed
+> R32 slots from FIFA within ~10 min — confirm `/bracket` flips a third-placed slot (e.g. USA v `3B/E/F/I/J` →
+> USA v Bosnia) and the server logs `knockout team backfill: %{resolved: …}`. If a slot doesn't fill, the likely
+> cause is a KO `slot_key` mismatch (FIFA `date` offset vs openfootball `kickoff_at` UTC) — verified aligned for
+> the USA tie at design time, but eyeball one real fill.
 
 ### ▶ START HERE: enable the flag for all members (user's call, ops/no-code)
 The per-fixture native R32 game is live in prod but gated to admins. To open it to the league:
