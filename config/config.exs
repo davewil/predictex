@@ -99,7 +99,10 @@ config :predictex, Oban,
        {"*/5 * * * *", Predictex.Workers.LiveScoreSync},
        # Self-arms knockout fifa_match_id the moment FIFA publishes the bracket (predictex-hco WS1);
        # cheap stop-before-fetch makes the off-window ticks a no-op. Removable post-bracket.
-       {"*/10 * * * *", Predictex.Workers.KnockoutIds}
+       {"*/10 * * * *", Predictex.Workers.KnockoutIds},
+       # Fills knockout team names from FIFA rounds.json ahead of openfootball (predictex-e5o);
+       # stop-before-fetch no-ops once the bracket teams are fully resolved. Removable post-bracket.
+       {"*/10 * * * *", Predictex.Workers.KnockoutTeams}
      ]}
   ]
 
