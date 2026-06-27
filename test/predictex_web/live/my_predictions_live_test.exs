@@ -338,14 +338,12 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
   test "member enters native knockout picks via the editable form", %{conn: conn, round: round} do
     player = player_fixture(%{display_name: "KoPlayer"})
 
-    # The setup block gives us a group round at ordinal 1 with no fixtures — it is
-    # incomplete (no fixtures) and will be the dashboard's active round by default.
-    # We need round_open? to return true for our knockout round (ordinal 4), which
-    # requires a completed predecessor at ordinal 3. We also close out ordinal 1 by
-    # adding a completed fixture so it does not compete as the active round.
+    # Per-fixture gate (predictex-80k): a knockout fixture is :editable when the flag is on and
+    # its own teams are resolved + kickoff is future — round_open? was retired, so no completed
+    # predecessor round is needed. Close out the setup round (ordinal 1) so it doesn't steal
+    # "active"; the test then clicks the knockout chip to make it active.
     past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
 
-    # Complete the setup round (ordinal 1) so it doesn't steal "active".
     _done1 =
       fixture!(round, %{
         team1: "France",
@@ -356,21 +354,6 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
         away_goals: 0
       })
 
-    # Predecessor of knockout round: ordinal 3, group stage, with a completed fixture.
-    {:ok, pred_round} =
-      Tournament.create_round(%{name: "Matchday 3", stage: :group, ordinal: 3})
-
-    _done3 =
-      fixture!(pred_round, %{
-        team1: "Brazil",
-        team2: "Argentina",
-        kickoff_at: past,
-        status: :completed,
-        home_goals: 2,
-        away_goals: 1
-      })
-
-    # Knockout round at ordinal 4 (predecessor = ordinal 3, now complete → round_open? true).
     {:ok, ko_round} =
       Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
 
@@ -422,10 +405,10 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     conn: conn,
     round: round
   } do
-    # predictex-5q6 dark-ship gate: even with the knockout round fully open (predecessor
-    # complete → round_open? true), the editable native form must NOT render while the
-    # :native_ko_entry flag is off (this test is deliberately UNtagged → flag off). Members
-    # see the read-only FIFA-import grid until the flag is enabled for them.
+    # predictex-5q6 dark-ship gate: even when the knockout fixture's own teams are resolved (so
+    # the per-fixture gate would otherwise make it :editable), the native form must NOT render
+    # while the :native_ko_entry flag is off (this test is deliberately UNtagged → flag off).
+    # Members see the read-only FIFA-import grid until the flag is enabled for them.
     player = player_fixture(%{display_name: "FlagOff"})
     past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
     future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
@@ -439,20 +422,6 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
         status: :completed,
         home_goals: 1,
         away_goals: 0
-      })
-
-    # Predecessor (ordinal 3) complete → the knockout round at ordinal 4 IS open.
-    {:ok, pred_round} =
-      Tournament.create_round(%{name: "Matchday 3", stage: :group, ordinal: 3})
-
-    _done3 =
-      fixture!(pred_round, %{
-        team1: "Brazil",
-        team2: "Argentina",
-        kickoff_at: past,
-        status: :completed,
-        home_goals: 2,
-        away_goals: 1
       })
 
     {:ok, ko_round} =
@@ -593,8 +562,11 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     refute html =~ ~s(name="picks[#{locked.id}][home_goals]")
     # pending: no inputs
     refute html =~ ~s(name="picks[#{pending.id}][home_goals]")
-    # pending card label
+    # pending card label + friendly placeholder spelled out, not the raw code (predictex-94u)
     assert html =~ "awaiting teams"
+    assert html =~ "Germany"
+    assert html =~ "3rd · A/B/C/D/F"
+    refute html =~ "3A/B/C/D/F"
   end
 
   @tag :native_ko
@@ -616,20 +588,8 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
         away_goals: 0
       })
 
-    # Predecessor knockout round needs a completed fixture so round_open? returns true.
-    {:ok, pred_round} =
-      Tournament.create_round(%{name: "Matchday 3", stage: :group, ordinal: 3})
-
-    _done3 =
-      fixture!(pred_round, %{
-        team1: "Brazil",
-        team2: "Argentina",
-        kickoff_at: past,
-        status: :completed,
-        home_goals: 2,
-        away_goals: 1
-      })
-
+    # Per-fixture gate (predictex-80k): the knockout fixture's own resolved teams make it
+    # :editable — no completed predecessor round is needed (round_open? was retired).
     {:ok, ko_round} =
       Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
 

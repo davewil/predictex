@@ -20,4 +20,32 @@ defmodule Predictex.Knockout do
   end
 
   def resolved_team?(_), do: false
+
+  @doc """
+  Human-friendly label for a fixture slot (predictex-94u): a real team name passes through; a
+  placeholder is spelled out — `"1A"` → "Winner A", `"2B"` → "Runners-up B", `"3A/B/C/D/F"` →
+  "3rd · A/B/C/D/F", `"W89"` → "Winner of 89", `"L101"` → "Loser of 101". Total.
+  """
+  def slot_label(name) when is_binary(name) do
+    cond do
+      resolved_team?(name) ->
+        name
+
+      caps = Regex.run(~r/^([12])([A-Z])$/, name) ->
+        [_, pos, group] = caps
+        "#{if pos == "1", do: "Winner", else: "Runners-up"} #{group}"
+
+      Regex.match?(@third, name) ->
+        "3rd · " <> String.slice(name, 1..-1//1)
+
+      caps = Regex.run(~r/^([WL])(\d+)$/, name) ->
+        [_, side, num] = caps
+        "#{if side == "W", do: "Winner", else: "Loser"} of #{num}"
+
+      true ->
+        name
+    end
+  end
+
+  def slot_label(_), do: ""
 end

@@ -10,7 +10,7 @@ defmodule PredictexWeb.MyPredictionsLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Dashboard, Predictions, Tournament}
+  alias Predictex.{Dashboard, Knockout, Predictions, Tournament}
   alias PredictexWeb.Flags
 
   @impl true
@@ -159,11 +159,15 @@ defmodule PredictexWeb.MyPredictionsLive do
             :for={nm <- @next_matches}
             class="flex items-center gap-2 text-sm font-bold"
           >
-            {nm.fixture.team1}
-            <span class="text-base">{Flags.flag(nm.fixture.team1)}</span>
+            {Knockout.slot_label(nm.fixture.team1)}
+            <span :if={Knockout.resolved_team?(nm.fixture.team1)} class="text-base">
+              {Flags.flag(nm.fixture.team1)}
+            </span>
             <span class="text-base-content/40">v</span>
-            <span class="text-base">{Flags.flag(nm.fixture.team2)}</span>
-            {nm.fixture.team2}
+            <span :if={Knockout.resolved_team?(nm.fixture.team2)} class="text-base">
+              {Flags.flag(nm.fixture.team2)}
+            </span>
+            {Knockout.slot_label(nm.fixture.team2)}
           </span>
           <span class="text-xs font-semibold text-base-content/70">
             Kicks off
@@ -344,9 +348,11 @@ defmodule PredictexWeb.MyPredictionsLive do
                 class="rounded-box bg-base-200 border border-base-content/10 p-3 text-sm"
               >
                 <p class="font-semibold">
-                  {Flags.flag(fx.fixture.team1)} {fx.fixture.team1}
+                  <span :if={Knockout.resolved_team?(fx.fixture.team1)}>{Flags.flag(fx.fixture.team1)}</span>
+                  {Knockout.slot_label(fx.fixture.team1)}
                   <span class="opacity-60">v</span>
-                  {Flags.flag(fx.fixture.team2)} {fx.fixture.team2}
+                  <span :if={Knockout.resolved_team?(fx.fixture.team2)}>{Flags.flag(fx.fixture.team2)}</span>
+                  {Knockout.slot_label(fx.fixture.team2)}
                 </p>
                 <p class="opacity-70">⏳ awaiting teams</p>
               </div>

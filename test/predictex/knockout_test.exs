@@ -22,4 +22,23 @@ defmodule Predictex.KnockoutTest do
     # empty string is not a placeholder pattern, so it counts as (degenerate) resolved
     assert Knockout.resolved_team?("")
   end
+
+  describe "slot_label/1 (predictex-94u)" do
+    test "a real team name passes through unchanged" do
+      assert Knockout.slot_label("Brazil") == "Brazil"
+      assert Knockout.slot_label("Côte d'Ivoire") == "Côte d'Ivoire"
+    end
+
+    test "spells out each placeholder form" do
+      assert Knockout.slot_label("1A") == "Winner A"
+      assert Knockout.slot_label("2B") == "Runners-up B"
+      assert Knockout.slot_label("3A/B/C/D/F") == "3rd · A/B/C/D/F"
+      assert Knockout.slot_label("W89") == "Winner of 89"
+      assert Knockout.slot_label("L101") == "Loser of 101"
+    end
+
+    test "is total — a non-binary returns an empty string" do
+      assert Knockout.slot_label(nil) == ""
+    end
+  end
 end
