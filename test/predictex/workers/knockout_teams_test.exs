@@ -1,5 +1,9 @@
 defmodule Predictex.Workers.KnockoutTeamsTest do
-  use Predictex.DataCase, async: true
+  # async: false — this test and my_predictions_live_test both set the process-global
+  # :ko_teams_rounds_fun Application key; running sync keeps it out of the concurrent pool so
+  # the two can't race (a delete_env between a put_env and the worker's get_env would fall back
+  # to a live FIFA fetch / a cross-test stub would slot-mismatch). predictex-e5o final review.
+  use Predictex.DataCase, async: false
 
   alias Predictex.Tournament
   alias Predictex.Tournament.Fixture
