@@ -13,7 +13,9 @@ defmodule Predictex.Bracket do
   alias Predictex.{GroupTables, Knockout, Tournament}
 
   @winner_runner_up ~r/^([12])([A-Z])$/
-  @third ~r{^3([A-Z])(?:/([A-Z]))+$}
+  # Non-capturing: only used with Regex.match?/2 (the candidate-set parse uses String.split,
+  # not captures). Mirrors Knockout's @third grammar. (predictex-57t)
+  @third ~r{^3[A-Z](?:/[A-Z])+$}
 
   @doc "Resolve one R32 slot placeholder into a renderable value. Total."
   def resolve_slot(placeholder, group_tables) when is_binary(placeholder) do
