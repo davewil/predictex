@@ -214,19 +214,24 @@ defmodule Predictex.Predictions do
   end
 
   # A different fixture already holds the booster AND it has kicked off → the booster is
-  # committed to it for the round; a new booster elsewhere is rejected.
+  # committed to it for the round; a new booster elsewhere is rejected. Short-circuits when the
+  # submit carries no booster (the common case), skipping the committed-booster query (predictex-cfi).
   defp booster_locked_conflict?(player_id, round_id, fixtures, rows, now) do
-    incoming = Enum.find(rows, & &1.booster)
+    case Enum.find(rows, & &1.booster) do
+      nil ->
+        false
 
-    committed_id =
-      Repo.one(
-        from p in Prediction,
-          where: p.player_id == ^player_id and p.round_id == ^round_id and p.booster == true,
-          select: p.fixture_id
-      )
+      incoming ->
+        committed_id =
+          Repo.one(
+            from p in Prediction,
+              where: p.player_id == ^player_id and p.round_id == ^round_id and p.booster == true,
+              select: p.fixture_id
+          )
 
-    not is_nil(incoming) and not is_nil(committed_id) and incoming.fixture_id != committed_id and
-      locked?(Map.get(fixtures, committed_id), now)
+        not is_nil(committed_id) and incoming.fixture_id != committed_id and
+          locked?(Map.get(fixtures, committed_id), now)
+    end
   end
 
   @doc "All players' predictions for one fixture, with the player preloaded (by-fixture admin lens)."
