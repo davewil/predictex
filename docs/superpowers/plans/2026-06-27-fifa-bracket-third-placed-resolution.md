@@ -123,11 +123,15 @@ defmodule Predictex.Fifa.KnockoutTeamsTest do
       assert KnockoutTeams.plan(r, [f], @canon) == []
     end
 
-    test "both placeholders: fills positionally home→team1, away→team2" do
+    test "both placeholders: no fill (no resolved anchor to validate orientation against)" do
+      # Anchored-only (v1): without a resolved side we can't trust FIFA's home/away order, and the
+      # codebase deliberately distrusts pair ordering (Crosswalk.match_key is an unordered set;
+      # Cohort handles swaps). The group winner resolves first via openfootball, then the anchored
+      # case fills the third — so we lose essentially nothing by waiting.
       ko = ~U[2026-07-02 01:00:00Z]
       f = %Fixture{id: 12, team1: "1H", team2: "2J", kickoff_at: ko}
       r = rounds("2026-07-02T01:00:00+00:00", "Brazil", "Japan")
-      assert [%{fixture_id: 12, team1: "Brazil", team2: "Japan"}] = KnockoutTeams.plan(r, [f], @canon)
+      assert KnockoutTeams.plan(r, [f], @canon) == []
     end
   end
 end
@@ -197,7 +201,10 @@ defmodule Predictex.Fifa.KnockoutTeams do
     c_away = canonical(idx, away)
 
     cond do
-      t1_ph and t2_ph -> %{} |> maybe_put(:team1, c_home) |> maybe_put(:team2, c_away)
+      # Anchored-only (v1): a fill requires exactly one resolved side to anchor orientation.
+      # Both-placeholder is skipped (no anchor to validate FIFA's home/away order); the group
+      # winner resolves first via openfootball, after which the anchored branch fills the third.
+      t1_ph and t2_ph -> %{}
       t1_ph -> anchored(f.team2, :team1, home, away, c_home, c_away)
       t2_ph -> anchored(f.team1, :team2, home, away, c_home, c_away)
       true -> %{}
@@ -583,7 +590,7 @@ In `test/predictex_web/live/my_predictions_live_test.exs`, add (the `@tag :nativ
   end
 ```
 
-> If the broadcast does not reach the LiveView in the test (no subscription in the test process), drive the re-pull the same way the other `:native_ko` tests do (e.g. `Tournament.broadcast_change()` is already called inside `assign/1`; if the LiveView needs an explicit nudge, send the `:fixtures_changed`/tick the test harness uses). Confirm by reading how the existing per-fixture-resolution test (predictex-80k) re-renders after `broadcast_change()`.
+> This is the exact mechanism the predictex-80k per-fixture-resolution test already uses (rewrite a fixture's teams → `Tournament.broadcast_change()` → `render(lv)` re-pulls the dashboard). `assign/1` calls `broadcast_change/0` internally, so calling the worker then `render(lv)` is the same proven path — copy that test's structure; no new re-pull wiring is needed.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -630,7 +637,7 @@ git commit -m "test(fifa): :pending R32 card flips :editable after FIFA team res
 
 ## Notes for the implementer
 
-- The orientation rule has two cases: **anchored** (one side already resolved — the safe, high-value path: USA v `3B/E/F/I/J`) keys orientation off the resolved side; **both-placeholder** fills positionally (FIFA home→team1). Both go through the canonical lookup and the placeholder-only guard, so neither can overwrite a real name.
+- Orientation is **anchored-only** (v1): a fill requires exactly one side already resolved (USA v `3B/E/F/I/J`), and the resolved side must equal one of the FIFA names — which both fixes orientation AND validates the slot match (a spurious slot hit fails the anchor check → skip). Both-placeholder fixtures are intentionally skipped; their group winner resolves first via openfootball's sync, after which the anchored branch fills the third. This deliberately mirrors the codebase's existing distrust of pair ordering (`Crosswalk.match_key` is an unordered set; `Cohort` handles home/away swaps). Verified from the live feeds 2026-06-27: FIFA `rounds.json` carries USA v `"Bosnia and Herzegovina"` at `01:00+01:00` (= 00:00 UTC), openfootball has the same fixture at `17:00 UTC-7` (= 00:00 UTC) → same `slot_key {2026-07-02, 0, 0}`, no R32 minute-slot collisions.
 - Why a separate worker (not extend `KnockoutIds`): `KnockoutIds` stops fetching once every KO fixture has a `fifa_match_id`, but a slot can carry its `fifaId` before FIFA fills its third-placed *name* — so the id-stop would halt before names resolve. `KnockoutTeams` has its own placeholder-based stop condition.
 - Do NOT write a raw FIFA name — always map through `canonical_index/1` so the stored name is openfootball-canonical (flags resolve via `Flags.flag/1`, and openfootball's later sync matches without churn). A FIFA name with no canonical match is skipped, not written.
 - After this lands, no flag/rollout step — it only ever *fills* placeholders, so it's a no-op until FIFA resolves a slot; member visibility stays gated by `:native_ko_entry`.
