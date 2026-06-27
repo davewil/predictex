@@ -511,6 +511,59 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
   end
 
   @tag :native_ko
+  test "a :pending R32 card flips to :editable after FIFA resolves its placeholder side",
+       %{conn: conn, round: round} do
+    player = player_fixture(%{display_name: "FifaResolve"})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    # Group fixture supplies canonical names and closes ordinal-1 so it doesn't steal "active".
+    _g =
+      fixture!(round, %{
+        team1: "USA",
+        team2: "Bosnia & Herzegovina",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, ko} = Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 4})
+    ko_fx = fixture!(ko, %{team1: "USA", team2: "3B/E/F/I/J", kickoff_at: future})
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    html = lv |> element("button", "Round of 32") |> render_click()
+    refute html =~ ~s(name="picks[#{ko_fx.id}][home_goals]")
+    assert html =~ "awaiting teams"
+
+    # FIFA rounds.json resolves the slot; the worker fills the placeholder side.
+    Application.put_env(:predictex, :ko_teams_rounds_fun, fn ->
+      {:ok,
+       [
+         %{
+           "stage" => "r32",
+           "tournaments" => [
+             %{
+               "date" => DateTime.to_iso8601(future),
+               "homeSquadName" => "USA",
+               "awaySquadName" => "Bosnia and Herzegovina"
+             }
+           ]
+         }
+       ]}
+    end)
+
+    on_exit(fn -> Application.delete_env(:predictex, :ko_teams_rounds_fun) end)
+
+    # assign/1 writes team2, broadcasts :fixtures_changed → the open dashboard re-pulls.
+    assert :ok = Predictex.Workers.KnockoutTeams.perform(%Oban.Job{args: %{}})
+    html = render(lv)
+
+    assert html =~ ~s(name="picks[#{ko_fx.id}][home_goals]")
+    assert html =~ "Bosnia &amp; Herzegovina"
+  end
+
+  @tag :native_ko
   test "the R32 tab is a per-fixture mix: editable, locked, pending", %{conn: conn, round: round} do
     player = player_fixture(%{display_name: "Mix"})
     past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)

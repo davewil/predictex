@@ -63,6 +63,15 @@ authority on its next real-result sync; a `:completed` fixture never reverts to 
 `Ingest` no-downgrade guard). Knockouts (extra-time / penalties) are out of scope.
 _Avoid_: result source, scraper.
 
+**FIFA bracket resolution**:
+Provisional filling of knockout **fixture** placeholder slots from FIFA's `rounds.json`
+(`Predictex.Fifa.KnockoutTeams`, predictex-e5o): when a KO slot still holds a placeholder side
+(`"3B/E/F/I/J"`) but FIFA has resolved the bracket, fill the openfootball-canonical name ahead of
+openfootball's sync. openfootball reclaims authority on its next sync (the two-writer rule). Sibling
+to **FIFA result fallback** — the same no-downgrade principle applies: only placeholder sides are
+written; a resolved side is structurally absent from the output.
+_Avoid_: slot resolution, bracket fill.
+
 **Leaderboard**:
 The ranked standings. Two boards exist: the cumulative board (all rounds) and the re-based
 **knockout** board (knockout rounds only, from zero).

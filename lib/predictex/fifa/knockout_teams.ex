@@ -12,6 +12,10 @@ defmodule Predictex.Fifa.KnockoutTeams do
   the placeholder side(s)** — never a side `Knockout.resolved_team?/1` already calls real. That
   "placeholders only" rule IS the no-downgrade guard: a resolved side is structurally absent from
   the output, so openfootball stays authoritative and reclaims on its next sync.
+
+  The no-downgrade principle mirrors `Predictex.Results.FifaFallback` (predictex-iy1): there, FIFA
+  fills a missing group *result* ahead of openfootball; here, FIFA fills a missing bracket *team name*.
+  Both are provisional; openfootball reclaims on its next sync.
   """
 
   alias Predictex.Fifa.Crosswalk
