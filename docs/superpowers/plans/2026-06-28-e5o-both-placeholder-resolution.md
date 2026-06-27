@@ -142,24 +142,23 @@ git commit -m "feat(knockout): parse_slot/1 placeholder classifier (predictex-du
 
 - [ ] **Step 1: Write the failing pure tests**
 
-The Task-1 file `test/predictex/fifa/knockout_teams_test.exs` already has a `@canon` and a `rounds/3` helper. Add a `describe` for both-placeholder. Build group tables by hand via `GroupTables.build/1` over `%Fixture{}` group results so a `1X`/`2X` slot resolves:
+The Task-1 file `test/predictex/fifa/knockout_teams_test.exs` already has a module-level `@canon` and a `rounds/3` helper (and `alias Predictex.Tournament.Fixture`).
+
+**⚠️ MODULE-LEVEL, not inside `describe`:** a module attribute (`@tables`) and the `GroupTables` alias must live at the TOP of the test module (alongside the existing `@canon`/aliases), NOT inside the `describe` block — module attributes evaluate at compile time and an alias scoped inside `describe` won't be in scope, which fails to compile. Add these two lines near the top of the module:
+
+```elixir
+  alias Predictex.GroupTables
+
+  # Group I result → France is rank 1 (winner of I), Spain rank 2.
+  @tables GroupTables.build([
+            %Fixture{team1: "France", team2: "Spain", group: "I", status: :completed, home_goals: 1, away_goals: 0}
+          ])
+```
+
+Then add the `describe` block (it references the module-level `@tables`):
 
 ```elixir
   describe "plan/4 — both-placeholder (projection-validated orientation, predictex-dum)" do
-    alias Predictex.GroupTables
-
-    # Group I result → France is rank 1 (winner of I), Spain rank 2.
-    @tables GroupTables.build([
-              %Fixture{
-                team1: "France",
-                team2: "Spain",
-                group: "I",
-                status: :completed,
-                home_goals: 1,
-                away_goals: 0
-              }
-            ])
-
     test "fills BOTH sides when the winner slot projects to a team matching a FIFA name" do
       ko = ~U[2026-07-02 01:00:00Z]
       # Our fixture: team1 = winner of I (placeholder), team2 = a third (placeholder).
@@ -568,4 +567,5 @@ git commit -m "test(fifa): both-placeholder flip + ahi regression + docs (predic
 - Orientation is per-side: `orient_both` tries team1 as the anchor first, then team2 — whichever is a `1X`/`2X` slot that projects to a FIFA-matching team. The returned tuple is always `{for_team1, for_team2}` in fixture order, regardless of which side anchored.
 - The winner-side fill is FIFA-sourced and projection-validated (we confirmed the projected team ≡ that FIFA name); we never write a team from standings alone.
 - `GroupTables.build/1` is pure and already filters to `:group` fixtures — do not pre-filter; pass all fixtures.
+- The `provisional_tie?: false` guard in `team_at` is *tie*-detection, NOT *group-decided* detection: it rejects a tied leader but will anchor on a clear leader of a group that isn't yet mathematically locked. That's accepted — if FIFA is ever ahead of our standings' lock, a wrong fill self-heals via openfootball's real→real authority (the `ahi` guard only blocks real→placeholder). Do not over-read the flag as "group complete"; a stricter "all teams played equal games" check is possible future hardening, out of scope here.
 - After this lands, no flag/rollout change — it only fills placeholder fixtures FIFA has resolved AND our standings corroborate; member visibility stays gated by `:native_ko_entry`.
