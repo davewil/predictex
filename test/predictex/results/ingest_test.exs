@@ -264,6 +264,50 @@ defmodule Predictex.Results.IngestTest do
       ko_doc("Brazil", "Belgium") |> Ingest.plan() |> Ingest.commit()
       assert Tournament.get_fixture_by_source_num(73).team2 == "Belgium"
     end
+
+    test "an e5o both-placeholder fill survives a later openfootball placeholder sync (predictex-dum)" do
+      {:ok, grp} = Tournament.create_round(%{name: "Group I", stage: :group, ordinal: 1})
+
+      for {a, b, g} <- [{"France", "Spain", "I"}, {"Sweden", "Qatar", "C"}] do
+        {:ok, _} =
+          Tournament.create_fixture(%{
+            external_ref: "g-#{a}",
+            team1: a,
+            team2: b,
+            group: g,
+            status: :completed,
+            home_goals: 2,
+            away_goals: 0,
+            kickoff_at: ~U[2026-06-20 19:00:00Z],
+            round_id: grp.id
+          })
+      end
+
+      # openfootball seeds the R32 fixture both-placeholder (num 73 via ko_doc; kickoff 19:00 UTC).
+      ko_doc("1I", "3C/D/F/G/H") |> Ingest.plan() |> Ingest.commit()
+
+      rounds = [
+        %{
+          "stage" => "r32",
+          "tournaments" => [
+            %{
+              "date" => "2026-06-28T19:00:00+00:00",
+              "homeSquadName" => "France",
+              "awaySquadName" => "Sweden"
+            }
+          ]
+        }
+      ]
+
+      assert %{resolved: 1} = KnockoutTeams.assign(rounds)
+      filled = Tournament.get_fixture_by_source_num(73)
+      assert {filled.team1, filled.team2} == {"France", "Sweden"}
+
+      # Next ResultSync STILL carries both placeholders — must NOT revert either filled name.
+      ko_doc("1I", "3C/D/F/G/H") |> Ingest.plan() |> Ingest.commit()
+      kept = Tournament.get_fixture_by_source_num(73)
+      assert {kept.team1, kept.team2} == {"France", "Sweden"}
+    end
   end
 
   test "first sync stamps source_num onto a pre-existing placeholder KO fixture via the ref fallback (predictex-g8m bootstrap)" do

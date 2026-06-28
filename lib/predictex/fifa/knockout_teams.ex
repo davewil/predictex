@@ -13,6 +13,14 @@ defmodule Predictex.Fifa.KnockoutTeams do
   "placeholders only" rule IS the no-downgrade guard: a resolved side is structurally absent from
   the output, so openfootball stays authoritative and reclaims on its next sync.
 
+  Both-placeholder fixtures (where NEITHER side is resolved yet — e.g. `"1I"` vs
+  `"3C/D/F/G/H"`) are handled via a group-standings anchor (predictex-dum): `orient_both/7`
+  projects a winner/runner-up slot (`1X`/`2X`) against `GroupTables` to confirm orientation,
+  then fills BOTH sides from FIFA's canonical names — or fills nothing (all-or-nothing guard).
+  The no-downgrade ahi guard covers both-placeholder fills identically: once both sides are
+  real names, a subsequent openfootball re-sync carrying the original placeholders cannot
+  revert either filled name.
+
   The no-downgrade principle mirrors `Predictex.Results.FifaFallback` (predictex-iy1): there, FIFA
   fills a missing group *result* ahead of openfootball; here, FIFA fills a missing bracket *team name*.
   Both are provisional; openfootball reclaims on its next sync.
