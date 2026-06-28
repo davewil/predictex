@@ -267,6 +267,27 @@ defmodule Predictex.ScoringTest do
       assert r.components.first_player_to_score == 0
     end
 
+    test "first-player award is accent-insensitive (FIFA vs openfootball spelling)" do
+      r =
+        Scoring.score(
+          pred(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "Julián Álvarez"
+          }),
+          fixture(%{
+            home_goals: 1,
+            away_goals: 0,
+            first_scorer_side: :home,
+            first_scorer_player: "Julian Alvarez"
+          }),
+          :knockout
+        )
+
+      assert r.components.first_player_to_score == 10
+    end
+
     test "player name match is whitespace/case insensitive" do
       r =
         Scoring.score(

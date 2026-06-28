@@ -165,5 +165,13 @@ defmodule Predictex.Scoring do
   defp f(data, key), do: Map.get(data, key)
 
   defp norm(nil), do: nil
-  defp norm(name) when is_binary(name), do: name |> String.trim() |> String.downcase()
+
+  defp norm(name) when is_binary(name) do
+    name
+    |> String.trim()
+    |> String.downcase()
+    |> :unicode.characters_to_nfd_binary()
+    |> String.replace(~r/\p{Mn}/u, "")
+    |> String.replace(~r/\s+/u, " ")
+  end
 end
