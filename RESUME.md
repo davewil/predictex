@@ -148,29 +148,36 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-28) — NEXT: build `predictex-u4k` (first-player-to-score picker) BEFORE 20:00 R32 kickoff
+## ⏵ Continue here (2026-06-28) — `predictex-u4k` CODE-COMPLETE (committed LOCAL); DEPLOY is the user's call
 
 The native KO game is **LIVE for all members** — `:native_ko_entry` flag switched ON in prod 2026-06-28
 (user ran `rpc 'FunWithFlags.enable(:native_ko_entry)'`). Members can predict resolved R32 matches natively.
 Latest deployed tag **`v0.11.20`** (e5o third-placed + ahi guard, prod-verified). On origin-but-UNDEPLOYED:
-`dum` (e5o v2 both-placeholder) + the tidy-up batch (`kob`/`94u`/`57t`/`cfi`/`34w`) — a `v0.11.21` would ship them.
-**Prod cleanup done:** the 6 demo players (`@demo.predictex.local`) purged via `Demo.purge()` (SSH/rpc); only the
-real admin account remains.
+`dum` (e5o v2 both-placeholder) + the tidy-up batch (`kob`/`94u`/`57t`/`cfi`/`34w`). **`v0.11.21` would bundle
+those + u4k.** **Prod cleanup done:** the 6 demo players purged; only the real admin remains.
 
-### ▶ START HERE: `predictex-u4k` — first-player-to-score picker (P1, URGENT)
-**The gap:** the native KO form lets members pick first *team* to score (side toggle) but NOT first *player* —
-yet `Scoring.first_player_points/3` awards **+10, KO-only** (free-text `norm` match). Members forfeit it on
-every KO fixture; each kickoff locks it out. **Source FOUND + verified:** the deferred picker is unblocked.
-- **Spec:** `docs/superpowers/specs/2026-06-28-first-player-picker-design.md` — go straight to `writing-plans` → SDD.
-- **Source:** `play.fifa.com/json/match_predictor/players.json` (static, no auth, pre-match; 1264 players, 48
-  squads, 26-man rosters; per player `shortName`/`position` (1GK/2DEF/3MID/4FWD)/`stats.goals`/`squadId`/`fifaId`).
-  Join: fixture team → `squads.json` `squadId` → filter `players.json` (`Crosswalk.norm` for name divergence).
-- **Build:** `Fifa.Players` (fetch+cache, CohortSync-style worker) + app-styled modal in the `:editable` KO card
-  (2-team toggle, searchable list of name·position·goals, "No first scorer"), selection writes the existing
-  sr-only `first_scorer_player` input via the `RoundEntry` hook pattern. **Scoring free-text v1** (works day-one,
-  no migration); exact-`fifaId` scoring is a follow-up bead. v1 defers position-filter + photos.
-- **Decision (locked w/ user):** skip the free-text stopgap — build the real picker; ship as `v0.11.21` (bundles
-  `dum` + tidy-up) **before 20:00 UTC** R32 kickoff (don't tag mid-capture).
+### ✅ DONE this session: `predictex-u4k` first-player picker — CODE-COMPLETE, committed LOCAL (10 commits `fe13e33`(plan)..`2de046a`)
+Subagent-driven 7-task TDD + opus whole-branch review. **594 tests green, full gate clean. NOT pushed/tagged.**
+- **Shipped:** `Fifa.Players` (pure `players.json`⋈`squads.json` join, keyed `Crosswalk.norm(team)`) · `Fifa.Players.Cache`
+  (supervised ETS, lazy-load + boot-warm + `refresh/0` + **negative-cache** cold-load failure + keep-stale + non-destructive
+  swap) · `Workers.PlayersSync` (`*/30` cron freshness tick) · **`first_scorer_fifaid`** column + intake (predictions-side
+  half of `i9k`) · scoring `norm/1` **accent-fold** · `MyPredictionsLive` app-styled modal picker (2-team toggle / search /
+  name·position·goals / "No first scorer") + `.RoundEntry` hook writing sr-only `first_scorer_player`+`first_scorer_fifaid`
+  (flag-gated render). Plan: `docs/superpowers/plans/2026-06-28-first-player-picker.md`.
+- **⚠️ KEY DATA-CONTRACT FINDING (drove scope; verified, not in original spec):** the picker stores a FIFA `shortName` but
+  scoring matches **openfootball**'s scorer name via `trim+downcase`. Cross-source test (2022 OF goals × 2026 FIFA names,
+  ~68 same-player pairs): only **~72%** match; **~12%** accent-only (the accent-fold now recovers these); **~16%** structural
+  (Mbappé→"Kylian Mbappé", Rashford, Mac Allister — mononyms). So v1 **stores `first_scorer_fifaid`** so the exact-id fix
+  isn't lost, and accent-folds. The structural ~16% is a **KNOWN gap, deferred by user decision to `i9k`** (exact-`fifaId`
+  actual-side scoring). Without `i9k`, those correct picks still score 0.
+- **▶ DEPLOY GATE (opus review) — when you choose to ship `v0.11.21`:** the cold-cache path does a synchronous FIFA fetch on
+  the render path; it's dormant if boot-warm succeeds. **Tag before 20:00 UTC kickoff ONLY after confirming the post-deploy
+  log line `players cache: N squads loaded` on a healthy feed**, then `rpc 'Predictex.Fifa.Players.Cache.refresh()'` to
+  force-warm. Don't tag mid-capture. **Manual eyeball before tag:** `iex -S mix phx.server` → `FunWithFlags.enable(:native_ko_entry)`
+  + `Fifa.Players.Cache.refresh()` → `mix predictex.preview_knockout` → open an editable R32 card → modal open/toggle/search/select
+  → submit → reload → pick persists. (Phone over Tailscale for touch.) **I decide production-ready — code is committed local, awaiting your "push".**
+- **Follow-ups filed:** `predictex-6ea` (P4 — accent-fold the picker *search box*; minor test hardening) · `i9k` (exact-`fifaId`
+  scoring — the structural-divergence fix; u4k shipped its predictions-side column).
 
 > **Other open:** `predictex-hco` WS1 — confirm `KO fifa_match_id: 32/32` once FIFA publishes the bracket, then
 > first KO capture through ET/pens with `is_live` clearing (closes `hco`). `predictex-i9k` (KO scorer import +
