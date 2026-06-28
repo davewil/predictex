@@ -36,8 +36,8 @@ defmodule Predictex.Workers.KnockoutIdsTest do
     on_exit(fn -> Application.put_env(:predictex, :ko_ids_rounds_fun, fn -> {:ok, []} end) end)
   end
 
-  test "perform no-ops without fetching when every knockout fixture already has a fifa_match_id" do
-    ko_fixture(%{fifa_match_id: "already"})
+  test "perform no-ops without fetching when every knockout fixture has both a fifa_match_id and stage" do
+    ko_fixture(%{fifa_match_id: "already", fifa_stage_id: "289287"})
     test_pid = self()
 
     put_rounds_fun(fn ->
@@ -47,6 +47,34 @@ defmodule Predictex.Workers.KnockoutIdsTest do
 
     assert :ok = perform_job(KnockoutIds, %{})
     refute_received :fetched
+  end
+
+  test "perform fetches and backfills fifa_stage_id for a knockout fixture that has an id but no stage" do
+    # The latent bug: a KO fixture was assigned a fifa_match_id before the stage column existed,
+    # so live capture addressed the wrong (group) stage. The stop-before-fetch guard must fire on a
+    # MISSING STAGE too (not just a missing id), or these fixtures never get their stage.
+    f = ko_fixture(%{team1: "Germany", team2: "Brazil", fifa_match_id: "400021600"})
+
+    rounds = [
+      %{
+        "stage" => "r32",
+        "tournaments" => [
+          %{
+            "fifaId" => 400_021_600,
+            "homeSquadName" => "Germany",
+            "awaySquadName" => "Brazil",
+            "date" => "2026-06-28T20:00:00+01:00",
+            "matchcentreUrl" =>
+              "https://www.fifa.com/fifaplus/en/match-centre/match/17/285023/289287/400021600?gender=2"
+          }
+        ]
+      }
+    ]
+
+    put_rounds_fun(fn -> {:ok, rounds} end)
+
+    assert :ok = perform_job(KnockoutIds, %{})
+    assert %{fifa_match_id: "400021600", fifa_stage_id: "289287"} = Tournament.get_fixture!(f.id)
   end
 
   test "perform fetches rounds and backfills a knockout fixture missing its fifa_match_id (via the slot fallback)" do

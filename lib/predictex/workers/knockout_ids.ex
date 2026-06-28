@@ -5,8 +5,10 @@ defmodule Predictex.Workers.KnockoutIds do
   knockout kicks off the same day — too tight for a manual step. This Oban worker runs on the cron
   and assigns the moment FIFA publishes:
 
-    * **Stop before fetch** — if no knockout fixture is missing a `fifa_match_id`, it no-ops
-      without touching the network (so it isn't hammering the CDN for the rest of the tournament).
+    * **Stop before fetch** — if no knockout fixture is missing a `fifa_match_id` *or* a
+      `fifa_stage_id`, it no-ops without touching the network (so it isn't hammering the CDN for
+      the rest of the tournament). The live `/detail` endpoint needs both — each KO round is a
+      distinct stage — so a stage-only gap must still arm the worker.
     * Otherwise it fetches `rounds.json` and runs `Fifa.LiveIds.assign/1`, logging coverage
       (`KO fifa_match_id: N/32`) and the name/slot split so the 28 Jun window is observable.
 
@@ -40,11 +42,15 @@ defmodule Predictex.Workers.KnockoutIds do
     end
   end
 
+  # A knockout fixture still needs FIFA addressing when it's missing its match id OR its stage id
+  # (the live `/detail` endpoint needs BOTH — each KO round is a distinct stage). The stage arm is
+  # essential: the existing R32 rows already have ids, so an id-only guard would no-op and never
+  # backfill their stage, leaving live capture pointed at the wrong stage.
   defp ko_pending? do
     Repo.exists?(
       from f in Fixture,
         join: r in assoc(f, :round),
-        where: r.stage == :knockout and is_nil(f.fifa_match_id)
+        where: r.stage == :knockout and (is_nil(f.fifa_match_id) or is_nil(f.fifa_stage_id))
     )
   end
 
