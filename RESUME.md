@@ -148,33 +148,34 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-27) — NEXT: roll out the `:native_ko_entry` flag to all members (ops, no code)
+## ⏵ Continue here (2026-06-28) — NEXT: build `predictex-u4k` (first-player-to-score picker) BEFORE 20:00 R32 kickoff
 
-`predictex-e5o` (FIFA third-placed resolution) + `kob` (next-match banner) are **DEPLOYED + verified** as
-`v0.11.19`; `80k` + `7qu` shipped earlier in `v0.11.18` (see "Live right now"). Everything is on origin/main and
-deployed. The single live next step is the **flag rollout** — the native game is still DARK for members (flag
-enabled only for `:admins`).
+The native KO game is **LIVE for all members** — `:native_ko_entry` flag switched ON in prod 2026-06-28
+(user ran `rpc 'FunWithFlags.enable(:native_ko_entry)'`). Members can predict resolved R32 matches natively.
+Latest deployed tag **`v0.11.20`** (e5o third-placed + ahi guard, prod-verified). On origin-but-UNDEPLOYED:
+`dum` (e5o v2 both-placeholder) + the tidy-up batch (`kob`/`94u`/`57t`/`cfi`/`34w`) — a `v0.11.21` would ship them.
+**Prod cleanup done:** the 6 demo players (`@demo.predictex.local`) purged via `Demo.purge()` (SSH/rpc); only the
+real admin account remains.
 
-> **e5o post-deploy watch:** the new `Workers.KnockoutTeams` cron (`*/10`) should fill the resolved third-placed
-> R32 slots from FIFA within ~10 min — confirm `/bracket` flips a third-placed slot (e.g. USA v `3B/E/F/I/J` →
-> USA v Bosnia) and the server logs `knockout team backfill: %{resolved: …}`. If a slot doesn't fill, the likely
-> cause is a KO `slot_key` mismatch (FIFA `date` offset vs openfootball `kickoff_at` UTC) — verified aligned for
-> the USA tie at design time, but eyeball one real fill.
+### ▶ START HERE: `predictex-u4k` — first-player-to-score picker (P1, URGENT)
+**The gap:** the native KO form lets members pick first *team* to score (side toggle) but NOT first *player* —
+yet `Scoring.first_player_points/3` awards **+10, KO-only** (free-text `norm` match). Members forfeit it on
+every KO fixture; each kickoff locks it out. **Source FOUND + verified:** the deferred picker is unblocked.
+- **Spec:** `docs/superpowers/specs/2026-06-28-first-player-picker-design.md` — go straight to `writing-plans` → SDD.
+- **Source:** `play.fifa.com/json/match_predictor/players.json` (static, no auth, pre-match; 1264 players, 48
+  squads, 26-man rosters; per player `shortName`/`position` (1GK/2DEF/3MID/4FWD)/`stats.goals`/`squadId`/`fifaId`).
+  Join: fixture team → `squads.json` `squadId` → filter `players.json` (`Crosswalk.norm` for name divergence).
+- **Build:** `Fifa.Players` (fetch+cache, CohortSync-style worker) + app-styled modal in the `:editable` KO card
+  (2-team toggle, searchable list of name·position·goals, "No first scorer"), selection writes the existing
+  sr-only `first_scorer_player` input via the `RoundEntry` hook pattern. **Scoring free-text v1** (works day-one,
+  no migration); exact-`fifaId` scoring is a follow-up bead. v1 defers position-filter + photos.
+- **Decision (locked w/ user):** skip the free-text stopgap — build the real picker; ship as `v0.11.21` (bundles
+  `dum` + tidy-up) **before 20:00 UTC** R32 kickoff (don't tag mid-capture).
 
-### ▶ START HERE: enable the flag for all members (user's call, ops/no-code)
-The per-fixture native R32 game is live in prod but gated to admins. To open it to the league:
-1. **(Optional) admin smoke-check first:** as an admin, open `/predictions` → R32 tab once a match's teams
-   resolve (FIFA/openfootball resolves them ~15-min cadence as group results land) → confirm the native
-   `:editable` card renders + a pick saves. R32 fixtures stay `:pending` ("⏳ awaiting teams") until their
-   teams resolve, so eyeball after the first R32 pairings are known.
-2. **Roll out to everyone:** `rpc 'FunWithFlags.enable(:native_ko_entry)'` → all members get the FIFA-style
-   per-match unlock (each resolved R32 match becomes predictable the moment its teams land, not a whole-round
-   flip). **Kill switch** = `rpc 'FunWithFlags.disable(:native_ko_entry)'`, no redeploy.
-3. **28-Jun watch (unchanged):** `predictex-hco` WS1 self-arms — confirm `KO fifa_match_id: 32/32` once FIFA
-   publishes the bracket, then first KO capture through ET/pens with `is_live` clearing (closes `hco`).
-
-> **NOTE:** 2 group matches kick off 20:00 (26 Jun) — `v0.11.18` was tagged/deployed BEFORE kickoff (no
-> mid-capture frame loss). Don't tag again while either is capturing.
+> **Other open:** `predictex-hco` WS1 — confirm `KO fifa_match_id: 32/32` once FIFA publishes the bracket, then
+> first KO capture through ET/pens with `is_live` clearing (closes `hco`). `predictex-i9k` (KO scorer import +
+> exact-`fifaId` matching) is the scoring-data sibling of u4k — the `players.json` `fifaId` ↔ `/detail` `IdPlayer`
+> join (spike 8/8) is the path.
 
 > **What 80k changed (shipped):** native KO entry is now gated **per fixture**, not per round. `round_open?`
 > is **retired**. A knockout fixture is `:editable` when the flag is on AND both teams are resolved (real
