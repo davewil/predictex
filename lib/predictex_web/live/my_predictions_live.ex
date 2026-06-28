@@ -241,19 +241,32 @@ defmodule PredictexWeb.MyPredictionsLive do
           phx-submit="save_round"
           phx-hook=".RoundEntry"
         >
-          <input
-            type="text"
-            class="sr-only"
-            tabindex="-1"
-            aria-hidden="true"
-            name="booster_fixture_id"
-            value={current_booster_id(@active.fixtures)}
-            data-booster-input
-          />
+          <%!-- phx-update=ignore: a live-update re-render (`:fixtures_changed`/`:tick`) must not
+               reset the member's in-progress, unsaved booster selection back to the saved value
+               before they hit "Save picks". The form id carries the round ordinal, so switching
+               rounds replaces the form and re-renders this fresh. --%>
+          <div id="ko-booster-state" phx-update="ignore">
+            <input
+              type="text"
+              class="sr-only"
+              tabindex="-1"
+              aria-hidden="true"
+              name="booster_fixture_id"
+              value={current_booster_id(@active.fixtures)}
+              data-booster-input
+            />
+          </div>
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <div :for={fx <- @active.fixtures} class="contents">
+              <%!-- phx-update=ignore preserves the member's in-progress entry (goals, first-team
+                   toggle, first-player pick, booster) across live-update re-renders. Locked/settled
+                   cards (the sibling :if branches below) are NOT ignored, so they keep live-updating.
+                   The card only un-ignores when its :if drops it on the editable→locked kickoff flip,
+                   or on a round switch (the form id carries the round ordinal → fresh form). --%>
               <div
                 :if={@fixture_states[fx.fixture.id] == :editable}
+                id={"ko-entry-#{fx.fixture.id}"}
+                phx-update="ignore"
                 data-fixture-card
                 class="rounded-box bg-base-100 border border-base-content/10 p-3 shadow"
               >

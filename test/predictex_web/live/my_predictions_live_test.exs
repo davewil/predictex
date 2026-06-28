@@ -835,5 +835,10 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     # The editable card shows the kickoff time pre-match (it was previously omitted — only the
     # settled/locked cards showed it).
     assert html =~ "kickoff-edit-"
+    # The editable card is phx-update=ignore so a live-update re-render can't wipe in-progress
+    # entry before the member saves (the client-side preservation itself isn't unit-testable;
+    # this locks the wiring so a regression that drops the directive fails).
+    assert html =~ ~s(id="ko-entry-)
+    assert html =~ ~s(phx-update="ignore")
   end
 end
