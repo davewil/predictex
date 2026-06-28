@@ -135,6 +135,25 @@ defmodule Predictex.Fifa.KnockoutTeamsTest do
                KnockoutTeams.plan(r, [f], canon, @tables)
     end
 
+    test "orients when the winner slot is on team2 (covers orient_both arms c/d), both FIFA orderings" do
+      ko = ~U[2026-07-02 01:00:00Z]
+      # The winner placeholder is team2 this time; the third is team1 (which never projects).
+      f = %Fixture{id: 26, team1: "3C/D/F/G/H", team2: "1I", kickoff_at: ko}
+      canon = KnockoutTeams.canonical_index(["France", "Sweden"])
+
+      # arm (c): 1I→France matches FIFA home → team2 (the winner) must become France.
+      r_home = rounds("2026-07-02T01:00:00+00:00", "France", "Sweden")
+
+      assert [%{fixture_id: 26, team1: "Sweden", team2: "France"}] =
+               KnockoutTeams.plan(r_home, [f], canon, @tables)
+
+      # arm (d): FIFA lists the pair swapped — 1I→France matches FIFA away → team2 still France.
+      r_away = rounds("2026-07-02T01:00:00+00:00", "Sweden", "France")
+
+      assert [%{fixture_id: 26, team1: "Sweden", team2: "France"}] =
+               KnockoutTeams.plan(r_away, [f], canon, @tables)
+    end
+
     test "skips when no side projects (group not decided → empty tables)" do
       ko = ~U[2026-07-02 01:00:00Z]
       f = %Fixture{id: 22, team1: "1Z", team2: "3C/D/F/G/H", kickoff_at: ko}
