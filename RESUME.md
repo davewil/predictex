@@ -187,8 +187,10 @@ Subagent-driven 7-task TDD + opus whole-branch review. **594 tests green, full g
   force-warm. Don't tag mid-capture. **Manual eyeball before tag:** `iex -S mix phx.server` → `FunWithFlags.enable(:native_ko_entry)`
   + `Fifa.Players.Cache.refresh()` → `mix predictex.preview_knockout` → open an editable R32 card → modal open/toggle/search/select
   → submit → reload → pick persists. (Phone over Tailscale for touch.) **I decide production-ready — code is committed local, awaiting your "push".**
-- **Follow-ups filed:** `predictex-6ea` (P4 — accent-fold the picker *search box*; minor test hardening) · `i9k` (exact-`fifaId`
-  scoring — the structural-divergence fix; u4k shipped its predictions-side column).
+- **Follow-ups filed:** `predictex-3tg` (P3 — picker **mobile UI polish**; modal doesn't look great on phones,
+  deferred post-match 2026-06-28, suspect areas noted on the bead) · `predictex-6ea` (P4 — accent-fold the picker
+  *search box*; minor test hardening) · `i9k` (exact-`fifaId` scoring — the structural-divergence fix; u4k shipped
+  its predictions-side column).
 
 > **Other open:** `predictex-hco` WS1 — confirm `KO fifa_match_id: 32/32` once FIFA publishes the bracket, then
 > first KO capture through ET/pens with `is_live` clearing (closes `hco`). `predictex-i9k` (KO scorer import +
