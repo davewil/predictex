@@ -19,6 +19,10 @@ defmodule Predictex.Fifa.Players.Cache do
   @table __MODULE__
   @players_url "https://play.fifa.com/json/match_predictor/players.json"
   @squads_url "https://play.fifa.com/json/match_predictor/squads.json"
+  # After a cold-load failure, suppress re-fetches for this window. This prevents a
+  # fetch-storm when the FIFA feed is down on boot: every render that calls for_team/1
+  # would otherwise funnel through the GenServer and re-enter the 30s Req.get.
+  @retry_backoff_ms 60_000
 
   ## Public API
 
@@ -73,7 +77,20 @@ defmodule Predictex.Fifa.Players.Cache do
   ## Internals
 
   defp ensure_loaded do
-    if loaded?(), do: :ok, else: GenServer.call(__MODULE__, :ensure, 30_000)
+    cond do
+      loaded?() ->
+        :ok
+
+      failed_recently?() ->
+        # Within the backoff window after a cold-load failure — short-circuit without a
+        # GenServer roundtrip. for_team/1 reads from the table: stale data on a warm cache,
+        # or [] on a cold one. Either is preferable to serialising every render behind a
+        # 30s Req.get when the FIFA feed is down.
+        :ok
+
+      true ->
+        GenServer.call(__MODULE__, :ensure, 30_000)
+    end
   end
 
   defp loaded? do
@@ -83,12 +100,25 @@ defmodule Predictex.Fifa.Players.Cache do
     end
   end
 
+  defp failed_recently? do
+    case :ets.lookup(@table, :__failed_at__) do
+      [{:__failed_at__, failed_at}] ->
+        System.monotonic_time(:millisecond) - failed_at < @retry_backoff_ms
+
+      [] ->
+        false
+    end
+  end
+
   defp load do
     case source_fun().() do
       {:ok, %{players: players, squads: squads}} ->
         map = Players.parse(players, squads)
-        :ets.delete_all_objects(@table)
+        # Overwrite each team row in-place (`:set` semantics) instead of deleting the whole
+        # table first. Concurrent readers always see old-or-new squad data, never an empty
+        # snapshot mid-refresh. The 48 team-keys are stable across loads so no stale key leaks.
         Enum.each(map, fn {team, list} -> :ets.insert(@table, {team, list}) end)
+        :ets.delete(@table, :__failed_at__)
         :ets.insert(@table, {:__loaded__, true})
         Logger.info("players cache: #{map_size(map)} squads loaded")
         :ok
@@ -96,9 +126,11 @@ defmodule Predictex.Fifa.Players.Cache do
       {:error, reason} ->
         # Keep any existing (stale) cache on a failed refresh: a transient feed blip during
         # the cron refresh must NOT empty the picker for all members. A cold cache stays empty
-        # (the :ok branch never ran, sentinel unset) so for_team/1 returns [] and retries on the
-        # next call; a warm cache keeps its good squad data until a successful reload replaces it.
+        # (the :ok branch never ran, sentinel unset) so for_team/1 returns []; we stamp a
+        # :__failed_at__ marker so subsequent ensure_loaded/0 calls short-circuit for
+        # @retry_backoff_ms instead of re-entering the 30s fetch on every render.
         Logger.error("players cache load failed: #{inspect(reason)}")
+        :ets.insert(@table, {:__failed_at__, System.monotonic_time(:millisecond)})
         {:error, reason}
     end
   end

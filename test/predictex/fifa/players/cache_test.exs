@@ -63,4 +63,22 @@ defmodule Predictex.Fifa.Players.CacheTest do
     assert {:error, :feed_down} = Cache.refresh()
     assert Cache.for_team("Brazil") != []
   end
+
+  test "a cold-load failure does not re-fetch on every subsequent read (negative-cache)" do
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    Application.put_env(:predictex, :players_source_fun, fn ->
+      Agent.update(counter, &(&1 + 1))
+      {:error, :down}
+    end)
+
+    # Both reads return [] (cold cache, failing source)
+    assert Cache.for_team("Brazil") == []
+    assert Cache.for_team("Brazil") == []
+
+    # Source invoked only ONCE — the negative-cache marker prevents re-fetch storm
+    assert Agent.get(counter, & &1) == 1
+
+    Agent.stop(counter)
+  end
 end

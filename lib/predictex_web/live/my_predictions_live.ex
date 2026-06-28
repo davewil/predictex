@@ -130,15 +130,15 @@ defmodule PredictexWeb.MyPredictionsLive do
   @impl true
   def render(assigns) do
     active = active_round(assigns.dash, assigns.active_ordinal)
-
     states = fixture_states(active, assigns.now)
+    native_ko = native_ko_round?(active, assigns.current_scope.player)
 
     assigns =
       assigns
       |> assign(:active, active)
-      |> assign(:native_ko_round?, native_ko_round?(active, assigns.current_scope.player))
+      |> assign(:native_ko_round?, native_ko)
       |> assign(:fixture_states, states)
-      |> assign(:squads, squads_for(active, states))
+      |> assign(:squads, if(native_ko, do: squads_for(active, states), else: %{}))
 
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} max_width="max-w-6xl">
