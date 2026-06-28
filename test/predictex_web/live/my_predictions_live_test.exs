@@ -402,6 +402,88 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
   end
 
   @tag :native_ko
+  test "auto-saves a complete pick on change — no explicit submit needed", %{
+    conn: conn,
+    round: round
+  } do
+    player = player_fixture(%{display_name: "AutoSaver"})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+    ko_fx = fixture!(ko_round, %{team1: "England", team2: "Germany", kickoff_at: future})
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    lv |> element("button", "Round of 16") |> render_click()
+
+    # A CHANGE (not a submit) of a complete scoreline must auto-persist.
+    lv
+    |> form("#round-entry-4", %{
+      "picks" => %{
+        "#{ko_fx.id}" => %{
+          "home_goals" => "3",
+          "away_goals" => "0",
+          "first_scorer_side" => "home"
+        }
+      }
+    })
+    |> render_change()
+
+    pred = Predictions.get_player_fixture_prediction(player.id, ko_fx.id)
+    assert pred && pred.home_goals == 3 && pred.away_goals == 0
+    assert pred.first_scorer_side == :home
+  end
+
+  @tag :native_ko
+  test "auto-save silently ignores an incomplete scoreline (no crash, nothing persisted)", %{
+    conn: conn,
+    round: round
+  } do
+    player = player_fixture(%{display_name: "Partial"})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+    ko_fx = fixture!(ko_round, %{team1: "England", team2: "Germany", kickoff_at: future})
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    lv |> element("button", "Round of 16") |> render_click()
+
+    # Half-entered scoreline (away blank): must not crash and must not persist a partial pick.
+    lv
+    |> form("#round-entry-4", %{
+      "picks" => %{"#{ko_fx.id}" => %{"home_goals" => "2", "away_goals" => ""}}
+    })
+    |> render_change()
+
+    assert Predictions.get_player_fixture_prediction(player.id, ko_fx.id) == nil
+  end
+
+  @tag :native_ko
   test "saving a KO round persists the picked first-player name and fifaid", %{
     conn: conn,
     round: round

@@ -55,6 +55,32 @@ defmodule PredictexWeb.MyPredictionsLive do
     end
   end
 
+  @impl true
+  # Save-as-you-go (phx-change): persist whatever is currently complete + valid on every edit, so
+  # picks survive a reload without an explicit "save". Incomplete scorelines are skipped and a
+  # booster-on-blank is held silently — no flash, no form re-render (the cards are phx-update=ignore
+  # and re-pulling the whole dashboard per keystroke would be wasteful; a static "saves
+  # automatically" indicator covers reassurance). Same write-auth/lockout guards as the explicit
+  # save (save_round_predictions skips locked/pending/incomplete rows individually).
+  def handle_event("autosave", params, socket) do
+    active = active_round(socket.assigns.dash, socket.assigns.active_ordinal)
+    player = socket.assigns.current_scope.player
+
+    if native_ko_round?(active, player) do
+      with {:ok, rows} <-
+             Predictions.parse_pick_rows(params["picks"] || %{}, params["booster_fixture_id"]) do
+        Predictions.save_round_predictions(
+          player.id,
+          active.round.id,
+          rows,
+          native_ko_enabled?(player)
+        )
+      end
+    end
+
+    {:noreply, socket}
+  end
+
   defp do_save_round(params, active, socket) do
     player = socket.assigns.current_scope.player
     player_id = player.id
@@ -238,6 +264,7 @@ defmodule PredictexWeb.MyPredictionsLive do
           :if={@active && @native_ko_round?}
           id={"round-entry-#{@active.round.ordinal}"}
           for={%{}}
+          phx-change="autosave"
           phx-submit="save_round"
           phx-hook=".RoundEntry"
         >
@@ -287,6 +314,7 @@ defmodule PredictexWeb.MyPredictionsLive do
                     pattern="[0-9]"
                     maxlength="1"
                     data-goal-input
+                    phx-debounce="400"
                     class="input input-bordered font-score w-14 text-center shrink-0"
                     name={"picks[#{fx.fixture.id}][home_goals]"}
                     value={fx.prediction && fx.prediction.home_goals}
@@ -303,6 +331,7 @@ defmodule PredictexWeb.MyPredictionsLive do
                     pattern="[0-9]"
                     maxlength="1"
                     data-goal-input
+                    phx-debounce="400"
                     class="input input-bordered font-score w-14 text-center shrink-0"
                     name={"picks[#{fx.fixture.id}][away_goals]"}
                     value={fx.prediction && fx.prediction.away_goals}
@@ -496,7 +525,15 @@ defmodule PredictexWeb.MyPredictionsLive do
               </div>
             </div>
           </div>
-          <button type="submit" class="btn btn-primary mt-4">Save picks</button>
+          <%!-- Save-as-you-go: every edit auto-persists via phx-change (no submit needed). The
+               static indicator reassures; the submit button stays as a manual fallback (e.g.
+               navigating within the goal-input debounce window). --%>
+          <div class="mt-4 flex items-center justify-between gap-2">
+            <span class="flex items-center gap-1 text-sm font-medium text-success">
+              ✓ <span class="text-base-content/60 font-normal">Picks save automatically</span>
+            </span>
+            <button type="submit" class="btn btn-sm btn-ghost">Save now</button>
+          </div>
         </.form>
 
         <%!-- Read-only fixture grid for group rounds and flag-off knockout rounds --%>
@@ -567,6 +604,9 @@ defmodule PredictexWeb.MyPredictionsLive do
             btn.classList.toggle("btn-primary", on)
             btn.classList.toggle("btn-ghost", !on)
           },
+          // Notify LiveView's phx-change so JS-written inputs (toggles/picker) auto-save too —
+          // assigning input.value in JS fires no native event that phx-change would otherwise catch.
+          commit(el) { el.dispatchEvent(new Event("input", { bubbles: true })) },
           // First scorer: re-tap the lit flag clears to None; tapping a side is exclusive within the card.
           toggleScorer(btn) {
             const card = btn.closest("[data-fixture-card]")
@@ -575,6 +615,7 @@ defmodule PredictexWeb.MyPredictionsLive do
             card.querySelectorAll("[data-scorer-btn]").forEach((b) => this.setPressed(b, false))
             input.value = wasOn ? "" : btn.dataset.side
             if (!wasOn) this.setPressed(btn, true)
+            this.commit(input)
           },
           // Booster: round-exclusive — turning one on clears the rest; re-tap turns it off.
           toggleBooster(btn) {
@@ -583,6 +624,7 @@ defmodule PredictexWeb.MyPredictionsLive do
             this.el.querySelectorAll("[data-booster-btn]").forEach((b) => this.setPressed(b, false))
             input.value = wasOn ? "" : btn.dataset.fixture
             if (!wasOn) this.setPressed(btn, true)
+            this.commit(input)
           },
           focusRel(el, offset) {
             const inputs = this.goalInputs()
@@ -624,6 +666,7 @@ defmodule PredictexWeb.MyPredictionsLive do
             card.querySelector(`[data-fifaid-input="${fid}"]`).value = btn.dataset.fifaid
             const label = card.querySelector(`[data-picker-label="${fid}"]`)
             if (label) label.textContent = btn.dataset.name || "First Player To Score"
+            this.commit(card.querySelector(`[data-player-input="${fid}"]`))
             this.closePicker(modal)
           },
           mounted() {
