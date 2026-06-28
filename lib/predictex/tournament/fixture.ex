@@ -33,6 +33,8 @@ defmodule Predictex.Tournament.Fixture do
     field :live_minute, :string
     field :is_live, :boolean, default: false
     field :fifa_match_id, :string
+    # FIFA live `/detail` stage segment (per knockout round); nil → group stage at capture time.
+    field :fifa_stage_id, :string
     # Stable openfootball match number (knockout only) — the identity the ingest keys on so a
     # KO fixture's teams resolve in place rather than spawning a duplicate (predictex-g8m).
     field :source_num, :integer
@@ -71,6 +73,7 @@ defmodule Predictex.Tournament.Fixture do
     :live_minute,
     :is_live,
     :fifa_match_id,
+    :fifa_stage_id,
     :round_id
   ]
 

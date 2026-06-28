@@ -43,6 +43,18 @@ defmodule Predictex.Workers.LiveScoreSyncTest do
 
   defp minutes_ago(m), do: DateTime.add(DateTime.utc_now(), -m * 60)
 
+  test "detail_url/1 addresses the fixture's knockout stage, defaulting to the group stage" do
+    base = "https://api.fifa.com/api/v3/live/football/17/285023"
+
+    # Knockout fixture: its own stage (group=289273, R32=289287, …) — the bug was hardcoding 289273.
+    ko = fixture(%{external_ref: "ko", fifa_match_id: "400021518", fifa_stage_id: "289287"})
+    assert Live.detail_url(ko) == "#{base}/289287/400021518"
+
+    # Group / legacy fixture (no stage id) falls back to the group stage.
+    grp = fixture(%{external_ref: "grp", fifa_match_id: "400021001"})
+    assert Live.detail_url(grp) == "#{base}/289273/400021001"
+  end
+
   test "publishes a snapshot per in-window fixture and reschedules" do
     f = window_fixture()
     Phoenix.PubSub.subscribe(Predictex.PubSub, "fifa:snapshots")

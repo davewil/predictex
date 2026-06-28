@@ -21,6 +21,8 @@ defmodule Predictex.Fifa.LiveIdsTest do
   end
 
   # One FIFA `rounds.json` knockout match at 2026-06-28 19:00 UTC (the slot the KO tests key on).
+  # `matchcentreUrl` carries the per-stage id (`289287` for R32) that the live `/detail` endpoint
+  # is keyed on — LiveIds parses it into `fifa_stage_id` (predictex-bug: KO live capture).
   defp r32_round(teams \\ {"Germany", "Brazil"}, fifa_id \\ 400_021_600) do
     {home, away} = teams
 
@@ -31,24 +33,46 @@ defmodule Predictex.Fifa.LiveIdsTest do
           "fifaId" => fifa_id,
           "homeSquadName" => home,
           "awaySquadName" => away,
-          "date" => "2026-06-28T20:00:00+01:00"
+          "date" => "2026-06-28T20:00:00+01:00",
+          "matchcentreUrl" =>
+            "https://www.fifa.com/fifaplus/en/match-centre/match/17/285023/289287/#{fifa_id}?gender=2&date=2026-06-28"
         }
       ]
     }
   end
 
-  test "plan/2 skips fixtures that already have a fifa_match_id" do
-    # name AND slot would both match r32_round — the only reason for [] is the already-assigned skip.
+  test "plan/2 skips a fully-resolved knockout fixture (id AND stage already set)" do
+    # name AND slot would both match r32_round — the only reason for [] is the fully-resolved skip.
     f =
       fixture(%{
         team1: "Germany",
         team2: "Brazil",
         round_id: ko_round().id,
         kickoff_at: ~U[2026-06-28 19:00:00Z],
-        fifa_match_id: "already"
+        fifa_match_id: "400021600",
+        fifa_stage_id: "289287"
       })
 
     assert [] = LiveIds.plan([r32_round()], [f])
+  end
+
+  test "plan/2 backfills fifa_stage_id for a knockout fixture that has an id but no stage" do
+    # The latent-bug case: the existing R32 fixtures were assigned a fifa_match_id before the
+    # stage column existed, so live capture addressed the wrong (group) stage. Backfill the stage
+    # from rounds.json without changing the (correct) id.
+    f =
+      fixture(%{
+        team1: "Germany",
+        team2: "Brazil",
+        round_id: ko_round().id,
+        kickoff_at: ~U[2026-06-28 19:00:00Z],
+        fifa_match_id: "400021600"
+      })
+
+    assert [%{fixture_id: id, fifa_match_id: "400021600", fifa_stage_id: "289287", via: :stage}] =
+             LiveIds.plan([r32_round()], [f])
+
+    assert id == f.id
   end
 
   test "plan/2 falls back to a date+time slot match for a knockout fixture the name-join misses" do
@@ -61,7 +85,7 @@ defmodule Predictex.Fifa.LiveIdsTest do
         kickoff_at: ~U[2026-06-28 19:00:00Z]
       })
 
-    assert [%{fixture_id: id, fifa_match_id: "400021600", via: :slot}] =
+    assert [%{fixture_id: id, fifa_match_id: "400021600", fifa_stage_id: "289287", via: :slot}] =
              LiveIds.plan([r32_round()], [f])
 
     assert id == f.id
@@ -92,7 +116,8 @@ defmodule Predictex.Fifa.LiveIdsTest do
         kickoff_at: ~U[2026-06-28 19:00:00Z]
       })
 
-    assert [%{fifa_match_id: "400021600", via: :name}] = LiveIds.plan([r32_round()], [f])
+    assert [%{fifa_match_id: "400021600", fifa_stage_id: "289287", via: :name}] =
+             LiveIds.plan([r32_round()], [f])
   end
 
   test "assign/1 writes ids and returns a name/slot summary" do
@@ -138,6 +163,8 @@ defmodule Predictex.Fifa.LiveIdsTest do
 
     assert %{assigned: 2, by_name: 1, by_slot: 1, errors: 0} = LiveIds.assign(rounds)
     assert Tournament.get_fixture!(ko.id).fifa_match_id == "400021600"
+    # The KO fixture also gets its stage id (289287) so live capture hits the right stage.
+    assert Tournament.get_fixture!(ko.id).fifa_stage_id == "289287"
     assert Tournament.get_fixture!(grp.id).fifa_match_id == "400021001"
   end
 

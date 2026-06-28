@@ -50,7 +50,12 @@ defmodule Predictex.Workers.LiveScoreSync do
   alias Predictex.{LiveScore, Repo}
   alias Predictex.Tournament.Fixture
 
-  @detail_base "https://api.fifa.com/api/v3/live/football/17/285023/289273"
+  # FIFA live `/detail` is keyed `.../{competition}/{season}/{stage}/{matchId}`. The stage segment
+  # varies per knockout round (group=289273, R32=289287, …), so it's addressed per fixture via
+  # `fifa_stage_id` (backfilled by Fifa.LiveIds from rounds.json). A nil stage — group / legacy
+  # rows — falls back to the group stage, preserving the original group-capture behaviour.
+  @detail_base "https://api.fifa.com/api/v3/live/football/17/285023"
+  @group_stage "289273"
   @pre_min 10
   @post_min 210
   # Last-resort backstop for `clear_stuck_live/1`. Must comfortably exceed the longest
@@ -117,7 +122,7 @@ defmodule Predictex.Workers.LiveScoreSync do
   end
 
   defp publish(f, now) do
-    url = "#{@detail_base}/#{f.fifa_match_id}"
+    url = detail_url(f)
 
     case fetch_fun().(url) do
       {:ok, 200, body} when is_map(body) ->
@@ -131,6 +136,12 @@ defmodule Predictex.Workers.LiveScoreSync do
         Logger.warning("live snapshot fetch #{f.fifa_match_id}: #{inspect(other)}")
     end
   end
+
+  @doc """
+  The FIFA live `/detail` URL for a fixture: its knockout `fifa_stage_id`, or the group stage by
+  default (group / legacy fixtures with no stage id). Public for direct testing.
+  """
+  def detail_url(f), do: "#{@detail_base}/#{f.fifa_stage_id || @group_stage}/#{f.fifa_match_id}"
 
   defp reschedule, do: %{} |> new(schedule_in: @interval) |> Oban.insert()
 
