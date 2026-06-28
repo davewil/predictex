@@ -56,4 +56,11 @@ defmodule Predictex.Fifa.Players.CacheTest do
     # GenServer still alive:
     assert Process.alive?(Process.whereis(Cache))
   end
+
+  test "a failing refresh keeps stale data (warm cache survives)" do
+    assert Cache.refresh() == :ok
+    Application.put_env(:predictex, :players_source_fun, fn -> {:error, :feed_down} end)
+    assert {:error, :feed_down} = Cache.refresh()
+    assert Cache.for_team("Brazil") != []
+  end
 end
