@@ -18,10 +18,9 @@ the app scores them against real results and ranks a leaderboard.
   `players.json` source) **+ `dum`** (e5o v2 both-placeholder R32) **+ the tidy-up batch**. u4k: `Fifa.Players`
   squad join + ETS cache (lazy/boot-warm/**negative-cache**/keep-stale) + `Workers.PlayersSync` (`*/30`) +
   `first_scorer_fifaid` column + scoring **accent-fold** + flag-gated modal picker writing
-  `first_scorer_player`+`first_scorer_fifaid`. ⚠️ **Cache-warm note:** boot-warm runs automatically on container
-  start; the post-deploy `rpc 'Fifa.Players.Cache.refresh()'` + `players cache: N squads loaded` log confirmation
-  was **NOT run by the agent** (auto-mode blocks prod-host SSH reads) — run it for certainty, else the cron +
-  lazy-load + negative-cache cover it. ⚠️ **Known scoring gap (deferred `i9k`):** ~16% of correct first-player
+  `first_scorer_player`+`first_scorer_fifaid`. ✅ **Cache verified warm in prod** 2026-06-28 ~18:55 UTC via rpc:
+  `:ets.info(Players.Cache, :size)` = **49** (48 squads + `:__loaded__` sentinel), Brazil/France `for_team` =
+  26/26 (full rosters) — boot-warm succeeded. So flag-on + an editable R32 card → members get a populated picker. ⚠️ **Known scoring gap (deferred `i9k`):** ~16% of correct first-player
   picks (mononyms — Mbappé→"Kylian Mbappé") still score 0 until exact-`fifaId` scoring lands; accent-fold
   recovers the ~12% accent-only cases. See `bd remember fifa-vs-openfootball-scorer-names`.
 - **Prior deployed tag:** `v0.11.20` (deployed + **verified in prod** 2026-06-27 ~18:30 UTC: Deploy success in
