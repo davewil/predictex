@@ -706,4 +706,76 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert html =~ "Italy"
     assert html =~ "Japan"
   end
+
+  @tag :native_ko
+  test "editable KO card renders the first-player picker with both squads", %{
+    conn: conn,
+    round: round
+  } do
+    player = player_fixture(%{display_name: "PickerTester"})
+
+    # Close out ordinal 1 so it doesn't steal "active".
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 32", stage: :knockout, ordinal: 4})
+
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    _ko_fx =
+      fixture!(ko_round, %{
+        team1: "Brazil",
+        team2: "Argentina",
+        kickoff_at: future
+      })
+
+    # Warm the players cache with a stub so the modal has rows to render.
+    # Team names in the stub MUST match the fixture's team1/team2 exactly (via Crosswalk.norm).
+    Application.put_env(:predictex, :players_source_fun, fn ->
+      {:ok,
+       %{
+         players: [
+           %{
+             "shortName" => "Neymar",
+             "position" => 4,
+             "stats" => %{"goals" => 2},
+             "squadId" => 7,
+             "fifaId" => 1
+           },
+           %{
+             "shortName" => "Lionel Messi",
+             "position" => 4,
+             "stats" => %{"goals" => 3},
+             "squadId" => 2,
+             "fifaId" => 9
+           }
+         ],
+         squads: [
+           %{"id" => 7, "name" => "Brazil", "abbr" => "BRA"},
+           %{"id" => 2, "name" => "Argentina", "abbr" => "ARG"}
+         ]
+       }}
+    end)
+
+    on_exit(fn -> Application.delete_env(:predictex, :players_source_fun) end)
+    Predictex.Fifa.Players.Cache.refresh()
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+    html = lv |> element("button", "Round of 32") |> render_click()
+
+    assert html =~ "First Player To Score"
+    assert html =~ "Neymar"
+    assert html =~ "Lionel Messi"
+    assert html =~ "No first scorer"
+  end
 end

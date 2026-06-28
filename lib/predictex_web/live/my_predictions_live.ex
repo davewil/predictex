@@ -131,11 +131,14 @@ defmodule PredictexWeb.MyPredictionsLive do
   def render(assigns) do
     active = active_round(assigns.dash, assigns.active_ordinal)
 
+    states = fixture_states(active, assigns.now)
+
     assigns =
       assigns
       |> assign(:active, active)
       |> assign(:native_ko_round?, native_ko_round?(active, assigns.current_scope.player))
-      |> assign(:fixture_states, fixture_states(active, assigns.now))
+      |> assign(:fixture_states, states)
+      |> assign(:squads, squads_for(active, states))
 
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope} max_width="max-w-6xl">
@@ -321,6 +324,121 @@ defmodule PredictexWeb.MyPredictionsLive do
                       </button>
                     </div>
                   </div>
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold text-base-content/60">First player</span>
+                    <button
+                      type="button"
+                      data-picker-open
+                      data-fixture={fx.fixture.id}
+                      class="btn btn-xs btn-ghost"
+                    >
+                      <span data-picker-label={fx.fixture.id}>
+                        {(fx.prediction && fx.prediction.first_scorer_player) ||
+                          "First Player To Score"}
+                      </span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    class="sr-only"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    name={"picks[#{fx.fixture.id}][first_scorer_player]"}
+                    value={fx.prediction && fx.prediction.first_scorer_player}
+                    data-player-input={fx.fixture.id}
+                  />
+                  <input
+                    type="text"
+                    class="sr-only"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    name={"picks[#{fx.fixture.id}][first_scorer_fifaid]"}
+                    value={fx.prediction && fx.prediction.first_scorer_fifaid}
+                    data-fifaid-input={fx.fixture.id}
+                  />
+
+                  <%!-- Hidden modal; the .RoundEntry hook toggles `hidden`, filters, and selects. --%>
+                  <div
+                    data-picker-modal={fx.fixture.id}
+                    class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                  >
+                    <div class="rounded-box bg-base-100 border border-base-content/10 w-full max-w-md max-h-[80vh] flex flex-col shadow-xl">
+                      <div class="flex items-center justify-between gap-2 p-3 border-b border-base-content/10">
+                        <span class="font-bold">Which player will score first?</span>
+                        <button type="button" data-picker-close class="btn btn-xs btn-ghost">✕</button>
+                      </div>
+                      <div class="flex gap-1 p-2">
+                        <button
+                          type="button"
+                          data-picker-team="team1"
+                          data-fixture={fx.fixture.id}
+                          class="btn btn-xs btn-primary flex-1"
+                        >
+                          {Flags.flag(fx.fixture.team1)} {fx.fixture.team1}
+                        </button>
+                        <button
+                          type="button"
+                          data-picker-team="team2"
+                          data-fixture={fx.fixture.id}
+                          class="btn btn-xs btn-ghost flex-1"
+                        >
+                          {Flags.flag(fx.fixture.team2)} {fx.fixture.team2}
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        data-picker-search
+                        class="input input-bordered input-sm mx-2 mb-2"
+                        placeholder="Search player…"
+                      />
+                      <ul class="overflow-y-auto px-2 pb-3 space-y-1">
+                        <li>
+                          <button
+                            type="button"
+                            data-picker-select
+                            data-name=""
+                            data-fifaid=""
+                            class="w-full text-left btn btn-ghost btn-sm justify-start"
+                          >
+                            No first scorer
+                          </button>
+                        </li>
+                        <li
+                          :for={
+                            {side, players} <- [
+                              {"team1", @squads[fx.fixture.id][:team1] || []},
+                              {"team2", @squads[fx.fixture.id][:team2] || []}
+                            ]
+                          }
+                          :if={players != []}
+                          class="contents"
+                        >
+                          <ul
+                            data-picker-list={side}
+                            class={if side == "team1", do: "contents", else: "hidden"}
+                          >
+                            <li :for={pl <- players}>
+                              <button
+                                type="button"
+                                data-picker-select
+                                data-name={pl.name}
+                                data-fifaid={pl.fifa_id}
+                                data-search={String.downcase(pl.name)}
+                                class="w-full text-left btn btn-ghost btn-sm justify-between"
+                              >
+                                <span class="truncate">{pl.name}</span>
+                                <span class="flex items-center gap-2 shrink-0 text-xs opacity-70">
+                                  <span class="badge badge-ghost badge-xs">{pl.position}</span>
+                                  <span class="font-score">{pl.goals}⚽</span>
+                                </span>
+                              </button>
+                            </li>
+                          </ul>
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     data-booster-btn
@@ -513,6 +631,21 @@ defmodule PredictexWeb.MyPredictionsLive do
       end)
 
   defp fixture_states(_active, _now), do: %{}
+
+  # Squads for the first-player picker — only editable KO fixtures need them. Reads the FIFA
+  # squads cache (lazy-loads on first miss); a cold cache yields [] and the modal renders empty
+  # (the card still saves a blank first-player, exactly as before the picker).
+  defp squads_for(%{fixtures: fixtures}, states) do
+    for fx <- fixtures, states[fx.fixture.id] == :editable, into: %{} do
+      {fx.fixture.id,
+       %{
+         team1: Predictex.Fifa.Players.Cache.for_team(fx.fixture.team1),
+         team2: Predictex.Fifa.Players.Cache.for_team(fx.fixture.team2)
+       }}
+    end
+  end
+
+  defp squads_for(_active, _states), do: %{}
 
   # Single source for the flag resolution — used by the render gate and the write gate so
   # the two defense-in-depth layers can't drift. The :admins group resolves off is_admin
