@@ -159,7 +159,15 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
-## ⏵ Continue here (2026-06-28 late) — `predictex-r8j` KO-live-capture fix CODE-COMPLETE (committed LOCAL); ready to deploy `v0.11.22`
+## ⏵ Continue here (2026-06-28 late) — `predictex-r8j` KO-live-capture fix **DEPLOYED `v0.11.22` + prod-verified**
+
+**DEPLOYED `v0.11.22` 2026-06-28 ~21:55 UTC** (deploy success, `/health`+`/`+`/bracket` 200, valid TLS). **Capture fix
+prod-verified by rpc:** `LiveIds.assign` backfilled **all 16 R32 stages** (`%{assigned: 16, by_stage: 16, errors: 0}`);
+Brazil v Japan (next KO, 29 Jun 18:00) now `fifa_stage_id="289287"` and a `/detail` fetch under it returns a
+**populated** frame (`MatchStatus 1`, home=Brazil) — the exact thing that was null before. **▶ Tomorrow:** confirm the
+first real live KO capture (Brazil v Japan flips `is_live` when it goes live) → then close `predictex-r8j`. The
+`v0.11.22` tag also shipped **u4k** (first-player picker) + **dum** + the tidy-up batch. Q1 (first-scorer bonus in
+match preview) still a P3 follow-up.
 
 **Found + fixed a P0 capture bug while watching the first R32.** `LiveScoreSync` hardcoded the **group**
 stage (`289273`) in the FIFA live `/detail` URL, but the endpoint is keyed `/{comp}/{season}/{stage}/{match}`
