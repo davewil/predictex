@@ -401,6 +401,61 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert pred.booster == true
   end
 
+  @tag :native_ko
+  test "saving a KO round persists the picked first-player name and fifaid", %{
+    conn: conn,
+    round: round
+  } do
+    player = player_fixture(%{display_name: "KoPlayer"})
+    past = DateTime.utc_now() |> DateTime.add(-7200, :second) |> DateTime.truncate(:second)
+
+    _done1 =
+      fixture!(round, %{
+        team1: "France",
+        team2: "Spain",
+        kickoff_at: past,
+        status: :completed,
+        home_goals: 1,
+        away_goals: 0
+      })
+
+    {:ok, ko_round} =
+      Tournament.create_round(%{name: "Round of 16", stage: :knockout, ordinal: 4})
+
+    future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
+
+    ko_fx =
+      fixture!(ko_round, %{
+        team1: "England",
+        team2: "Germany",
+        kickoff_at: future
+      })
+
+    {:ok, lv, _html} = conn |> log_in_player(player) |> live(~p"/predictions")
+
+    # Activate the knockout round chip.
+    lv |> element("button", "Round of 16") |> render_click()
+
+    # Submit the params the JS hook would have written after the player selected "Neymar".
+    lv
+    |> form("#round-entry-4", %{
+      "picks" => %{
+        "#{ko_fx.id}" => %{
+          "home_goals" => "2",
+          "away_goals" => "1",
+          "first_scorer_side" => "home",
+          "first_scorer_player" => "Neymar",
+          "first_scorer_fifaid" => "1"
+        }
+      }
+    })
+    |> render_submit()
+
+    pred = Predictions.get_player_fixture_prediction(player.id, ko_fx.id)
+    assert pred.first_scorer_player == "Neymar"
+    assert pred.first_scorer_fifaid == 1
+  end
+
   test "flag off: an OPEN knockout round stays read-only (native form dark-shipped)", %{
     conn: conn,
     round: round

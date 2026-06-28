@@ -569,6 +569,43 @@ defmodule PredictexWeb.MyPredictionsLive do
             const target = inputs[inputs.indexOf(el) + offset]
             if (target) { target.focus(); target.select() }
           },
+          // --- first-player picker ---
+          openPicker(fid) {
+            const modal = this.el.querySelector(`[data-picker-modal="${fid}"]`)
+            if (modal) { modal.classList.remove("hidden"); this.showTeam(fid, "team1") }
+          },
+          closePicker(modal) {
+            if (modal) modal.classList.add("hidden")
+          },
+          showTeam(fid, side) {
+            const modal = this.el.querySelector(`[data-picker-modal="${fid}"]`)
+            if (!modal) return
+            modal.querySelectorAll("[data-picker-list]").forEach((ul) => {
+              ul.classList.toggle("hidden", ul.dataset.pickerList !== side)
+              ul.classList.toggle("contents", ul.dataset.pickerList === side)
+            })
+            modal.querySelectorAll("[data-picker-team]").forEach((b) =>
+              this.setPressed(b, b.dataset.pickerTeam === side))
+            const search = modal.querySelector("[data-picker-search]")
+            if (search) { search.value = ""; this.filterPicker(modal, "") }
+          },
+          filterPicker(modal, q) {
+            const needle = q.toLowerCase()
+            modal.querySelectorAll("[data-picker-select][data-search]").forEach((btn) => {
+              const li = btn.closest("li")
+              if (li) li.classList.toggle("hidden", !btn.dataset.search.includes(needle))
+            })
+          },
+          selectPlayer(btn) {
+            const modal = btn.closest("[data-picker-modal]")
+            const fid = modal.dataset.pickerModal
+            const card = btn.closest("[data-fixture-card]")
+            card.querySelector(`[data-player-input="${fid}"]`).value = btn.dataset.name
+            card.querySelector(`[data-fifaid-input="${fid}"]`).value = btn.dataset.fifaid
+            const label = card.querySelector(`[data-picker-label="${fid}"]`)
+            if (label) label.textContent = btn.dataset.name || "First Player To Score"
+            this.closePicker(modal)
+          },
           mounted() {
             // Auto-focus the first box on desktop (fine pointer). On touch we skip it
             // so the on-screen keyboard doesn't spring up the moment the tab opens.
@@ -579,6 +616,11 @@ defmodule PredictexWeb.MyPredictionsLive do
             }
 
             this.el.addEventListener("input", (e) => {
+              const search = e.target.closest && e.target.closest("[data-picker-search]")
+              if (search) {
+                this.filterPicker(search.closest("[data-picker-modal]"), search.value)
+                return
+              }
               const el = e.target
               if (!el.matches || !el.matches("[data-goal-input]")) return
               const deleting = e.inputType && e.inputType.startsWith("delete")
@@ -604,6 +646,14 @@ defmodule PredictexWeb.MyPredictionsLive do
             })
 
             this.el.addEventListener("click", (e) => {
+              const open = e.target.closest("[data-picker-open]")
+              if (open) { this.openPicker(open.dataset.fixture); return }
+              const close = e.target.closest("[data-picker-close]")
+              if (close) { this.closePicker(close.closest("[data-picker-modal]")); return }
+              const team = e.target.closest("[data-picker-team]")
+              if (team) { this.showTeam(team.dataset.fixture, team.dataset.pickerTeam); return }
+              const sel = e.target.closest("[data-picker-select]")
+              if (sel) { this.selectPlayer(sel); return }
               const scorer = e.target.closest("[data-scorer-btn]")
               if (scorer) { this.toggleScorer(scorer); return }
               const booster = e.target.closest("[data-booster-btn]")
