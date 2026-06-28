@@ -18,7 +18,7 @@ defmodule Predictex.Application do
         # {Predictex.Worker, arg},
         # Start to serve requests, typically the last entry
         PredictexWeb.Endpoint
-      ] ++ capture_subscribers() ++ replay_cache()
+      ] ++ capture_subscribers() ++ replay_cache() ++ [Predictex.Fifa.Players.Cache]
 
     # See https://elixir.hexdocs.pm/Supervisor.html
     # for other strategies and supported options

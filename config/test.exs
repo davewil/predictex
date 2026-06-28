@@ -64,6 +64,10 @@ config :predictex, :ko_ids_rounds_fun, fn -> {:ok, []} end
 config :predictex, :cohort_source_fun, fn -> {:ok, %{rounds: [], match_stats: %{}}} end
 config :predictex, :fifa_reference_fun, fn -> {:ok, []} end
 
+# The players cache is started by the app in tests; don't let it fetch the network on boot.
+# Tests that exercise it inject `:players_source_fun` and call `refresh/0`/`for_team/1`.
+config :predictex, warm_players_cache: false
+
 # LiveScoreSync (predictex-c46) fetch stubbed in tests; worker tests override per-test.
 config :predictex, :live_score_fetch_fun, fn _url -> {:ok, 200, %{}} end
 
