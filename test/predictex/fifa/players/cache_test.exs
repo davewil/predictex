@@ -30,7 +30,9 @@ defmodule Predictex.Fifa.Players.CacheTest do
   end
 
   setup do
-    # Cache is started by the app (warm disabled in test); reset between cases.
+    # Cache is started by the app (warm disabled in test); it's a shared named singleton, so
+    # clear its ETS table before each case to isolate state (no cross-test stale-data leakage).
+    :ets.delete_all_objects(Predictex.Fifa.Players.Cache)
     Application.put_env(:predictex, :players_source_fun, ok_source())
     on_exit(fn -> Application.delete_env(:predictex, :players_source_fun) end)
     :ok

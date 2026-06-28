@@ -94,10 +94,11 @@ defmodule Predictex.Fifa.Players.Cache do
         :ok
 
       {:error, reason} ->
+        # Keep any existing (stale) cache on a failed refresh: a transient feed blip during
+        # the cron refresh must NOT empty the picker for all members. A cold cache stays empty
+        # (the :ok branch never ran, sentinel unset) so for_team/1 returns [] and retries on the
+        # next call; a warm cache keeps its good squad data until a successful reload replaces it.
         Logger.error("players cache load failed: #{inspect(reason)}")
-        # Clear the table (including any :__loaded__ sentinel) so stale data is not served
-        # after a failed refresh, and for_team/1 returns [] rather than stale entries.
-        :ets.delete_all_objects(@table)
         {:error, reason}
     end
   end
