@@ -48,4 +48,35 @@ defmodule Predictex.Knockout do
   end
 
   def slot_label(_), do: ""
+
+  @doc """
+  Classify a fixture-slot string into its bracket-grammar token (predictex-dum). Single source of
+  the placeholder classification, consistent with `resolved_team?/1` (`{:resolved, _}` iff resolved).
+
+    * `"1A"` → `{:winner, "A"}`           — group winner slot
+    * `"2B"` → `{:runner_up, "B"}`        — group runner-up slot
+    * `"3A/B/C/D/F"` → `{:third, ["A","B","C","D","F"]}` — third-placed candidate set
+    * `"W89"`/`"L101"` → `{:later, name}` — later-round winner/loser-of slot
+    * a real team name → `{:resolved, name}`
+
+  Total.
+  """
+  def parse_slot(name) when is_binary(name) do
+    cond do
+      Regex.match?(@winner_runner_up, name) ->
+        <<pos::binary-1, group::binary>> = name
+        if pos == "1", do: {:winner, group}, else: {:runner_up, group}
+
+      Regex.match?(@third, name) ->
+        {:third, name |> String.slice(1..-1//1) |> String.split("/")}
+
+      Regex.match?(@later_round, name) ->
+        {:later, name}
+
+      true ->
+        {:resolved, name}
+    end
+  end
+
+  def parse_slot(_), do: {:resolved, ""}
 end

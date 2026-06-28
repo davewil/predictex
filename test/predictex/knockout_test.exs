@@ -41,4 +41,27 @@ defmodule Predictex.KnockoutTest do
       assert Knockout.slot_label(nil) == ""
     end
   end
+
+  describe "parse_slot/1 (predictex-dum)" do
+    test "classifies each placeholder form" do
+      assert Knockout.parse_slot("1A") == {:winner, "A"}
+      assert Knockout.parse_slot("2B") == {:runner_up, "B"}
+      assert Knockout.parse_slot("3A/B/C/D/F") == {:third, ["A", "B", "C", "D", "F"]}
+      assert Knockout.parse_slot("W89") == {:later, "W89"}
+      assert Knockout.parse_slot("L101") == {:later, "L101"}
+    end
+
+    test "a real team name is {:resolved, name}" do
+      assert Knockout.parse_slot("Brazil") == {:resolved, "Brazil"}
+      assert Knockout.parse_slot("Côte d'Ivoire") == {:resolved, "Côte d'Ivoire"}
+    end
+
+    test "is total and agrees with resolved_team?/1" do
+      for s <- ["1A", "2B", "3A/B/C/D/F", "W89", "Brazil", ""] do
+        assert match?({:resolved, _}, Knockout.parse_slot(s)) == Knockout.resolved_team?(s)
+      end
+
+      assert Knockout.parse_slot(nil) == {:resolved, ""}
+    end
+  end
 end
