@@ -159,6 +159,24 @@ the app scores them against real results and ranks a leaderboard.
     stage stays as described above (frozen, FIFA-import). **Phase 1 is DEPLOYED (rode the v0.11.x tags); ⚠️
     verify the editable R32 entry actually renders — see "Continue here".**
 
+## ⏵ Continue here (2026-06-28 late) — `predictex-r8j` KO-live-capture fix CODE-COMPLETE (committed LOCAL); ready to deploy `v0.11.22`
+
+**Found + fixed a P0 capture bug while watching the first R32.** `LiveScoreSync` hardcoded the **group**
+stage (`289273`) in the FIFA live `/detail` URL, but the endpoint is keyed `/{comp}/{season}/{stage}/{match}`
+and **every KO round is a distinct stage** (R32=`289287`, …). So all KO live fetches returned a null body and
+never captured — South Africa v Canada (first R32, 28 Jun) had the **correct** `fifa_match_id` (`400021518`) but
+`is_live` never set; it settled 0-1 via openfootball only. **Proven in prod:** id under `289273`→nil, under
+`289287`→the real frame. Fix (2 commits `2ebcf86`+`e5cbf95`, **596 green, gate clean, NOT deployed**): `fifa_stage_id`
+column; `Fifa.LiveIds` parses the stage from each `rounds.json` `matchcentreUrl` (backfills KO rows that already
+have an id); `LiveScoreSync.detail_url/1` uses it (group/legacy default `289273`, unchanged); `KnockoutIds.ko_pending?`
+arms on missing id **or** missing stage (advisor-flagged — id-only guard would no-op once the bracket fully resolves).
+All 16 R32 rows verified carrying `matchcentreUrl`/`289287`. **▶ DEPLOY (user's call):** tag `v0.11.22` (bundles u4k +
+dum + tidy-up + this), then **post-deploy force the backfill** — `rpc 'Predictex.Fifa.LiveIds.assign(elem(Predictex.Fifa.Reference.fetch_rounds(),
+0) == :ok && elem(Predictex.Fifa.Reference.fetch_rounds(),1))'` (or just let the `*/10` `KnockoutIds` cron run) — then
+confirm R32 fixtures have `fifa_stage_id` set and a KO `/detail` fetch returns a populated body. **Next KO: Brazil v
+Japan 29 Jun 18:00 BST** — fix must be live before then. SA v Canada's live timeline is unrecoverable. Bug: `predictex-r8j`.
+Q1 (first-scorer bonus in match preview) deferred → `predictex` follow-up bead (P3).
+
 ## ⏵ Continue here (2026-06-28) — `predictex-u4k` CODE-COMPLETE (committed LOCAL); DEPLOY is the user's call
 
 The native KO game is **LIVE for all members** — `:native_ko_entry` flag switched ON in prod 2026-06-28
