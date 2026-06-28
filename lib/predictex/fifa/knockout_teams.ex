@@ -19,7 +19,7 @@ defmodule Predictex.Fifa.KnockoutTeams do
   """
 
   alias Predictex.Fifa.Crosswalk
-  alias Predictex.{Knockout, Repo, Tournament}
+  alias Predictex.{GroupTables, Knockout, Repo, Tournament}
   alias Predictex.Tournament.Fixture
 
   @ko_stages ~w(r32 r16 qf sf f)
@@ -33,7 +33,7 @@ defmodule Predictex.Fifa.KnockoutTeams do
   Per-fixture fills for placeholder knockout slots. One entry per fixture that has a placeholder
   side AND a canonical FIFA name to fill it with; the entry carries only the placeholder side(s).
   """
-  def plan(rounds, fixtures, canonical_index) do
+  def plan(rounds, fixtures, canonical_index, group_tables \\ %{}) do
     slot_idx =
       for r <- rounds, r["stage"] in @ko_stages, t <- r["tournaments"] || [], into: %{} do
         {Crosswalk.slot_key(t["date"]), {t["homeSquadName"], t["awaySquadName"]}}
@@ -42,7 +42,7 @@ defmodule Predictex.Fifa.KnockoutTeams do
     for f <- fixtures,
         not (Knockout.resolved_team?(f.team1) and Knockout.resolved_team?(f.team2)),
         {home, away} = Map.get(slot_idx, Crosswalk.slot_key(f.kickoff_at), {nil, nil}),
-        fill = fill_for(f, home, away, canonical_index),
+        fill = fill_for(f, home, away, canonical_index, group_tables),
         map_size(fill) > 0 do
       Map.put(fill, :fixture_id, f.id)
     end
@@ -58,10 +58,11 @@ defmodule Predictex.Fifa.KnockoutTeams do
     fixtures = Repo.all(Fixture)
     by_id = Map.new(fixtures, &{&1.id, &1})
     idx = canonical_index(Enum.flat_map(fixtures, &[&1.team1, &1.team2]))
+    group_tables = GroupTables.build(fixtures)
 
     summary =
       rounds
-      |> plan(fixtures, idx)
+      |> plan(fixtures, idx, group_tables)
       |> Enum.reduce(%{resolved: 0, sides: 0, errors: 0}, fn fill, acc ->
         {fid, attrs} = Map.pop(fill, :fixture_id)
 
@@ -75,20 +76,67 @@ defmodule Predictex.Fifa.KnockoutTeams do
     summary
   end
 
-  defp fill_for(f, home, away, idx) do
+  defp fill_for(f, home, away, idx, group_tables) do
     t1_ph = not Knockout.resolved_team?(f.team1)
     t2_ph = not Knockout.resolved_team?(f.team2)
     c_home = canonical(idx, home)
     c_away = canonical(idx, away)
 
     cond do
-      # Anchored-only (v1): a fill requires exactly one resolved side to anchor orientation.
-      # Both-placeholder is skipped (no anchor to validate FIFA's home/away order); the group
-      # winner resolves first via openfootball, after which the anchored branch fills the third.
-      t1_ph and t2_ph -> %{}
+      t1_ph and t2_ph -> both_placeholder(f, home, away, c_home, c_away, group_tables)
       t1_ph -> anchored(f.team2, :team1, home, away, c_home, c_away)
       t2_ph -> anchored(f.team1, :team2, home, away, c_home, c_away)
       true -> %{}
+    end
+  end
+
+  # Both sides are bracket placeholders. Resolve a winner/runner-up side against our group
+  # standings as a validating anchor (predictex-dum): if the projected team matches one FIFA name,
+  # that fixes orientation. Fill BOTH sides from the canonical FIFA names, or nothing.
+  defp both_placeholder(f, fifa_home, fifa_away, c_home, c_away, tables) do
+    {for_t1, for_t2} = orient_both(f.team1, f.team2, fifa_home, fifa_away, c_home, c_away, tables)
+
+    if is_nil(for_t1) or is_nil(for_t2) do
+      %{}
+    else
+      %{team1: for_t1, team2: for_t2}
+    end
+  end
+
+  # Returns {canonical_for_team1, canonical_for_team2}; {nil, nil} when neither side's projection
+  # matches a FIFA name (no validated orientation → skip).
+  defp orient_both(slot1, slot2, fifa_home, fifa_away, c_home, c_away, tables) do
+    cond do
+      anchor_matches?(slot1, fifa_home, tables) -> {c_home, c_away}
+      anchor_matches?(slot1, fifa_away, tables) -> {c_away, c_home}
+      anchor_matches?(slot2, fifa_home, tables) -> {c_away, c_home}
+      anchor_matches?(slot2, fifa_away, tables) -> {c_home, c_away}
+      true -> {nil, nil}
+    end
+  end
+
+  defp anchor_matches?(slot, fifa_name, tables) do
+    case project_slot(slot, tables) do
+      nil -> false
+      team -> Crosswalk.norm(team) == Crosswalk.norm(fifa_name)
+    end
+  end
+
+  # A 1X/2X slot → the real team at that group position in our standings, or nil if the group
+  # isn't represented, the position is empty, or the row is a provisional tie (don't anchor on a
+  # coin-flip leader). Third/later/resolved slots are not group-position anchors.
+  defp project_slot(slot, tables) do
+    case Knockout.parse_slot(slot) do
+      {:winner, group} -> team_at(tables, group, 1)
+      {:runner_up, group} -> team_at(tables, group, 2)
+      _ -> nil
+    end
+  end
+
+  defp team_at(tables, group, rank) do
+    case tables |> Map.get(group, []) |> Enum.at(rank - 1) do
+      %{team: team, provisional_tie?: false} -> team
+      _ -> nil
     end
   end
 

@@ -2,7 +2,20 @@ defmodule Predictex.Fifa.KnockoutTeamsTest do
   use ExUnit.Case, async: true
 
   alias Predictex.Fifa.KnockoutTeams
+  alias Predictex.GroupTables
   alias Predictex.Tournament.Fixture
+
+  # Group I result → France is rank 1 (winner of I), Spain rank 2.
+  @tables GroupTables.build([
+            %Fixture{
+              team1: "France",
+              team2: "Spain",
+              group: "I",
+              status: :completed,
+              home_goals: 1,
+              away_goals: 0
+            }
+          ])
 
   # A FIFA rounds.json R32 entry kicking off at `iso` between FIFA-named home/away.
   defp rounds(iso, home, away) do
@@ -96,6 +109,80 @@ defmodule Predictex.Fifa.KnockoutTeamsTest do
       f = %Fixture{id: 12, team1: "1H", team2: "2J", kickoff_at: ko}
       r = rounds("2026-07-02T01:00:00+00:00", "Brazil", "Japan")
       assert KnockoutTeams.plan(r, [f], @canon) == []
+    end
+  end
+
+  describe "plan/4 — both-placeholder (projection-validated orientation, predictex-dum)" do
+    test "fills BOTH sides when the winner slot projects to a team matching a FIFA name" do
+      ko = ~U[2026-07-02 01:00:00Z]
+      # Our fixture: team1 = winner of I (placeholder), team2 = a third (placeholder).
+      f = %Fixture{id: 20, team1: "1I", team2: "3C/D/F/G/H", kickoff_at: ko}
+      r = rounds("2026-07-02T01:00:00+00:00", "France", "Sweden")
+      canon = KnockoutTeams.canonical_index(["France", "Sweden", "Spain"])
+
+      assert [%{fixture_id: 20, team1: "France", team2: "Sweden"}] =
+               KnockoutTeams.plan(r, [f], canon, @tables)
+    end
+
+    test "re-orients when FIFA lists the pair swapped (team1 still gets the winner)" do
+      ko = ~U[2026-07-02 01:00:00Z]
+      f = %Fixture{id: 21, team1: "1I", team2: "3C/D/F/G/H", kickoff_at: ko}
+      # FIFA lists Sweden home, France away — our team1 (1I→France) must still become France.
+      r = rounds("2026-07-02T01:00:00+00:00", "Sweden", "France")
+      canon = KnockoutTeams.canonical_index(["France", "Sweden"])
+
+      assert [%{fixture_id: 21, team1: "France", team2: "Sweden"}] =
+               KnockoutTeams.plan(r, [f], canon, @tables)
+    end
+
+    test "skips when no side projects (group not decided → empty tables)" do
+      ko = ~U[2026-07-02 01:00:00Z]
+      f = %Fixture{id: 22, team1: "1Z", team2: "3C/D/F/G/H", kickoff_at: ko}
+      r = rounds("2026-07-02T01:00:00+00:00", "France", "Sweden")
+      canon = KnockoutTeams.canonical_index(["France", "Sweden"])
+
+      assert KnockoutTeams.plan(r, [f], canon, @tables) == []
+    end
+
+    test "skips when the projected anchor matches neither FIFA name (spurious slot / disagreement)" do
+      ko = ~U[2026-07-02 01:00:00Z]
+      f = %Fixture{id: 23, team1: "1I", team2: "3C/D/F/G/H", kickoff_at: ko}
+      # 1I projects to France, but FIFA's entry is a different pair → skip.
+      r = rounds("2026-07-02T01:00:00+00:00", "Brazil", "Japan")
+      canon = KnockoutTeams.canonical_index(["France", "Brazil", "Japan"])
+
+      assert KnockoutTeams.plan(r, [f], canon, @tables) == []
+    end
+
+    test "all-or-nothing: skips when one FIFA name is not a known canonical team" do
+      ko = ~U[2026-07-02 01:00:00Z]
+      f = %Fixture{id: 24, team1: "1I", team2: "3C/D/F/G/H", kickoff_at: ko}
+      r = rounds("2026-07-02T01:00:00+00:00", "France", "Atlantis")
+      canon = KnockoutTeams.canonical_index(["France"])
+
+      assert KnockoutTeams.plan(r, [f], canon, @tables) == []
+    end
+
+    test "does not anchor on a provisional-tie position" do
+      # Group J: two teams level on points/GD/GF → rank-1 row is provisional_tie? → no anchor.
+      tied =
+        GroupTables.build([
+          %Fixture{
+            team1: "Argentina",
+            team2: "Mexico",
+            group: "J",
+            status: :completed,
+            home_goals: 1,
+            away_goals: 1
+          }
+        ])
+
+      ko = ~U[2026-07-02 01:00:00Z]
+      f = %Fixture{id: 25, team1: "1J", team2: "3C/D/F/G/H", kickoff_at: ko}
+      r = rounds("2026-07-02T01:00:00+00:00", "Argentina", "Sweden")
+      canon = KnockoutTeams.canonical_index(["Argentina", "Sweden"])
+
+      assert KnockoutTeams.plan(r, [f], canon, tied) == []
     end
   end
 end
