@@ -102,7 +102,8 @@ config :predictex, Oban,
        {"*/10 * * * *", Predictex.Workers.KnockoutIds},
        # Fills knockout team names from FIFA rounds.json ahead of openfootball (predictex-e5o);
        # stop-before-fetch no-ops once the bracket teams are fully resolved. Removable post-bracket.
-       {"*/10 * * * *", Predictex.Workers.KnockoutTeams}
+       {"*/10 * * * *", Predictex.Workers.KnockoutTeams},
+       {"*/30 * * * *", Predictex.Workers.PlayersSync}
      ]}
   ]
 
