@@ -257,6 +257,13 @@ defmodule PredictexWeb.MyPredictionsLive do
                 data-fixture-card
                 class="rounded-box bg-base-100 border border-base-content/10 p-3 shadow"
               >
+                <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-base-content/50">
+                  <.local_time
+                    at={fx.fixture.kickoff_at}
+                    id={"kickoff-edit-#{fx.fixture.id}"}
+                    tz={@tz}
+                  />
+                </div>
                 <div class="flex items-center justify-between gap-2">
                   <span class="flex items-center gap-1 text-sm font-bold min-w-0">
                     {Flags.flag(fx.fixture.team1)} <span class="truncate">{fx.fixture.team1}</span>

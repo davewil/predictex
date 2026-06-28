@@ -832,5 +832,8 @@ defmodule PredictexWeb.MyPredictionsLiveTest do
     assert html =~ "Neymar"
     assert html =~ "Lionel Messi"
     assert html =~ "No first scorer"
+    # The editable card shows the kickoff time pre-match (it was previously omitted — only the
+    # settled/locked cards showed it).
+    assert html =~ "kickoff-edit-"
   end
 end
