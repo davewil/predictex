@@ -14,6 +14,7 @@ defmodule Predictex.Predictions.Prediction do
     field :away_goals, :integer
     field :first_scorer_side, Ecto.Enum, values: @sides
     field :first_scorer_player, :string
+    field :first_scorer_fifaid, :integer
     field :booster, :boolean, default: false
 
     belongs_to :player, Predictex.Accounts.Player
@@ -31,6 +32,7 @@ defmodule Predictex.Predictions.Prediction do
       :away_goals,
       :first_scorer_side,
       :first_scorer_player,
+      :first_scorer_fifaid,
       :booster,
       :player_id,
       :fixture_id,

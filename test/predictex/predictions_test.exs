@@ -523,6 +523,7 @@ defmodule Predictex.PredictionsTest do
                away_goals: 1,
                first_scorer_side: :home,
                first_scorer_player: "Messi",
+               first_scorer_fifaid: nil,
                booster: true
              }
 
@@ -532,6 +533,7 @@ defmodule Predictex.PredictionsTest do
                away_goals: 0,
                first_scorer_side: :away,
                first_scorer_player: nil,
+               first_scorer_fifaid: nil,
                booster: false
              }
     end
@@ -548,6 +550,27 @@ defmodule Predictex.PredictionsTest do
     test "rejects a booster on a blank scoreline (booster-on-blank invariant)" do
       picks = %{"10" => %{"home_goals" => "", "away_goals" => ""}}
       assert {:error, :booster_on_blank} = Predictions.parse_pick_rows(picks, "10")
+    end
+
+    test "carries first_scorer_fifaid (parsed to integer) into the row" do
+      picks = %{
+        "10" => %{
+          "home_goals" => "1",
+          "away_goals" => "0",
+          "first_scorer_player" => "Neymar",
+          "first_scorer_fifaid" => "100002"
+        }
+      }
+
+      assert {:ok, [row]} = Predictions.parse_pick_rows(picks, nil)
+      assert row.first_scorer_player == "Neymar"
+      assert row.first_scorer_fifaid == 100_002
+    end
+
+    test "blank first_scorer_fifaid parses to nil" do
+      picks = %{"10" => %{"home_goals" => "1", "away_goals" => "0", "first_scorer_fifaid" => ""}}
+      assert {:ok, [row]} = Predictions.parse_pick_rows(picks, nil)
+      assert row.first_scorer_fifaid == nil
     end
 
     test "skips a forged non-integer fixture key instead of crashing" do

@@ -412,6 +412,7 @@ defmodule Predictex.Predictions do
       away_goals: parse_int(attrs["away_goals"]),
       first_scorer_side: parse_side(attrs["first_scorer_side"]),
       first_scorer_player: blank_to_nil(attrs["first_scorer_player"]),
+      first_scorer_fifaid: parse_int(attrs["first_scorer_fifaid"]),
       booster: fixture_id == boost_id
     }
   end
