@@ -1,0 +1,171 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <PredictexWeb.AdminComponents.admin_nav active={:predictions} />
+
+  <div class="mb-4 inline-flex gap-1 rounded-xl border border-base-300 bg-base-200/60 p-1">
+    <.link
+      patch={~p"/admin/predictions?view=player"}
+      class={[
+        "rounded-lg px-3.5 py-1.5 text-sm font-bold transition-colors",
+        (@view == :player && "bg-primary text-primary-content shadow") ||
+          "text-base-content/70 hover:bg-base-300"
+      ]}
+    >Enter by player</.link>
+    <.link
+      patch={~p"/admin/predictions?view=fixture"}
+      class={[
+        "rounded-lg px-3.5 py-1.5 text-sm font-bold transition-colors",
+        (@view == :fixture && "bg-primary text-primary-content shadow") ||
+          "text-base-content/70 hover:bg-base-300"
+      ]}
+    >By fixture</.link>
+  </div>
+
+  <div :if={@view == :player}>
+    <form id="by-player-select" phx-change="load_player_round" class="flex gap-2 mb-4">
+      <select name="player_id" class="select select-bordered">
+        <option value="">Player…</option>
+        <option :for={p <- @players} value={p.id} selected={p.id == @selected_player_id}>
+          {p.display_name}
+        </option>
+      </select>
+      <select name="round_id" class="select select-bordered">
+        <option value="">Round…</option>
+        <option :for={r <- @rounds} value={r.id} selected={r.id == @selected_round_id}>
+          {r.name}
+        </option>
+      </select>
+    </form>
+
+    <form
+      :if={@fixtures != [] && @selected_player_id}
+      id="by-player-form"
+      phx-submit="save_player_round"
+    >
+      <input type="hidden" name="player_id" value={@selected_player_id} />
+      <input type="hidden" name="round_id" value={@selected_round_id} />
+      <label class="label cursor-pointer gap-2 w-fit mb-2">
+        <span class="text-sm">No booster</span>
+        <input
+          type="radio"
+          class="radio"
+          name="booster_fixture_id"
+          value=""
+          checked={Enum.all?(@existing, fn {_id, p} -> !p.booster end)}
+        />
+      </label>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Fixture</th>
+            <th>H</th>
+            <th>A</th>
+            <th :if={@knockout?}>1st side</th>
+            <th :if={@knockout?}>1st player</th>
+            <th>⚡</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr :for={f <- @fixtures}>
+            <td class="font-medium">
+              {Flags.flag(f.team1)} {f.team1} v {f.team2} {Flags.flag(f.team2)}
+            </td>
+            <td>
+              <input
+                type="number"
+                min="0"
+                class="input input-bordered font-score w-16"
+                name={"rows[#{f.id}][home_goals]"}
+                value={existing_val(@existing, f.id, :home_goals)}
+              />
+            </td>
+            <td>
+              <input
+                type="number"
+                min="0"
+                class="input input-bordered font-score w-16"
+                name={"rows[#{f.id}][away_goals]"}
+                value={existing_val(@existing, f.id, :away_goals)}
+              />
+            </td>
+            <td :if={@knockout?}>
+              <select name={"rows[#{f.id}][first_scorer_side]"} class="select select-bordered">
+                <option value="">—</option>
+                <option
+                  value="home"
+                  selected={existing_val(@existing, f.id, :first_scorer_side) == :home}
+                >
+                  Home
+                </option>
+                <option
+                  value="away"
+                  selected={existing_val(@existing, f.id, :first_scorer_side) == :away}
+                >
+                  Away
+                </option>
+              </select>
+            </td>
+            <td :if={@knockout?}>
+              <input
+                type="text"
+                class="input input-bordered"
+                name={"rows[#{f.id}][first_scorer_player]"}
+                value={existing_val(@existing, f.id, :first_scorer_player)}
+              />
+            </td>
+            <td>
+              <input
+                type="radio"
+                class="radio"
+                name="booster_fixture_id"
+                value={f.id}
+                checked={existing_val(@existing, f.id, :booster) == true}
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <button type="submit" class="btn btn-primary mt-4">Save all</button>
+    </form>
+  </div>
+
+  <div :if={@view == :fixture}>
+    <form id="by-fixture-select" phx-change="load_fixture" class="mb-4">
+      <select name="fixture_id" class="select select-bordered">
+        <option value="">Fixture…</option>
+        <option :for={f <- @all_fixtures} value={f.id} selected={f.id == @selected_fixture_id}>
+          {Flags.flag(f.team1)} {f.team1} v {f.team2} {Flags.flag(f.team2)}
+        </option>
+      </select>
+    </form>
+
+    <table :if={@selected_fixture_id} class="table">
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Pick</th>
+          <th>⚡</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr :for={p <- @fixture_preds}>
+          <td class="font-medium">{p.player.display_name}</td>
+          <td class="font-score">{p.home_goals}–{p.away_goals}</td>
+          <td>
+            <span
+              :if={p.booster}
+              class="rounded bg-accent px-1.5 py-0.5 text-[10px] font-bold text-accent-content"
+            >
+              ⚡ 2×
+            </span>
+          </td>
+        </tr>
+        <tr :for={pl <- @missing_players} class="opacity-60">
+          <td>{pl.display_name}</td>
+          <td colspan="2">
+            <span class="rounded-md bg-error/15 px-2 py-1 text-[11px] font-semibold text-error">no pick</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</Layouts.app>

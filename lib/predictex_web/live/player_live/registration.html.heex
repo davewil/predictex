@@ -1,0 +1,58 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <.auth_card heading="Join the league" sub="Pick a name worth seeing at the top of the table.">
+    <.form
+      for={@form}
+      id="registration_form"
+      action={~p"/players/log-in"}
+      phx-submit="save"
+      phx-change="validate"
+      phx-trigger-action={@trigger_submit}
+    >
+      <.input
+        field={@form[:display_name]}
+        type="text"
+        label="Display name"
+        autocomplete="nickname"
+        required
+        phx-mounted={JS.focus()}
+      />
+
+      <.input
+        field={@form[:email]}
+        type="email"
+        label="Email"
+        autocomplete="username"
+        spellcheck="false"
+        required
+      />
+
+      <.input
+        field={@form[:password]}
+        type="password"
+        label="Password"
+        autocomplete="new-password"
+        required
+      />
+
+      <.input
+        field={@form[:invite_code]}
+        type="text"
+        label="League invite code"
+        class="font-score tracking-wide text-accent"
+        required
+      />
+      <p class="mb-2 text-[11px] text-base-content/55">🔑 Ask the group admin for the code.</p>
+
+      <.button phx-disable-with="Creating account..." class="btn btn-primary w-full">
+        Create an account
+      </.button>
+    </.form>
+
+    <p class="mt-5 text-center text-sm text-base-content/60">
+      Already playing?
+      <.link navigate={~p"/players/log-in"} class="font-bold text-primary hover:underline">
+        Log in
+      </.link>
+    </p>
+  </.auth_card>
+</Layouts.app>

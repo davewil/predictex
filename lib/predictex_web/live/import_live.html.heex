@@ -1,0 +1,125 @@
+<Layouts.app flash={@flash} current_scope={@current_scope}>
+  <div class="mx-auto max-w-2xl">
+    <h1 class="text-2xl font-bold mb-4">Import your FIFA picks</h1>
+
+    <p :if={@error} class="alert alert-error mb-4">{@error}</p>
+
+    <%!-- DESKTOP: one-tap button --%>
+    <div
+      :if={@platform == "desktop" and @step == :awaiting}
+      id="import-root"
+      phx-hook=".FifaFragment"
+    >
+      <ol class="list-decimal ml-5 mb-4 space-y-1">
+        <li>
+          Drag this button up to your bookmarks bar:
+          <a href={bookmarklet()} class="btn btn-sm">Import my picks</a>
+        </li>
+        <li>Open the FIFA Match Predictor and sign in.</li>
+        <li>
+          Click <strong>Import my picks</strong>. It brings your picks back here so you can check them.
+        </li>
+      </ol>
+      <.escape_hatch />
+    </div>
+
+    <script :type={Phoenix.LiveView.ColocatedHook} name=".FifaFragment">
+      export default {
+        mounted() {
+          const hash = window.location.hash.slice(1)
+          if (hash) {
+            this.pushEvent("payload", {data: hash})
+            history.replaceState(null, "", window.location.pathname)
+          }
+        }
+      }
+    </script>
+
+    <%!-- MOBILE: per-round copy-paste --%>
+    <div :if={@platform == "mobile" and @step == :paste}>
+      <p class="mb-2">
+        Step {@current_round} of 3 — let's get your <strong>Round {@current_round}</strong> picks.
+      </p>
+      <ol class="list-decimal ml-5 mb-4 space-y-2">
+        <li>
+          <a
+            href={"https://play.fifa.com/api/en/match-predictor/prediction/show/#{@current_round}"}
+            target="_blank"
+            rel="noopener"
+            class="link link-primary font-semibold"
+          >
+            Tap here to open your Round {@current_round} picks
+          </a>
+        </li>
+        <li>
+          Press and hold the text, choose <strong>Select all</strong>, then <strong>Copy</strong>.
+          <%!-- [screenshot: android long-press -> Select all -> Copy] --%>
+        </li>
+        <li>Come back here and paste it into the box below.</li>
+      </ol>
+      <.paste_form round={@current_round} />
+      <.escape_hatch />
+    </div>
+
+    <%!-- SHARED: preview --%>
+    <div :if={@step == :preview}>
+      <p :if={@booster_unmatched} class="alert alert-warning mb-4">
+        Your booster is on a match we couldn't find — saving this will leave you without a
+        booster here. Fix it on FIFA, or carry on knowing that.
+      </p>
+
+      <p class="mb-2 font-semibold">
+        {if @platform == "mobile", do: "Round #{@current_round}: ", else: ""}This will save these {length(
+          @matched
+        )} picks:
+      </p>
+      <ul class="mb-4">
+        <li :for={m <- @matched}>
+          {m.team1} {m.home_goals}–{m.away_goals} {m.team2}{if m.booster, do: " ⚡"}
+        </li>
+      </ul>
+
+      <div :if={@unmatched != []} class="mb-4">
+        <p class="font-semibold">We couldn't match these:</p>
+        <ul>
+          <li :for={u <- @unmatched}>{reason_text(u.reason)}</li>
+        </ul>
+      </div>
+
+      <button
+        :if={@platform == "mobile" and @matched != []}
+        class="btn btn-primary"
+        phx-click="confirm_round"
+      >
+        Save Round {@current_round}
+      </button>
+      <button
+        :if={@platform == "mobile" and @matched == []}
+        class="btn"
+        phx-click="skip_round"
+      >
+        Nothing to save here — continue
+      </button>
+
+      <button
+        :if={@platform == "desktop"}
+        class="btn btn-primary"
+        phx-click="confirm"
+        disabled={@matched == []}
+      >
+        Confirm import
+      </button>
+
+      <.escape_hatch />
+    </div>
+
+    <%!-- SHARED: done --%>
+    <div :if={@step == :done}>
+      <p class="alert alert-success">
+        Your picks are in ✅ {@summary.imported} saved{if @summary.errors > 0,
+          do: " (#{@summary.errors} we couldn't save)"}.
+      </p>
+      <.link navigate={~p"/predictions"} class="btn">See my predictions</.link>
+    </div>
+  </div>
+</Layouts.app>
