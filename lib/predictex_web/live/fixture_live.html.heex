@@ -50,6 +50,12 @@
         <.local_time at={@fixture.kickoff_at} id={"kickoff-#{@fixture.id}"} tz={@tz} />
       </p>
 
+      <%!-- Live viewer presence (predictex-x16): who's watching this match right now --%>
+      <p :if={@watchers != []} class="text-xs font-semibold text-base-content/50">
+        👁 {length(@watchers)} watching
+        <span class="text-base-content/40">· {watchers_label(@watchers, @viewer_id)}</span>
+      </p>
+
       <%!-- Replay controls (predictex-i1s) — read-only in-process playback --%>
       <div :if={@replay_available?} class="pt-1">
         <button

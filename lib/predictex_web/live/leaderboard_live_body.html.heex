@@ -6,6 +6,10 @@
         <p class="text-sm text-base-content/60">
           FIFA World Cup 2026 · {@completed} {ngettext("fixture", "fixtures", @completed)} scored
         </p>
+        <%!-- Live viewer presence (predictex-x16): how many are watching a live match now --%>
+        <p :if={@live_watch_count > 0} class="mt-0.5 text-xs font-bold text-error">
+          👁 {@live_watch_count} watching live
+        </p>
       </div>
       <button
         id="copy-wa"

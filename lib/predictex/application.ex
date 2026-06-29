@@ -14,6 +14,8 @@ defmodule Predictex.Application do
         {Oban, Application.fetch_env!(:predictex, Oban)},
         {DNSCluster, query: Application.get_env(:predictex, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Predictex.PubSub},
+        # Live viewer presence ("who's watching") — rides Predictex.PubSub (ADR 0002).
+        PredictexWeb.Presence,
         # Start a worker by calling: Predictex.Worker.start_link(arg)
         # {Predictex.Worker, arg},
         # Start to serve requests, typically the last entry

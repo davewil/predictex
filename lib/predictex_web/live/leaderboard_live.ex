@@ -6,11 +6,19 @@ defmodule PredictexWeb.LeaderboardLive do
   use PredictexWeb, :live_view
 
   alias Predictex.{Scoring.Standings, Tournament}
+  alias PredictexWeb.Presence
+
+  # Cross-match aggregate of viewers currently on a live fixture (predictex-x16).
+  @watching_live_topic "watching:live"
 
   @impl true
   def mount(_params, _session, socket) do
     overall = Standings.leaderboard()
     knockout = Standings.knockout_leaderboard()
+
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Predictex.PubSub, @watching_live_topic)
+    end
 
     {:ok,
      socket
@@ -21,8 +29,17 @@ defmodule PredictexWeb.LeaderboardLive do
      |> assign(:knockout, knockout)
      |> assign(:standings, overall)
      |> assign(:whatsapp_text, whatsapp_text(overall))
-     |> assign(:live_fixtures, Tournament.list_live_fixtures())}
+     |> assign(:live_fixtures, Tournament.list_live_fixtures())
+     |> assign(:live_watch_count, live_watch_count())}
   end
+
+  # A viewer started/stopped watching a live match somewhere — refresh the count.
+  @impl true
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign(socket, :live_watch_count, live_watch_count())}
+  end
+
+  defp live_watch_count, do: @watching_live_topic |> Presence.list() |> Presence.watch_count()
 
   @impl true
   def handle_event("select_board", %{"board" => board}, socket) do

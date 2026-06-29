@@ -699,6 +699,45 @@ defmodule PredictexWeb.FixtureLiveTest do
     end
   end
 
+  describe "live viewer presence (predictex-x16)" do
+    # Per-fixture presence rides a fixture-id-scoped topic ("fixture_presence:<id>"),
+    # so these assertions are naturally isolated from other async tests.
+    test "shows a names+count indicator that updates live as viewers join" do
+      alice = player_fixture(%{display_name: "Alice"})
+      bob = player_fixture(%{display_name: "Bob"})
+      round = round!()
+      fx = live_fixture!(round)
+
+      # Subscribe so we can synchronise on presence propagation deterministically,
+      # rather than sleeping (the tracker delivers presence_diff asynchronously).
+      Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture_presence:#{fx.id}")
+
+      {:ok, view_a, _html} = build_conn() |> log_in_player(alice) |> live(~p"/fixtures/#{fx.id}")
+      assert_receive %Phoenix.Socket.Broadcast{event: "presence_diff"}
+
+      # Alice alone: count of 1, and she sees herself as "you".
+      html_a = render(view_a)
+      assert html_a =~ "1 watching"
+      assert html_a =~ "you"
+
+      # Bob joins.
+      {:ok, view_b, _html} = build_conn() |> log_in_player(bob) |> live(~p"/fixtures/#{fx.id}")
+      assert_receive %Phoenix.Socket.Broadcast{event: "presence_diff"}
+
+      # Alice's view updates with no refresh: count of 2, Bob named, herself "you".
+      html_a = render(view_a)
+      assert html_a =~ "2 watching"
+      assert html_a =~ "Bob"
+      assert html_a =~ "you"
+
+      # Bob sees Alice by name (the other watcher), and himself as "you".
+      html_b = render(view_b)
+      assert html_b =~ "2 watching"
+      assert html_b =~ "Alice"
+      assert html_b =~ "you"
+    end
+  end
+
   # The viewer's projected total from the rendered "If your pick lands" card (the row total
   # is the last tabular-nums span in its <li>).
   defp viewer_total(card) do

@@ -24,17 +24,25 @@ defmodule PredictexWeb.FixtureLive do
     Scoring.Standings
   }
 
-  alias PredictexWeb.Flags
+  alias PredictexWeb.{Flags, Presence}
+
+  # Cross-match aggregate of viewers currently on a *live* fixture, observed by the
+  # leaderboard (predictex-x16). FixtureLive joins it only while fixture.is_live.
+  @watching_live_topic "watching:live"
 
   @impl true
   def mount(%{"id" => id}, _session, socket) do
     fixture = Tournament.get_fixture!(id, :round)
 
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{id}")
-    end
+    socket =
+      if connected?(socket) do
+        Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{id}")
+        track_fixture_presence(socket, fixture)
+      else
+        socket
+      end
 
-    {:ok, load_all(socket, fixture)}
+    {:ok, socket |> assign_watchers(fixture) |> load_all(fixture)}
   end
 
   # A replay owns the view; a stray live-update (a producer never writes a completed
@@ -66,6 +74,11 @@ defmodule PredictexWeb.FixtureLive do
       end
 
     {:noreply, socket}
+  end
+
+  # A viewer opened/closed this fixture page — recompute the "who's watching" indicator.
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+    {:noreply, assign_watchers(socket, socket.assigns.fixture)}
   end
 
   # Replay tick: advance to the next frame (no-op if replay was stopped meanwhile).
@@ -209,6 +222,68 @@ defmodule PredictexWeb.FixtureLive do
     |> assign(:points, if(recap?, do: MatchRecap.points(fixture, picks), else: %{}))
     |> assign(:goals, if(recap?, do: recap_goals(fixture), else: []))
     |> put_live_buzz(snapshot, fixture, h, a, viewer_id)
+    |> sync_live_presence(fixture)
+  end
+
+  # --- Live viewer presence (predictex-x16) ---
+
+  defp fixture_presence_topic(id), do: "fixture_presence:#{id}"
+
+  # Join this fixture's presence topic and announce the viewer (by display name).
+  # Only ever called on the connected mount; the entry is dropped automatically on
+  # socket process DOWN (no manual untrack).
+  defp track_fixture_presence(socket, fixture) do
+    viewer = socket.assigns.current_scope.player
+    topic = fixture_presence_topic(fixture.id)
+    Phoenix.PubSub.subscribe(Predictex.PubSub, topic)
+
+    {:ok, _ref} =
+      Presence.track(self(), topic, to_string(viewer.id), %{name: viewer.display_name})
+
+    socket
+  end
+
+  # Recompute the watcher list from the tracker. On the dead render (no track) the
+  # list is empty, so @watchers is always assigned for the template.
+  defp assign_watchers(socket, fixture) do
+    watchers =
+      fixture.id |> fixture_presence_topic() |> Presence.list() |> Presence.watcher_list()
+
+    assign(socket, :watchers, watchers)
+  end
+
+  # Mirror the viewer's presence on the cross-match "watching:live" topic to exactly
+  # `fixture.is_live` — gated on the *persisted* fixture, never @view_fixture (replay
+  # forces that live on a completed match, which must not count as watching live).
+  # load_all runs on mount and on every material transition, so this one path covers
+  # kickoff, settle, and replay start/stop.
+  defp sync_live_presence(socket, fixture) do
+    if connected?(socket) do
+      viewer_id = to_string(socket.assigns.viewer_id)
+      tracking? = Map.get(socket.assigns, :watching_live?, false)
+
+      cond do
+        fixture.is_live and not tracking? ->
+          {:ok, _ref} = Presence.track(self(), @watching_live_topic, viewer_id, %{})
+          assign(socket, :watching_live?, true)
+
+        not fixture.is_live and tracking? ->
+          Presence.untrack(self(), @watching_live_topic, viewer_id)
+          assign(socket, :watching_live?, false)
+
+        true ->
+          socket
+      end
+    else
+      socket
+    end
+  end
+
+  # The watcher names for display: the viewer themselves shows as "you".
+  defp watchers_label(watchers, viewer_id) do
+    vid = to_string(viewer_id)
+
+    Enum.map_join(watchers, ", ", fn w -> if(w.id == vid, do: "you", else: w.name) end)
   end
 
   # A ranking snapshot is needed only when a projection could be shown: a live fixture, or an
