@@ -715,26 +715,35 @@ defmodule PredictexWeb.FixtureLiveTest do
       {:ok, view_a, _html} = build_conn() |> log_in_player(alice) |> live(~p"/fixtures/#{fx.id}")
       assert_receive %Phoenix.Socket.Broadcast{event: "presence_diff"}
 
-      # Alice alone: count of 1, and she sees herself as "you".
-      html_a = render(view_a)
-      assert html_a =~ "1 watching"
-      assert html_a =~ "you"
+      # Alice alone: count of 1, and she sees herself as "you". All assertions are
+      # scoped to the #watchers line, so the player names in the what-if standings
+      # projection can't spuriously satisfy them.
+      label = fn view -> view |> element("#watchers") |> render() end
+      assert label.(view_a) =~ "1 watching"
+      assert label.(view_a) =~ "· you"
 
       # Bob joins.
       {:ok, view_b, _html} = build_conn() |> log_in_player(bob) |> live(~p"/fixtures/#{fx.id}")
       assert_receive %Phoenix.Socket.Broadcast{event: "presence_diff"}
 
-      # Alice's view updates with no refresh: count of 2, Bob named, herself "you".
-      html_a = render(view_a)
-      assert html_a =~ "2 watching"
-      assert html_a =~ "Bob"
-      assert html_a =~ "you"
+      # Alice's view updates with no refresh: count of 2, with the watcher label
+      # naming Bob and showing herself as "you" (names sorted: Alice→you, then Bob).
+      assert label.(view_a) =~ "2 watching"
+      assert label.(view_a) =~ "· you, Bob"
 
-      # Bob sees Alice by name (the other watcher), and himself as "you".
-      html_b = render(view_b)
-      assert html_b =~ "2 watching"
-      assert html_b =~ "Alice"
-      assert html_b =~ "you"
+      # Bob sees Alice by name and himself as "you".
+      assert label.(view_b) =~ "2 watching"
+      assert label.(view_b) =~ "· Alice, you"
+
+      # Close path (the auto-untrack-on-DOWN the design relies on): Bob leaves →
+      # Alice's count drops to 1 with no refresh, and Bob is no longer named.
+      Process.unlink(view_b.pid)
+      GenServer.stop(view_b.pid)
+      assert_receive %Phoenix.Socket.Broadcast{event: "presence_diff"}
+
+      assert label.(view_a) =~ "1 watching"
+      assert label.(view_a) =~ "· you"
+      refute label.(view_a) =~ "Bob"
     end
   end
 

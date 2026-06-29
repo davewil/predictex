@@ -51,7 +51,7 @@
       </p>
 
       <%!-- Live viewer presence (predictex-x16): who's watching this match right now --%>
-      <p :if={@watchers != []} class="text-xs font-semibold text-base-content/50">
+      <p :if={@watchers != []} id="watchers" class="text-xs font-semibold text-base-content/50">
         👁 {length(@watchers)} watching
         <span class="text-base-content/40">· {watchers_label(@watchers, @viewer_id)}</span>
       </p>
