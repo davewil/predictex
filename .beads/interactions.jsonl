@@ -54,3 +54,7 @@
 {"id":"int-bd35d111","kind":"field_change","created_at":"2026-06-27T18:38:26.893313Z","actor":"davewil","issue_id":"predictex-ahi","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
 {"id":"int-64c73892","kind":"field_change","created_at":"2026-06-28T00:31:53.227081Z","actor":"davewil","issue_id":"predictex-dum","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
 {"id":"int-87460894","kind":"field_change","created_at":"2026-06-29T15:50:51.878495Z","actor":"davewil","issue_id":"predictex-bl8","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
+{"id":"int-0b335140","kind":"field_change","created_at":"2026-06-29T16:01:13.868992Z","actor":"davewil","issue_id":"predictex-5pz","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-cd5edca1","kind":"field_change","created_at":"2026-06-29T16:01:15.226626Z","actor":"davewil","issue_id":"predictex-cb4","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-137f4445","kind":"field_change","created_at":"2026-06-29T16:01:16.575169Z","actor":"davewil","issue_id":"predictex-u4k","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-2c7f82a6","kind":"field_change","created_at":"2026-06-29T17:18:14.182468Z","actor":"davewil","issue_id":"predictex-r8j","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
