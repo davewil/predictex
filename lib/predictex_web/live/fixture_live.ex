@@ -246,7 +246,10 @@ defmodule PredictexWeb.FixtureLive do
          pick when not is_nil(pick) <-
            Predictions.get_player_fixture_prediction(viewer_id, fixture.id) do
       snapshot
-      |> Buzz.pick_projection(fixture.id, pick.home_goals, pick.away_goals, viewer_id)
+      |> Buzz.pick_projection(fixture.id, pick.home_goals, pick.away_goals, viewer_id, %{
+        side: pick.first_scorer_side,
+        player: pick.first_scorer_player
+      })
       |> Map.merge(%{home: pick.home_goals, away: pick.away_goals})
     else
       _ -> nil

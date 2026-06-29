@@ -52,15 +52,16 @@ defmodule Predictex.LiveScore.Buzz do
   @doc """
   "If your pick lands" projection (kcx): project the board assuming `fixture_id` finished
   `home`-`away` (the viewer's own scoreline pick), enriched with rank movement vs the current
-  standings.
+  standings. Optional `scorer` (`%{side:, player:}`) also lands the viewer's knockout
+  first-scorer pick so the board reflects the +5 first-team / +10 first-player bonuses (gga).
 
   Returns `%{rows: [%{player_id, name, total, rank, prev_rank, delta}], viewer: row | nil}`,
   where `viewer` is the row for `viewer_id` (pulled out for the pre-kickoff headline, where the
   per-player board is withheld for anti-copy). The current ranking is computed once from `snapshot`.
   """
-  def pick_projection(snapshot, fixture_id, home, away, viewer_id) do
+  def pick_projection(snapshot, fixture_id, home, away, viewer_id, scorer \\ nil) do
     current = rank_index(Standings.rank(snapshot))
-    rows = enrich_rows(Standings.project(snapshot, fixture_id, home, away), current)
+    rows = enrich_rows(Standings.project(snapshot, fixture_id, home, away, scorer), current)
     %{rows: rows, viewer: Enum.find(rows, &(&1.player_id == viewer_id))}
   end
 

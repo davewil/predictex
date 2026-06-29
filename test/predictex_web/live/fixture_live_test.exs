@@ -670,24 +670,39 @@ defmodule PredictexWeb.FixtureLiveTest do
       refute html =~ "If your pick lands"
     end
 
-    test "knockout fixture: shows the scoreline-only caveat", %{conn: conn} do
+    test "knockout fixture: pick projection lands the first-scorer bonus (no caveat) (gga)", %{
+      conn: conn
+    } do
       viewer = player_fixture(%{display_name: "Viewer"})
       round = round!()
       fx = live_fixture!(round)
+      base = %{player_id: viewer.id, fixture_id: fx.id, home_goals: 1, away_goals: 0}
 
-      {:ok, _} =
-        Predictions.admin_upsert_prediction(%{
-          player_id: viewer.id,
-          fixture_id: fx.id,
-          home_goals: 1,
-          away_goals: 0
-        })
-
-      {:ok, lv, _html} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
-
+      # Scoreline-only pick: baseline projected total, and the caveat is gone.
+      {:ok, _} = Predictions.admin_upsert_prediction(base)
+      {:ok, lv, _} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
       card = lv |> element("#pick-projection") |> render()
       assert card =~ "If your pick lands"
-      assert card =~ "Scoreline only"
+      refute card =~ "Scoreline only"
+      scoreline_total = viewer_total(card)
+
+      # Same pick + a matching first-scorer: total gains first_team (5) + first_player (10).
+      {:ok, _} =
+        Predictions.admin_upsert_prediction(
+          Map.merge(base, %{first_scorer_side: :home, first_scorer_player: "Scorer"})
+        )
+
+      {:ok, lv2, _} = conn |> log_in_player(viewer) |> live(~p"/fixtures/#{fx.id}")
+      with_scorer_total = lv2 |> element("#pick-projection") |> render() |> viewer_total()
+
+      assert with_scorer_total == scoreline_total + 15
     end
+  end
+
+  # The viewer's projected total from the rendered "If your pick lands" card (the row total
+  # is the last tabular-nums span in its <li>).
+  defp viewer_total(card) do
+    [_, total] = Regex.run(~r|tabular-nums">\s*(\d+)\s*</span></li>|, card)
+    String.to_integer(total)
   end
 end

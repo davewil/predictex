@@ -74,17 +74,34 @@ defmodule Predictex.Scoring.Standings do
   Projected leaderboard over a `Standings.Snapshot`, as if `fixture_id` finished `home`-`away`.
   Swaps that one fixture to `:completed` in memory and reuses the pure `rank/2`, so booster,
   risky/cohort, and round bonus are all honoured. Pure — no `Repo`, persists nothing.
+
+  Optional `scorer` (`%{side:, player:}`) also projects the knockout first-scorer result — the
+  "if your pick lands" board (gga) supplies the viewer's own pick so the +10 first-team / +10
+  first-player bonuses are reflected; `nil` (the next-goal scenarios) leaves it scoreline-only.
   """
-  def project(%Snapshot{players: players, fixtures: fixtures}, fixture_id, home, away) do
+  def project(snapshot, fixture_id, home, away, scorer \\ nil)
+
+  def project(%Snapshot{players: players, fixtures: fixtures}, fixture_id, home, away, scorer) do
     projected =
       Enum.map(fixtures, fn f ->
-        if f.id == fixture_id,
-          do: %{f | status: :completed, home_goals: home, away_goals: away},
-          else: f
+        if f.id == fixture_id, do: project_fixture(f, home, away, scorer), else: f
       end)
 
     rank(players, projected)
   end
+
+  defp project_fixture(f, home, away, nil),
+    do: %{f | status: :completed, home_goals: home, away_goals: away}
+
+  defp project_fixture(f, home, away, %{side: side, player: player}),
+    do: %{
+      f
+      | status: :completed,
+        home_goals: home,
+        away_goals: away,
+        first_scorer_side: side,
+        first_scorer_player: player
+    }
 
   # --- internals ---
 
