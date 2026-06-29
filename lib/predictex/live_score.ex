@@ -13,10 +13,23 @@ defmodule Predictex.LiveScore do
   def attrs_from_body(body, fixture) when is_map(body) do
     %{
       is_live: body["MatchStatus"] not in [0, 1],
-      live_home_goals: get_in(body, ["HomeTeam", "Score"]) || fixture.live_home_goals,
-      live_away_goals: get_in(body, ["AwayTeam", "Score"]) || fixture.live_away_goals,
+      live_home_goals: team_score(body, "HomeTeam") || fixture.live_home_goals,
+      live_away_goals: team_score(body, "AwayTeam") || fixture.live_away_goals,
       live_minute: body["MatchTime"]
     }
+  end
+
+  # A FIFA team object is `%{"Score" => goals}`. Treat any other shape — a scalar, nil, or an
+  # object with no "Score" — as "no score reported", exactly like a missing team key (`get_in`
+  # used to raise on a non-map here). Keeping the decode total means a schema-drift body falls
+  # back to the existing score instead of crashing the `LiveScore.Updater` subscriber: under the
+  # shared root supervisor budget, a batch of such crashes across concurrent matches could
+  # otherwise cascade the whole app down (predictex-bl8).
+  defp team_score(body, key) do
+    case body[key] do
+      %{"Score" => score} -> score
+      _ -> nil
+    end
   end
 
   @doc "Write the `live_*` attrs to `fixture` and broadcast `{:live_update, id}` when a live value changed."

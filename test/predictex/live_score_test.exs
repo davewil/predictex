@@ -72,6 +72,25 @@ defmodule Predictex.LiveScoreTest do
     assert %{live_home_goals: 0, live_away_goals: 0} = LiveScore.attrs_from_body(body, f)
   end
 
+  test "attrs_from_body/2 tolerates a non-map team object (schema drift), keeping the existing score" do
+    # FIFA schema drift: a team arriving as a scalar (or any non-`%{\"Score\" => _}` shape)
+    # instead of a nested score object must decode to the existing-score fallback, NOT raise.
+    # Pre-bl8 `get_in(body, [\"HomeTeam\", \"Score\"])` raised on a scalar, and the Updater's
+    # bare rescue swallowed it; the decode is now total so a malformed body can't crash the
+    # subscriber (predictex-bl8).
+    f = fixture(%{live_home_goals: 2, live_away_goals: 1})
+
+    body = %{
+      "MatchStatus" => 3,
+      "MatchTime" => "30'",
+      "HomeTeam" => "Brazil",
+      "AwayTeam" => nil
+    }
+
+    assert %{is_live: true, live_home_goals: 2, live_away_goals: 1, live_minute: "30'"} =
+             LiveScore.attrs_from_body(body, f)
+  end
+
   test "apply_to_fixture/2 writes only live_* and broadcasts on change" do
     f = fixture(%{status: :scheduled})
     Phoenix.PubSub.subscribe(Predictex.PubSub, "fixture:#{f.id}")
