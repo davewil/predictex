@@ -12,7 +12,17 @@ the app scores them against real results and ranks a leaderboard.
 
 ## Live right now
 - **URL:** https://wc-predict.davewil.dev  (deployed, valid TLS)
-- **Latest deployed tag:** `v0.11.21` (deployed + verified 2026-06-28 ~18:48 UTC: Deploy success **3m18s**,
+- **Latest deployed tag:** `v1.0.0` 🎉 **first major release** (deployed + verified 2026-06-29: Deploy success,
+  `/health`+`/`+`/bracket` 200, valid TLS) — bundles everything since v0.11.23 plus the headline:
+  **save-as-you-go knockout entry** (`predictex-5pz` sibling) — native KO picks now auto-persist on every edit via
+  `phx-change` (goals debounced; JS toggles/picker/booster dispatch an input event to save too; half-typed
+  scorelines held silently; static "✓ Picks save automatically" indicator + a "Save now" fallback). **Browser-verified
+  end-to-end** (local Chrome repro: typing goals auto-saves, first-team toggle auto-saves, pick survives a reload).
+  Replaces the batch "Save picks" button. Prior tags this session: **`v0.11.23`** (kickoff time on editable KO cards
+  + phx-update=ignore preserving in-progress entry across live-update re-renders — browser-verified two-run
+  discriminator), **`v0.11.22`** (KO live-capture stage-id fix `predictex-r8j` — per-stage FIFA `/detail` URL, all 16
+  R32 stages backfilled), **`v0.11.21`** (u4k first-player picker).
+- **Prior deployed tag:** `v0.11.21` (deployed + verified 2026-06-28 ~18:48 UTC: Deploy success **3m18s**,
   `/health`+`/`+`/bracket` 200, valid TLS, `/bracket` renders "As it stands"/"Round of 32"; tagged ~T-20 before
   the first R32 kickoff, clear of capture) — **`predictex-u4k`** first-player-to-score picker (app-styled modal,
   `players.json` source) **+ `dum`** (e5o v2 both-placeholder R32) **+ the tidy-up batch**. u4k: `Fifa.Players`
