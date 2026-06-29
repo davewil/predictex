@@ -18,7 +18,7 @@ defmodule Predictex.Workers.KnockoutTeams do
   import Ecto.Query
 
   alias Predictex.Fifa.{KnockoutTeams, Reference}
-  alias Predictex.{Knockout, Repo}
+  alias Predictex.{Scoring.Knockout, Repo}
   alias Predictex.Tournament.Fixture
 
   @impl Oban.Worker

@@ -19,7 +19,7 @@ defmodule Predictex.DashboardTest do
   defp build_dash(rounds),
     do: Dashboard.build(rounds, %{}, %{entry: nil, rank: 1, of: 1}, ~U[2026-06-15 12:00:00Z])
 
-  # A `Scoring.score/3`-shaped components map — production always sets every key,
+  # A `Engine.score/3`-shaped components map — production always sets every key,
   # so test doubles must too (CLAUDE.md: test fixtures stay honest to the contract).
   defp components(overrides) do
     Map.merge(

@@ -1,4 +1,4 @@
-defmodule Predictex.Leaderboard do
+defmodule Predictex.Scoring.Leaderboard do
   @moduledoc """
   Pure leaderboard aggregation: score every player's predictions against the
   fixtures and rank them. No DB — this drives the `mix predictex.leaderboard` task
@@ -21,14 +21,14 @@ defmodule Predictex.Leaderboard do
   correctly.
   """
 
-  alias Predictex.{Fifa, Ranking, Results.Openfootball, Scoring}
+  alias Predictex.{Fifa, Scoring.Ranking, Results.Openfootball, Scoring.Engine}
 
   @doc """
   Build ranked standings. Returns a list of player result maps sorted by `:total`
   descending (ties broken by name), each with `:name`, `:fixtures_total`,
   `:round_bonus_total`, `:total`, `:bonus_by_round`, and a per-fixture `:breakdown`.
 
-  This is the team-name-join adapter over the shared `Predictex.Ranking` core: it
+  This is the team-name-join adapter over the shared `Predictex.Scoring.Ranking` core: it
   matches each prediction to its fixture by normalized team names and hands the
   core already-scored entries; the core owns the fold (totals, Round Bonus, sort).
   """
@@ -68,7 +68,7 @@ defmodule Predictex.Leaderboard do
               %{
                 fixture: fx,
                 ordinal: fx.game_round.ordinal,
-                result: Scoring.score(to_pred(input), fx, fx.stage)
+                result: Engine.score(to_pred(input), fx, fx.stage)
               }
             ]
 

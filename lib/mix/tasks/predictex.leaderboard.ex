@@ -4,7 +4,7 @@ defmodule Mix.Tasks.Predictex.Leaderboard do
   @moduledoc """
   Score a league's predictions against World Cup results and print the standings —
   without a database. The thin I/O shell over the pure engine
-  (`Predictex.Results.Openfootball` → `Predictex.Fifa` → `Predictex.Leaderboard`).
+  (`Predictex.Results.Openfootball` → `Predictex.Fifa` → `Predictex.Scoring.Leaderboard`).
 
       mix predictex.leaderboard --predictions league.json
       mix predictex.leaderboard --predictions league.json --results local_worldcup.json
@@ -52,7 +52,7 @@ defmodule Mix.Tasks.Predictex.Leaderboard do
 
   use Mix.Task
 
-  alias Predictex.{Leaderboard, Results.Openfootball}
+  alias Predictex.{Scoring.Leaderboard, Results.Openfootball}
 
   @default_url "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
 

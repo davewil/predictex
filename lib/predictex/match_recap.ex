@@ -6,7 +6,7 @@ defmodule Predictex.MatchRecap do
   FIFA detail body). `FixtureLive` does the DB reads at the edge and calls these.
   """
   alias Predictex.Capture
-  alias Predictex.Scoring
+  alias Predictex.Scoring.Engine
 
   @doc """
   Goal breakdown for the recap: the FIFA-capture goals when they reconcile with the final
@@ -53,7 +53,7 @@ defmodule Predictex.MatchRecap do
   Points each prediction earned on this fixture: `%{player_id => fixture_total}`.
 
   `fixture.round` must be preloaded (the stage drives knockout-only scoring lines).
-  Uses `Scoring.score/3`, whose `:fixture_total` already folds in the ⚡ booster. This
+  Uses `Engine.score/3`, whose `:fixture_total` already folds in the ⚡ booster. This
   is the per-fixture contribution only — it deliberately excludes the round bonus, so it
   will not sum to the leaderboard total.
   """
@@ -62,7 +62,7 @@ defmodule Predictex.MatchRecap do
     stage = fixture.round.stage
 
     Map.new(predictions, fn pred ->
-      {pred.player_id, Scoring.score(pred, fixture, stage).fixture_total}
+      {pred.player_id, Engine.score(pred, fixture, stage).fixture_total}
     end)
   end
 end

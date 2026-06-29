@@ -1,7 +1,7 @@
-defmodule Predictex.KnockoutTest do
+defmodule Predictex.Scoring.KnockoutTest do
   use ExUnit.Case, async: true
 
-  alias Predictex.Knockout
+  alias Predictex.Scoring.Knockout
 
   test "resolved_team?/1 is false for every placeholder form" do
     refute Knockout.resolved_team?("1C")

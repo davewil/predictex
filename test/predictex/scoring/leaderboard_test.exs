@@ -1,7 +1,7 @@
-defmodule Predictex.LeaderboardTest do
+defmodule Predictex.Scoring.LeaderboardTest do
   use ExUnit.Case, async: true
 
-  alias Predictex.Leaderboard
+  alias Predictex.Scoring.Leaderboard
 
   defp fx(attrs) do
     Map.merge(

@@ -1,4 +1,4 @@
-defmodule Predictex.Knockout do
+defmodule Predictex.Scoring.Knockout do
   @moduledoc """
   Pure knockout-stage predicates shared across the projected bracket (`predictex-7qu`) and the
   per-fixture native entry gate (`predictex-80k`).

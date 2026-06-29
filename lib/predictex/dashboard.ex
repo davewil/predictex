@@ -3,14 +3,14 @@ defmodule Predictex.Dashboard do
   Read model for the member's personal "My Predictions" dashboard.
 
   Gather → Decide: `for_player/2` is the I/O edge (loads rounds+fixtures, the player's
-  predictions, and the player's `Predictex.Standings` entry); `build/4` is pure and
-  DB-free. `Predictex.Standings` is the single scoring authority — `build/4` does NO
+  predictions, and the player's `Predictex.Scoring.Standings` entry); `build/4` is pure and
+  DB-free. `Predictex.Scoring.Standings` is the single scoring authority — `build/4` does NO
   scoring arithmetic, only joining, lock state, display flags, and tab selection, so the
   headline total can never disagree with the leaderboard rank.
   """
   import Ecto.Query, warn: false
 
-  alias Predictex.{Repo, Predictions, Standings}
+  alias Predictex.{Repo, Predictions, Scoring.Standings}
   alias Predictex.Tournament.{Round, Fixture}
 
   @doc """

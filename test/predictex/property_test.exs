@@ -7,15 +7,15 @@ defmodule Predictex.PropertyTest do
   use ExUnit.Case, async: true
   use ExUnitProperties
 
-  alias Predictex.{Fifa, Scoring}
+  alias Predictex.{Fifa, Scoring.Engine}
 
   defp goals, do: integer(0..9)
 
-  describe "Scoring.score/3 laws" do
+  describe "Engine.score/3 laws" do
     property "an exact-score prediction always earns the full 30 base (group, no cohort)" do
       check all(h <- goals(), a <- goals()) do
         r =
-          Scoring.score(
+          Engine.score(
             %{home_goals: h, away_goals: a, booster: false},
             %{home_goals: h, away_goals: a},
             :group
@@ -29,7 +29,7 @@ defmodule Predictex.PropertyTest do
     property "group base total is always within 0..30 when no cohort is set" do
       check all(ph <- goals(), pa <- goals(), fh <- goals(), fa <- goals()) do
         r =
-          Scoring.score(
+          Engine.score(
             %{home_goals: ph, away_goals: pa, booster: false},
             %{home_goals: fh, away_goals: fa},
             :group
@@ -42,7 +42,7 @@ defmodule Predictex.PropertyTest do
     property "the booster doubles the fixture total and nothing else" do
       check all(ph <- goals(), pa <- goals(), fh <- goals(), fa <- goals(), booster <- boolean()) do
         r =
-          Scoring.score(
+          Engine.score(
             %{home_goals: ph, away_goals: pa, booster: booster},
             %{home_goals: fh, away_goals: fa},
             :group
@@ -55,14 +55,14 @@ defmodule Predictex.PropertyTest do
     property "scoring is symmetric under swapping home/away in both prediction and fixture" do
       check all(ph <- goals(), pa <- goals(), fh <- goals(), fa <- goals()) do
         base =
-          Scoring.score(
+          Engine.score(
             %{home_goals: ph, away_goals: pa, booster: false},
             %{home_goals: fh, away_goals: fa},
             :group
           ).base_total
 
         swapped =
-          Scoring.score(
+          Engine.score(
             %{home_goals: pa, away_goals: ph, booster: false},
             %{home_goals: fa, away_goals: fh},
             :group
@@ -75,7 +75,7 @@ defmodule Predictex.PropertyTest do
     property "an exact score fires every scoreline component" do
       check all(h <- goals(), a <- goals()) do
         c =
-          Scoring.score(
+          Engine.score(
             %{home_goals: h, away_goals: a, booster: false},
             %{home_goals: h, away_goals: a},
             :group
@@ -90,7 +90,7 @@ defmodule Predictex.PropertyTest do
     end
   end
 
-  describe "Scoring.round_total/2 laws" do
+  describe "Engine.round_total/2 laws" do
     property "total = fixtures + bonus; bonus ∈ {0,20}; bonus is 20 iff every outcome is correct" do
       result =
         gen(
@@ -102,7 +102,7 @@ defmodule Predictex.PropertyTest do
         )
 
       check all(results <- list_of(result, max_length: 12)) do
-        rt = Scoring.round_total(results, true)
+        rt = Engine.round_total(results, true)
 
         assert rt.fixtures_total == Enum.sum(Enum.map(results, & &1.fixture_total))
         assert rt.total == rt.fixtures_total + rt.round_bonus

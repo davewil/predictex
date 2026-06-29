@@ -2,7 +2,7 @@ defmodule Predictex.Fifa.KnockoutTeamsTest do
   use ExUnit.Case, async: true
 
   alias Predictex.Fifa.KnockoutTeams
-  alias Predictex.GroupTables
+  alias Predictex.Scoring.GroupTables
   alias Predictex.Tournament.Fixture
 
   # Group I result → France is rank 1 (winner of I), Spain rank 2.

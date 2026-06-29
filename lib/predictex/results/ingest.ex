@@ -16,7 +16,7 @@ defmodule Predictex.Results.Ingest do
   settles, instead of the changed `external_ref` spawning a duplicate fixture (predictex-g8m).
   """
 
-  alias Predictex.Knockout
+  alias Predictex.Scoring.Knockout
   alias Predictex.Repo
   alias Predictex.Results.Openfootball
   alias Predictex.Fifa

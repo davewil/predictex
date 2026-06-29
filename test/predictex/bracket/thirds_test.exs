@@ -2,7 +2,7 @@ defmodule Predictex.Bracket.ThirdsTest do
   use ExUnit.Case, async: true
 
   alias Predictex.Bracket.Thirds
-  alias Predictex.GroupTables.Row
+  alias Predictex.Scoring.GroupTables.Row
 
   # Build a group_tables map where each group's 3rd-placed team has the given points/gd.
   defp tables_with_thirds(specs) do

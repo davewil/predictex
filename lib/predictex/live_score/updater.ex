@@ -1,4 +1,4 @@
-defmodule Predictex.Live.Updater do
+defmodule Predictex.LiveScore.Updater do
   @moduledoc """
   Subscriber that turns published FIFA snapshots into the live buzz: decode → write
   `live_*` → broadcast `{:live_update}` (predictex-rfm). Independent of the Recorder.

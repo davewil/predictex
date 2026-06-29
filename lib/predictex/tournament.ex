@@ -4,7 +4,7 @@ defmodule Predictex.Tournament do
 
   Knockout fixture availability follows the per-fixture rule in `docs/rules.md` §4:
   a fixture is editable once both team slots are resolved and kickoff is in the future.
-  See `Predictex.Knockout.resolved_team?/1` and `Predictex.Predictions.fixture_entry_state/2`.
+  See `Predictex.Scoring.Knockout.resolved_team?/1` and `Predictex.Predictions.fixture_entry_state/2`.
   """
   import Ecto.Query, warn: false
 

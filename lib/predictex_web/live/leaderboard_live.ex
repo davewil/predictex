@@ -1,11 +1,11 @@
 defmodule PredictexWeb.LeaderboardLive do
   @moduledoc """
-  The league leaderboard — ranked standings from `Predictex.Standings`, with a
+  The league leaderboard — ranked standings from `Predictex.Scoring.Standings`, with a
   one-tap "Copy WhatsApp text" button for sharing in the group chat.
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Standings, Tournament}
+  alias Predictex.{Scoring.Standings, Tournament}
 
   @impl true
   def mount(_params, _session, socket) do

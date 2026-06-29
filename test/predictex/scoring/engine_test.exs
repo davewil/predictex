@@ -1,7 +1,7 @@
-defmodule Predictex.ScoringTest do
+defmodule Predictex.Scoring.EngineTest do
   use ExUnit.Case, async: true
 
-  alias Predictex.Scoring
+  alias Predictex.Scoring.Engine
 
   # --- builders: plain maps mirroring the fields the pure engine reads ---
 
@@ -40,7 +40,7 @@ defmodule Predictex.ScoringTest do
   describe "score/3 — scoreline components are additive" do
     test "exact correct score stacks outcome + home + away + GD + score bonus = 30" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 2, away_goals: 1}),
           fixture(%{home_goals: 2, away_goals: 1}),
           :group
@@ -64,7 +64,7 @@ defmodule Predictex.ScoringTest do
 
     test "correct outcome + goal difference but wrong exact score = 15" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 2, away_goals: 1}),
           fixture(%{home_goals: 3, away_goals: 2}),
           :group
@@ -80,7 +80,7 @@ defmodule Predictex.ScoringTest do
 
     test "correct outcome only = 10" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 1, away_goals: 0}),
           fixture(%{home_goals: 3, away_goals: 1}),
           :group
@@ -91,7 +91,7 @@ defmodule Predictex.ScoringTest do
 
     test "wrong outcome with nothing else matching = 0" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 2, away_goals: 1}),
           fixture(%{home_goals: 0, away_goals: 2}),
           :group
@@ -103,7 +103,7 @@ defmodule Predictex.ScoringTest do
 
     test "correct home goals only (wrong outcome) = 5" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 2, away_goals: 3}),
           fixture(%{home_goals: 2, away_goals: 0}),
           :group
@@ -116,7 +116,7 @@ defmodule Predictex.ScoringTest do
 
     test "exact draw stacks to 30" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 1, away_goals: 1}),
           fixture(%{home_goals: 1, away_goals: 1}),
           :group
@@ -129,7 +129,7 @@ defmodule Predictex.ScoringTest do
   describe "score/3 — booster" do
     test "booster doubles the fixture total only" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 2, away_goals: 1, booster: true}),
           fixture(%{home_goals: 2, away_goals: 1}),
           :group
@@ -144,7 +144,7 @@ defmodule Predictex.ScoringTest do
   describe "score/3 — risky bonus" do
     test "fires on a correct home win when cohort_home_pct < 20" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 1, away_goals: 0}),
           fixture(%{home_goals: 1, away_goals: 0, cohort_home_pct: 15}),
           :group
@@ -156,7 +156,7 @@ defmodule Predictex.ScoringTest do
 
     test "fires on a correct away win when cohort_away_pct < 20" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 0, away_goals: 2}),
           fixture(%{home_goals: 0, away_goals: 2, cohort_away_pct: 10}),
           :group
@@ -167,7 +167,7 @@ defmodule Predictex.ScoringTest do
 
     test "does not fire when cohort share >= 20" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 1, away_goals: 0}),
           fixture(%{home_goals: 1, away_goals: 0, cohort_home_pct: 25}),
           :group
@@ -178,7 +178,7 @@ defmodule Predictex.ScoringTest do
 
     test "skipped when cohort % is nil" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 1, away_goals: 0}),
           fixture(%{home_goals: 1, away_goals: 0}),
           :group
@@ -189,7 +189,7 @@ defmodule Predictex.ScoringTest do
 
     test "never fires for a correct draw, even with low cohort" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 1, away_goals: 1}),
           fixture(%{home_goals: 1, away_goals: 1, cohort_draw_pct: 5}),
           :group
@@ -200,7 +200,7 @@ defmodule Predictex.ScoringTest do
 
     test "independent of exact score — a correct outcome is enough" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 2, away_goals: 0}),
           fixture(%{home_goals: 3, away_goals: 0, cohort_home_pct: 10}),
           :group
@@ -214,7 +214,7 @@ defmodule Predictex.ScoringTest do
   describe "score/3 — knockout first team / first player to score" do
     test "first team to score correct = +5" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 1, away_goals: 0, first_scorer_side: :home}),
           fixture(%{home_goals: 1, away_goals: 0, first_scorer_side: :home}),
           :knockout
@@ -225,7 +225,7 @@ defmodule Predictex.ScoringTest do
 
     test "first player to score correct (no own goal) = +10" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{
             home_goals: 1,
             away_goals: 0,
@@ -246,7 +246,7 @@ defmodule Predictex.ScoringTest do
 
     test "own goal voids the first PLAYER but the first TEAM still scores" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{
             home_goals: 0,
             away_goals: 1,
@@ -269,7 +269,7 @@ defmodule Predictex.ScoringTest do
 
     test "first-player award is accent-insensitive (FIFA vs openfootball spelling)" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{
             home_goals: 1,
             away_goals: 0,
@@ -290,7 +290,7 @@ defmodule Predictex.ScoringTest do
 
     test "player name match is whitespace/case insensitive" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{
             home_goals: 1,
             away_goals: 0,
@@ -311,7 +311,7 @@ defmodule Predictex.ScoringTest do
 
     test "group stage ignores first team / player even when predicted" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{
             home_goals: 1,
             away_goals: 0,
@@ -333,7 +333,7 @@ defmodule Predictex.ScoringTest do
 
     test "0-0 knockout: no first scorer means no team points" do
       r =
-        Scoring.score(
+        Engine.score(
           pred(%{home_goals: 0, away_goals: 0, first_scorer_side: :home}),
           fixture(%{home_goals: 0, away_goals: 0, first_scorer_side: nil}),
           :knockout
@@ -346,17 +346,17 @@ defmodule Predictex.ScoringTest do
   describe "round_total/2" do
     test "adds +20 when every outcome is correct in a complete round" do
       results = [result(30, true), result(10, true), result(15, true)]
-      assert Scoring.round_total(results) == %{fixtures_total: 55, round_bonus: 20, total: 75}
+      assert Engine.round_total(results) == %{fixtures_total: 55, round_bonus: 20, total: 75}
     end
 
     test "no round bonus when any outcome is wrong" do
       results = [result(30, true), result(0, false)]
-      assert Scoring.round_total(results).round_bonus == 0
+      assert Engine.round_total(results).round_bonus == 0
     end
 
     test "round bonus is NOT doubled by a boosted fixture" do
       results = [result(60, true), result(10, true), result(15, true)]
-      rt = Scoring.round_total(results)
+      rt = Engine.round_total(results)
       assert rt.fixtures_total == 85
       assert rt.round_bonus == 20
       assert rt.total == 105
@@ -364,11 +364,11 @@ defmodule Predictex.ScoringTest do
 
     test "no round bonus for an incomplete round, even if all-so-far correct" do
       results = [result(30, true), result(10, true)]
-      assert Scoring.round_total(results, false).round_bonus == 0
+      assert Engine.round_total(results, false).round_bonus == 0
     end
 
     test "an empty round yields no bonus" do
-      assert Scoring.round_total([]).round_bonus == 0
+      assert Engine.round_total([]).round_bonus == 0
     end
   end
 end

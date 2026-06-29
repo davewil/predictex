@@ -2,7 +2,7 @@ defmodule Predictex.Predictions.Prediction do
   @moduledoc """
   A player's prediction for one fixture. Carries a denormalized `round_id` (kept in
   step with the fixture's round) so the one-booster-per-round rule can be enforced by
-  a partial unique index. Field names match `Predictex.Scoring.score/3`.
+  a partial unique index. Field names match `Predictex.Scoring.Engine.score/3`.
   """
   use Ecto.Schema
   import Ecto.Changeset

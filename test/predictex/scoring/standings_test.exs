@@ -1,7 +1,7 @@
-defmodule Predictex.StandingsTest do
+defmodule Predictex.Scoring.StandingsTest do
   use Predictex.DataCase, async: true
 
-  alias Predictex.{Predictions, Standings, Tournament}
+  alias Predictex.{Predictions, Scoring.Standings, Tournament}
 
   import Predictex.AccountsFixtures
 

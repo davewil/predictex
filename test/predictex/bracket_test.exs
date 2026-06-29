@@ -2,7 +2,7 @@ defmodule Predictex.BracketTest do
   use ExUnit.Case, async: true
 
   alias Predictex.Bracket
-  alias Predictex.GroupTables.Row
+  alias Predictex.Scoring.GroupTables.Row
 
   defp tables do
     %{

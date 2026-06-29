@@ -14,7 +14,7 @@ defmodule Predictex.Workers.LiveScoreSync do
   (`MatchStatus` 0) clears `is_live` naturally. Without this the producer chain stopped at
   kickoff+210min mid-second-half and the late goals + final score were lost.
 
-  The worker does NOT write any fixture `live_*` columns from snapshots. `Predictex.Live.Updater`
+  The worker does NOT write any fixture `live_*` columns from snapshots. `Predictex.LiveScore.Updater`
   (a PubSub subscriber) decodes each snapshot and writes them.
 
   It DOES run an independent `is_live` auto-clear sweep on every tick (`clear_stuck_live/1`) —

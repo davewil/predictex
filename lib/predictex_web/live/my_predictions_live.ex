@@ -10,7 +10,7 @@ defmodule PredictexWeb.MyPredictionsLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Dashboard, Knockout, Predictions, Tournament}
+  alias Predictex.{Dashboard, Scoring.Knockout, Predictions, Tournament}
   alias PredictexWeb.Flags
 
   @impl true

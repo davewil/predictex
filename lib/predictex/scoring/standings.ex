@@ -1,27 +1,27 @@
-defmodule Predictex.Standings do
+defmodule Predictex.Scoring.Standings do
   @moduledoc """
   DB-backed leaderboard: score every player's predictions against completed fixtures
-  and rank them, using the same pure `Predictex.Scoring` laws as the no-DB
+  and rank them, using the same pure `Predictex.Scoring.Engine` laws as the no-DB
   `mix predictex.leaderboard` tool.
 
   Gather → Decide:
 
     * `leaderboard/0` — the I/O edge: preloads players (with predictions) and fixtures
       (with their round).
-    * `rank/2` — pure: scores each completed, predicted fixture with `Scoring.score/3`
-      and awards the Round Bonus per game round via `Scoring.round_total/2`.
+    * `rank/2` — pure: scores each completed, predicted fixture with `Engine.score/3`
+      and awards the Round Bonus per game round via `Engine.round_total/2`.
 
-  Because `Scoring.score/3` reads its inputs with `Map.get`, the `Prediction` and
+  Because `Engine.score/3` reads its inputs with `Map.get`, the `Prediction` and
   `Fixture` structs are passed in directly — no intermediate mapping.
   """
 
   import Ecto.Query, warn: false
 
-  alias Predictex.Ranking
+  alias Predictex.Scoring.Ranking
   alias Predictex.Repo
-  alias Predictex.Scoring
+  alias Predictex.Scoring.Engine
   alias Predictex.Accounts.Player
-  alias Predictex.Standings.Snapshot
+  alias Predictex.Scoring.Standings.Snapshot
   alias Predictex.Tournament.Fixture
 
   @doc """
@@ -49,7 +49,7 @@ defmodule Predictex.Standings do
   `bonus_by_round` maps each round ordinal to its Round Bonus; each `breakdown`
   entry carries `%{ordinal, fixture_id, result}`.
 
-  This is the FK-join adapter over the shared `Predictex.Ranking` core: it resolves
+  This is the FK-join adapter over the shared `Predictex.Scoring.Ranking` core: it resolves
   each prediction to its fixture and hands the core already-scored entries; the
   core owns the fold (totals, Round Bonus, sort).
   """
@@ -105,7 +105,7 @@ defmodule Predictex.Standings do
         %{
           ordinal: fixture.round.ordinal,
           fixture_id: prediction.fixture_id,
-          result: Scoring.score(prediction, fixture, fixture.round.stage)
+          result: Engine.score(prediction, fixture, fixture.round.stage)
         }
       end
 

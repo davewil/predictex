@@ -13,7 +13,7 @@ defmodule Predictex.Predictions do
   alias Predictex.Predictions.Prediction
   alias Predictex.Tournament
   alias Predictex.Tournament.Fixture
-  alias Predictex.Knockout
+  alias Predictex.Scoring.Knockout
 
   def list_predictions, do: Repo.all(Prediction)
 

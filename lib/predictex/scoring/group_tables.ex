@@ -1,4 +1,4 @@
-defmodule Predictex.GroupTables do
+defmodule Predictex.Scoring.GroupTables do
   @moduledoc """
   Pure (DB-free) computation of the football group tables "as it stands" from actual
   results — the foundation of the projected R32 bracket (`predictex-7qu`).
@@ -10,7 +10,7 @@ defmodule Predictex.GroupTables do
   neighbour on points+GD+GF.
   """
 
-  alias Predictex.GroupTables.Row
+  alias Predictex.Scoring.GroupTables.Row
 
   defmodule Row do
     @moduledoc "One team's standing within its group."

@@ -1,7 +1,7 @@
-defmodule Predictex.Ranking do
+defmodule Predictex.Scoring.Ranking do
   @moduledoc """
-  The pure ranking core: the fold both `Predictex.Standings` (FK join) and
-  `Predictex.Leaderboard` (team-name join) share. No Repo, no Ecto — given
+  The pure ranking core: the fold both `Predictex.Scoring.Standings` (FK join) and
+  `Predictex.Scoring.Leaderboard` (team-name join) share. No Repo, no Ecto — given
   already-joined scored entries it owns everything the two boards must agree on:
   the fixtures total, the Round Bonus completeness rule, the total, and the sort.
 
@@ -12,7 +12,7 @@ defmodule Predictex.Ranking do
       key) and `:scored` (the player's per-fixture scoring results). Every other
       key is **echoed** onto the result untouched, so an adapter can carry
       identity (`:player_id`) through. Each `scored` entry **requires** `:ordinal`
-      (its game-round ordinal, or `nil`) and `:result` (a `Scoring.score/3` map);
+      (its game-round ordinal, or `nil`) and `:result` (a `Engine.score/3` map);
       any extra keys it carries (`:fixture_id`, `:fixture`, …) survive into the
       breakdown verbatim.
     * `round_fixtures` — the fixture universe as `[%{ordinal, completed?}]`. The
@@ -25,7 +25,7 @@ defmodule Predictex.Ranking do
   ties broken by `:name`.
   """
 
-  alias Predictex.Scoring
+  alias Predictex.Scoring.Engine
 
   @doc """
   Rank `scored_players` over the `round_fixtures` universe. See the module doc
@@ -72,7 +72,7 @@ defmodule Predictex.Ranking do
         not is_nil(ordinal) and meta != nil and meta.complete? and
           length(entries) == meta.count
 
-      {ordinal, Scoring.round_total(results, complete?).round_bonus}
+      {ordinal, Engine.round_total(results, complete?).round_bonus}
     end)
   end
 

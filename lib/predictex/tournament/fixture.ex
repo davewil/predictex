@@ -1,7 +1,7 @@
 defmodule Predictex.Tournament.Fixture do
   @moduledoc """
   A single match. Field names mirror `Predictex.Results.Openfootball.parse/1` (the
-  ingestion source) and exactly what `Predictex.Scoring.score/3` reads — the
+  ingestion source) and exactly what `Predictex.Scoring.Engine.score/3` reads — the
   producer/consumer data contract is kept aligned on purpose (see `docs/rules.md` §9).
 
   `home_goals`/`away_goals` are the full-time (regulation) result; extra time and

@@ -10,7 +10,7 @@ defmodule Predictex.Bracket do
   """
 
   alias Predictex.Bracket.Thirds
-  alias Predictex.{GroupTables, Knockout, Tournament}
+  alias Predictex.{Scoring.GroupTables, Scoring.Knockout, Tournament}
 
   @winner_runner_up ~r/^([12])([A-Z])$/
   # Non-capturing: only used with Regex.match?/2 (the candidate-set parse uses String.split,

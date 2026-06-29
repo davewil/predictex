@@ -1,4 +1,4 @@
-defmodule Predictex.Scoring do
+defmodule Predictex.Scoring.Engine do
   @moduledoc """
   Pure scoring engine for the FIFA World Cup predictor.
 

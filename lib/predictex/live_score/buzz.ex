@@ -1,13 +1,13 @@
-defmodule Predictex.Buzz do
+defmodule Predictex.LiveScore.Buzz do
   @moduledoc """
   Live "what-if" buzz: project a live fixture under a few next-goal scenarios and turn the
   rank changes into shareable narratives.
 
-  Pure over a `Predictex.Standings.Snapshot`: the caller loads one snapshot per live event and
+  Pure over a `Predictex.Scoring.Standings.Snapshot`: the caller loads one snapshot per live event and
   passes it to every function here, so the board is loaded once (not per projection) and every
   scenario in that event sees a single consistent instant. Persists nothing.
   """
-  alias Predictex.Standings
+  alias Predictex.Scoring.Standings
 
   @doc "The three scenario leaderboards for the current live score, over `snapshot`."
   def scenarios(snapshot, fixture_id, home, away) do

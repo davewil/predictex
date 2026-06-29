@@ -14,7 +14,16 @@ defmodule PredictexWeb.FixtureLive do
   """
   use PredictexWeb, :live_view
 
-  alias Predictex.{Tournament, Predictions, Buzz, MatchRecap, Capture, Replay, Standings}
+  alias Predictex.{
+    Tournament,
+    Predictions,
+    LiveScore.Buzz,
+    MatchRecap,
+    Capture,
+    Replay,
+    Scoring.Standings
+  }
+
   alias PredictexWeb.Flags
 
   @impl true

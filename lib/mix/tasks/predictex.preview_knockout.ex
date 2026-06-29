@@ -24,7 +24,7 @@ defmodule Mix.Tasks.Predictex.PreviewKnockout do
 
   import Ecto.Query, warn: false
 
-  alias Predictex.Knockout
+  alias Predictex.Scoring.Knockout
   alias Predictex.Repo
   alias Predictex.Tournament
   alias Predictex.Tournament.{Fixture, Round}

@@ -1,13 +1,13 @@
-defmodule Predictex.BuzzTest do
+defmodule Predictex.LiveScore.BuzzTest do
   # Pure tests: Buzz runs over a hand-built `Standings.Snapshot` and never touches the DB,
   # so there is no DataCase / Repo here. The zero-DB setup is itself the proof that Buzz no
   # longer loads per projection. Full wiring (snapshot load → Buzz → render) is covered by
   # the DB-backed FixtureLive integration tests.
   use ExUnit.Case, async: true
 
-  alias Predictex.Buzz
-  alias Predictex.Standings
-  alias Predictex.Standings.Snapshot
+  alias Predictex.LiveScore.Buzz
+  alias Predictex.Scoring.Standings
+  alias Predictex.Scoring.Standings.Snapshot
   alias Predictex.Accounts.Player
   alias Predictex.Predictions.Prediction
   alias Predictex.Tournament.{Fixture, Round}

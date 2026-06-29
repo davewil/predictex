@@ -5,7 +5,7 @@ defmodule Predictex.Results.Openfootball do
 
   This is the **anti-corruption boundary**: it absorbs the feed's quirks (minutes as
   strings *or* integers, `"90+9"` stoppage notation, own goals listed under the
-  beneficiary side) and emits clean, derived fields. `Predictex.Scoring` then trusts
+  beneficiary side) and emits clean, derived fields. `Predictex.Scoring.Engine` then trusts
   the shape. See `docs/rules.md` §9 for the data contract.
 
   Every function is pure — input map in, plain data out.

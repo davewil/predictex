@@ -1,6 +1,6 @@
-defmodule Predictex.Live.UpdaterTest do
+defmodule Predictex.LiveScore.UpdaterTest do
   use Predictex.DataCase, async: false
-  alias Predictex.{Tournament, Live.Updater}
+  alias Predictex.{Tournament, LiveScore.Updater}
 
   test "applies a broadcast snapshot to the fixture's live_* and broadcasts" do
     {:ok, r} = Tournament.create_round(%{name: "R1", stage: :group, ordinal: 1})

@@ -2,7 +2,7 @@ defmodule Predictex.Workers.CohortSyncTest do
   use Predictex.DataCase, async: true
   use Oban.Testing, repo: Predictex.Repo
 
-  alias Predictex.{Scoring, Tournament}
+  alias Predictex.{Scoring.Engine, Tournament}
   alias Predictex.Predictions.Prediction
   alias Predictex.Workers.CohortSync
 
@@ -54,7 +54,7 @@ defmodule Predictex.Workers.CohortSyncTest do
     # A correct home-win pick whose cohort share (15) is below the risky threshold (20)
     # now earns the risky bonus that was previously skipped (cohort was nil).
     pred = %Prediction{home_goals: 1, away_goals: 0, booster: false}
-    assert Scoring.score(pred, f, :group).components.risky_bonus == 10
+    assert Engine.score(pred, f, :group).components.risky_bonus == 10
   end
 
   test "returns {:error, reason} when the source fails (so Oban retries)" do

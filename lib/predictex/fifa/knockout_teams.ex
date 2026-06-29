@@ -27,7 +27,7 @@ defmodule Predictex.Fifa.KnockoutTeams do
   """
 
   alias Predictex.Fifa.Crosswalk
-  alias Predictex.{GroupTables, Knockout, Repo, Tournament}
+  alias Predictex.{Scoring.GroupTables, Scoring.Knockout, Repo, Tournament}
   alias Predictex.Tournament.Fixture
 
   @ko_stages ~w(r32 r16 qf sf f)

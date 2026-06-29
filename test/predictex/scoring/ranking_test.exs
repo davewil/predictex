@@ -1,7 +1,7 @@
-defmodule Predictex.RankingTest do
+defmodule Predictex.Scoring.RankingTest do
   @moduledoc """
-  The shared, pure ranking core. Both `Predictex.Standings` (FK join) and
-  `Predictex.Leaderboard` (team-name join) feed it already-joined `scored`
+  The shared, pure ranking core. Both `Predictex.Scoring.Standings` (FK join) and
+  `Predictex.Scoring.Leaderboard` (team-name join) feed it already-joined `scored`
   entries plus the round fixture universe; it owns the fold — fixtures total,
   the Round Bonus completeness rule, the total, and the sort.
 
@@ -11,9 +11,9 @@ defmodule Predictex.RankingTest do
   """
   use ExUnit.Case, async: true
 
-  alias Predictex.Ranking
+  alias Predictex.Scoring.Ranking
 
-  # A scoring result as `Scoring.score/3` would return it — only the two fields
+  # A scoring result as `Engine.score/3` would return it — only the two fields
   # the core reads.
   defp res(total, correct?), do: %{fixture_total: total, outcome_correct: correct?}
 

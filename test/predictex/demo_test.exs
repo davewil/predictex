@@ -1,7 +1,7 @@
 defmodule Predictex.DemoTest do
   use Predictex.DataCase, async: true
 
-  alias Predictex.{Accounts, Demo, Predictions, Standings, Tournament}
+  alias Predictex.{Accounts, Demo, Predictions, Scoring.Standings, Tournament}
   import Predictex.AccountsFixtures
 
   # Seed/setup: a completed round with 3 finished fixtures + one live fixture,

@@ -1,8 +1,8 @@
-defmodule Predictex.GroupTablesTest do
+defmodule Predictex.Scoring.GroupTablesTest do
   use ExUnit.Case, async: true
 
-  alias Predictex.GroupTables
-  alias Predictex.GroupTables.Row
+  alias Predictex.Scoring.GroupTables
+  alias Predictex.Scoring.GroupTables.Row
 
   defp fx(group, t1, t2, hg, ag, status \\ :completed) do
     %{group: group, team1: t1, team2: t2, home_goals: hg, away_goals: ag, status: status}
