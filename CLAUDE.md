@@ -106,7 +106,32 @@ See `docs/engineering-principles.md` (§1, §5) and `docs/software-delivery-prin
 
 ## Architecture Overview
 
-_Add a brief overview of your project architecture_
+Phoenix LiveView app (Phoenix 1.8 / LiveView 1.2). The web layer lives in
+`lib/predictex_web/` — LiveViews under `live/`, shared function components under
+`components/`.
+
+### LiveView templates live in co-located `.heex` files
+
+Render templates are kept **out of the LiveView modules** in co-located `.heex`
+files (not inline `~H` sigils) to keep module sizes manageable. Two shapes:
+
+- **Implicit (the default):** the module defines **no** `render/1`. LiveView 1.2
+  auto-loads a co-located template named after the source file
+  (`fixture_live.ex` → `fixture_live.html.heex`). Aliases (`Layouts`), the `~p`
+  verified-route sigil, module-local function components, and colocated JS hooks
+  all resolve because the template is compiled inside the module's context.
+- **Explicit (only when `render/1` must compute derived assigns):** keep a thin
+  `@impl render/1` that does the prep, then `embed_templates "<name>_body.html"`
+  and delegate to the generated `<name>_body/1` function component (backed by
+  `<name>_body.html.heex`). Used by `leaderboard_live` and `my_predictions_live`
+  — the latter's prep depends on `now` (ticks live), so it can't move to event
+  handlers without stale-render risk.
+
+A module's own **function components** (e.g. `import_live`'s `paste_form/1`,
+`escape_hatch/1`) keep their inline `~H` — only the main page render is extracted.
+`.heex` files are format-checked by the gate (`.formatter.exs` lists `heex` with
+the `Phoenix.LiveView.HTMLFormatter` plugin), so run `mix format` after editing
+them.
 
 ## Conventions & Patterns
 
