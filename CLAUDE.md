@@ -110,6 +110,31 @@ Phoenix LiveView app (Phoenix 1.8 / LiveView 1.2). The web layer lives in
 `lib/predictex_web/` — LiveViews under `live/`, shared function components under
 `components/`.
 
+### Domain layer — namespaces advertise the boundaries
+
+`lib/predictex/` follows a functional-core / imperative-shell split. Modules are
+grouped under one-level namespaces so the tree itself signals what's public,
+what's a pure core, and what's a read model — don't reintroduce flat siblings
+when a family already has a namespace.
+
+- **Contexts** (public API, co-located Ecto schemas): `Accounts`, `Tournament`,
+  `Predictions`, `Capture`, `Results`, `Fifa`, `Bracket`, `Replay`. Schemas live
+  under the context namespace (e.g. `Tournament.Fixture`), never at the top level.
+- **`Scoring.*`** — pure football/scoring cores (no Repo, no Ecto): `Scoring.Engine`
+  (the scoring laws — `Engine.score/3`), `Scoring.Ranking` (shared rank fold),
+  `Scoring.Leaderboard` (no-DB scorer), `Scoring.Standings` (DB-backed, reuses the
+  same laws; `+ Standings.Snapshot`), `Scoring.GroupTables` (`+ .Row`),
+  `Scoring.Knockout`.
+- **`LiveScore.*`** — the live-scoring concern: `Predictex.LiveScore` is the bare
+  decode+apply contract (the namespace's primary concept, `Ecto`/`Ecto.Query`
+  shape — not a peer, so it stays unprefixed); `LiveScore.Updater` (snapshot
+  subscriber) and `LiveScore.Buzz` (live what-if narratives) are its satellites.
+- **Read models** feeding LiveViews stay top-level (`Dashboard`, `MatchRecap`) —
+  presentation read models, not contexts, so no namespace bucket.
+
+The `test/` tree mirrors `lib/` (test module names match paths, e.g.
+`Predictex.Scoring.EngineTest`).
+
 ### LiveView templates live in co-located `.heex` files
 
 Render templates are kept **out of the LiveView modules** in co-located `.heex`
