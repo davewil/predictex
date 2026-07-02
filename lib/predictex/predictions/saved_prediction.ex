@@ -1,4 +1,4 @@
-defmodule Predictex.Predictions.Prediction do
+defmodule Predictex.Predictions.SavedPrediction do
   @moduledoc """
   A player's prediction for one fixture. Carries a denormalized `round_id` (kept in
   step with the fixture's round) so the one-booster-per-round rule can be enforced by

@@ -10,20 +10,20 @@ defmodule Predictex.Predictions do
   import Ecto.Query, warn: false
 
   alias Predictex.Repo
-  alias Predictex.Predictions.Prediction
+  alias Predictex.Predictions.SavedPrediction
   alias Predictex.Tournament
   alias Predictex.Tournament.Fixture
   alias Predictex.Scoring.Knockout
 
-  def list_predictions, do: Repo.all(Prediction)
+  def list_predictions, do: Repo.all(SavedPrediction)
 
   @doc "All of one player's predictions (any round, any fixture state)."
   def list_player_predictions(player_id) do
-    Repo.all(from p in Prediction, where: p.player_id == ^player_id)
+    Repo.all(from p in SavedPrediction, where: p.player_id == ^player_id)
   end
 
-  def change_prediction(%Prediction{} = prediction \\ %Prediction{}, attrs \\ %{}) do
-    Prediction.changeset(prediction, attrs)
+  def change_prediction(%SavedPrediction{} = prediction \\ %SavedPrediction{}, attrs \\ %{}) do
+    SavedPrediction.changeset(prediction, attrs)
   end
 
   @doc """
@@ -39,7 +39,7 @@ defmodule Predictex.Predictions do
       attrs
       |> Map.put(:round_id, fixture.round_id)
       |> Map.put(:fixture_id, fixture.id)
-      |> then(&Prediction.changeset(%Prediction{}, &1))
+      |> then(&SavedPrediction.changeset(%SavedPrediction{}, &1))
       |> Repo.insert()
     end
     |> broadcast_on_success()
@@ -72,9 +72,11 @@ defmodule Predictex.Predictions do
             clear_round_booster(player_id, fixture.round_id, fixture.id)
           end
 
-          existing = Repo.get_by(Prediction, player_id: player_id, fixture_id: fixture.id)
+          existing = Repo.get_by(SavedPrediction, player_id: player_id, fixture_id: fixture.id)
 
-          case Repo.insert_or_update(Prediction.changeset(existing || %Prediction{}, attrs)) do
+          case Repo.insert_or_update(
+                 SavedPrediction.changeset(existing || %SavedPrediction{}, attrs)
+               ) do
             {:ok, pred} -> pred
             {:error, cs} -> Repo.rollback(cs)
           end
@@ -106,7 +108,7 @@ defmodule Predictex.Predictions do
   """
   def admin_save_round_predictions(player_id, round_id, rows) when is_list(rows) do
     Repo.transaction(fn ->
-      from(p in Prediction, where: p.player_id == ^player_id and p.round_id == ^round_id)
+      from(p in SavedPrediction, where: p.player_id == ^player_id and p.round_id == ^round_id)
       |> Repo.update_all(set: [booster: false])
 
       results =
@@ -182,7 +184,7 @@ defmodule Predictex.Predictions do
       editable_ids = Enum.map(editable, & &1.fixture_id)
 
       # Clear boosters only among the editable (unlocked, resolved) fixtures being (re)saved.
-      from(p in Prediction,
+      from(p in SavedPrediction,
         where:
           p.player_id == ^player_id and p.round_id == ^round_id and
             p.fixture_id in ^editable_ids
@@ -224,7 +226,7 @@ defmodule Predictex.Predictions do
       incoming ->
         committed_id =
           Repo.one(
-            from p in Prediction,
+            from p in SavedPrediction,
               where: p.player_id == ^player_id and p.round_id == ^round_id and p.booster == true,
               select: p.fixture_id
           )
@@ -236,7 +238,7 @@ defmodule Predictex.Predictions do
 
   @doc "All players' predictions for one fixture, with the player preloaded (by-fixture admin lens)."
   def list_fixture_predictions(fixture_id) do
-    from(p in Prediction, where: p.fixture_id == ^fixture_id, preload: [:player])
+    from(p in SavedPrediction, where: p.fixture_id == ^fixture_id, preload: [:player])
     |> Repo.all()
   end
 
@@ -249,7 +251,7 @@ defmodule Predictex.Predictions do
   """
   def get_player_fixture_prediction(player_id, fixture_id) do
     Repo.one(
-      from p in Prediction, where: p.player_id == ^player_id and p.fixture_id == ^fixture_id
+      from p in SavedPrediction, where: p.player_id == ^player_id and p.fixture_id == ^fixture_id
     )
   end
 
@@ -369,7 +371,7 @@ defmodule Predictex.Predictions do
   defp booster_set?(attrs), do: take(attrs, :booster) in [true, "true"]
 
   defp clear_round_booster(player_id, round_id, except_fixture_id) do
-    from(p in Prediction,
+    from(p in SavedPrediction,
       where:
         p.player_id == ^player_id and p.round_id == ^round_id and
           p.fixture_id != ^except_fixture_id and p.booster == true
@@ -388,9 +390,9 @@ defmodule Predictex.Predictions do
       |> Map.put(:player_id, player_id)
       |> Map.put(:round_id, round_id)
 
-    existing = Repo.get_by(Prediction, player_id: player_id, fixture_id: row.fixture_id)
+    existing = Repo.get_by(SavedPrediction, player_id: player_id, fixture_id: row.fixture_id)
 
-    case Repo.insert_or_update(Prediction.changeset(existing || %Prediction{}, attrs)) do
+    case Repo.insert_or_update(SavedPrediction.changeset(existing || %SavedPrediction{}, attrs)) do
       {:ok, _pred} -> :upserted
       {:error, cs} -> {:error, cs}
     end

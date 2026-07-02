@@ -226,7 +226,7 @@ defmodule Predictex.Scoring.StandingsTest do
         id: 1,
         display_name: "Exact",
         predictions: [
-          %Predictex.Predictions.Prediction{fixture_id: 100, home_goals: 2, away_goals: 1}
+          %Predictex.Predictions.SavedPrediction{fixture_id: 100, home_goals: 2, away_goals: 1}
         ]
       }
 
@@ -234,7 +234,7 @@ defmodule Predictex.Scoring.StandingsTest do
         id: 2,
         display_name: "Off",
         predictions: [
-          %Predictex.Predictions.Prediction{fixture_id: 100, home_goals: 0, away_goals: 0}
+          %Predictex.Predictions.SavedPrediction{fixture_id: 100, home_goals: 0, away_goals: 0}
         ]
       }
 

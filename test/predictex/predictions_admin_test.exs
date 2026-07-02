@@ -63,7 +63,7 @@ defmodule Predictex.PredictionsAdminTest do
     assert pred.home_goals == 3
     assert pred.away_goals == 2
     # overwrite, not a second row
-    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 1
+    assert Repo.aggregate(Predictex.Predictions.SavedPrediction, :count) == 1
   end
 
   test "admin_upsert_prediction succeeds even after kickoff (no lockout)",
@@ -104,7 +104,10 @@ defmodule Predictex.PredictionsAdminTest do
              })
 
     assert pred_b.booster
-    pred_a = Repo.get_by(Predictex.Predictions.Prediction, player_id: player.id, fixture_id: a.id)
+
+    pred_a =
+      Repo.get_by(Predictex.Predictions.SavedPrediction, player_id: player.id, fixture_id: a.id)
+
     refute pred_a.booster
   end
 
@@ -136,7 +139,7 @@ defmodule Predictex.PredictionsAdminTest do
     assert results[full.id] == :upserted
     assert results[blank.id] == :skipped
     assert match?({:error, _}, results[half.id])
-    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 1
+    assert Repo.aggregate(Predictex.Predictions.SavedPrediction, :count) == 1
   end
 
   test "admin_save_round_predictions sets exactly one booster across the round",
@@ -157,7 +160,7 @@ defmodule Predictex.PredictionsAdminTest do
         %{fixture_id: b.id, home_goals: 0, away_goals: 0, booster: true}
       ])
 
-    boosted = Repo.all(from p in Predictex.Predictions.Prediction, where: p.booster == true)
+    boosted = Repo.all(from p in Predictex.Predictions.SavedPrediction, where: p.booster == true)
     assert length(boosted) == 1
     assert hd(boosted).fixture_id == b.id
   end
@@ -211,8 +214,10 @@ defmodule Predictex.PredictionsAdminTest do
     assert results[blank.id] == {:error, :booster_on_blank}
 
     # A's booster survived the rollback; nothing was written for the blank row.
-    pred_a = Repo.get_by(Predictex.Predictions.Prediction, player_id: player.id, fixture_id: a.id)
+    pred_a =
+      Repo.get_by(Predictex.Predictions.SavedPrediction, player_id: player.id, fixture_id: a.id)
+
     assert pred_a.booster
-    assert Repo.aggregate(Predictex.Predictions.Prediction, :count) == 1
+    assert Repo.aggregate(Predictex.Predictions.SavedPrediction, :count) == 1
   end
 end

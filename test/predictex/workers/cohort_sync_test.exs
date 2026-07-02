@@ -3,7 +3,7 @@ defmodule Predictex.Workers.CohortSyncTest do
   use Oban.Testing, repo: Predictex.Repo
 
   alias Predictex.{Scoring.Engine, Tournament}
-  alias Predictex.Predictions.Prediction
+  alias Predictex.Predictions.SavedPrediction
   alias Predictex.Workers.CohortSync
 
   defp put_source(fun) do
@@ -53,7 +53,7 @@ defmodule Predictex.Workers.CohortSyncTest do
 
     # A correct home-win pick whose cohort share (15) is below the risky threshold (20)
     # now earns the risky bonus that was previously skipped (cohort was nil).
-    pred = %Prediction{home_goals: 1, away_goals: 0, booster: false}
+    pred = %SavedPrediction{home_goals: 1, away_goals: 0, booster: false}
     assert Engine.score(pred, f, :group).components.risky_bonus == 10
   end
 

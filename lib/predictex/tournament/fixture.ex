@@ -47,7 +47,7 @@ defmodule Predictex.Tournament.Fixture do
     end
 
     belongs_to :round, Predictex.Tournament.Round
-    has_many :predictions, Predictex.Predictions.Prediction
+    has_many :predictions, Predictex.Predictions.SavedPrediction
 
     timestamps()
   end

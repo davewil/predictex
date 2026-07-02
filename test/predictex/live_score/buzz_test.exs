@@ -9,7 +9,7 @@ defmodule Predictex.LiveScore.BuzzTest do
   alias Predictex.Scoring.Standings
   alias Predictex.Scoring.Standings.Snapshot
   alias Predictex.Accounts.Player
-  alias Predictex.Predictions.Prediction
+  alias Predictex.Predictions.SavedPrediction
   alias Predictex.Tournament.{Fixture, Round}
 
   @fx_id 10
@@ -37,13 +37,13 @@ defmodule Predictex.LiveScore.BuzzTest do
     ana = %Player{
       id: 1,
       display_name: "Ana",
-      predictions: [%Prediction{fixture_id: @fx_id, home_goals: 1, away_goals: 0}]
+      predictions: [%SavedPrediction{fixture_id: @fx_id, home_goals: 1, away_goals: 0}]
     }
 
     bob = %Player{
       id: 2,
       display_name: "Bob",
-      predictions: [%Prediction{fixture_id: @completed_id, home_goals: 3, away_goals: 1}]
+      predictions: [%SavedPrediction{fixture_id: @completed_id, home_goals: 3, away_goals: 1}]
     }
 
     snapshot = %Snapshot{players: [ana, bob], fixtures: [fx, completed_fx]}

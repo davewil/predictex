@@ -3,7 +3,7 @@ defmodule Predictex.DashboardTest do
 
   alias Predictex.Dashboard
   alias Predictex.Tournament.{Round, Fixture}
-  alias Predictex.Predictions.Prediction
+  alias Predictex.Predictions.SavedPrediction
 
   defp dt(offset), do: DateTime.add(~U[2026-06-15 12:00:00Z], offset, :second)
 
@@ -72,8 +72,8 @@ defmodule Predictex.DashboardTest do
     rounds = [round_with(1, :group, [completed, locked, open_unpredicted])]
 
     preds = %{
-      1 => %Prediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: true},
-      2 => %Prediction{fixture_id: 2, home_goals: 1, away_goals: 1, booster: false}
+      1 => %SavedPrediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: true},
+      2 => %SavedPrediction{fixture_id: 2, home_goals: 1, away_goals: 1, booster: false}
     }
 
     entry = %{
@@ -152,7 +152,7 @@ defmodule Predictex.DashboardTest do
         kickoff_at: dt(-3600)
       }
 
-      pred = %Prediction{fixture_id: 1, home_goals: 1, away_goals: 0, booster: false}
+      pred = %SavedPrediction{fixture_id: 1, home_goals: 1, away_goals: 0, booster: false}
 
       # correct away/home win outcome + goal difference, but wrong scoreline → no exact
       result = %{
@@ -188,7 +188,7 @@ defmodule Predictex.DashboardTest do
       }
 
       # predicted Morocco (home) to win — the underdog side
-      pred = %Prediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: false}
+      pred = %SavedPrediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: false}
 
       result = %{
         fixture_total: 25,
@@ -213,7 +213,7 @@ defmodule Predictex.DashboardTest do
         kickoff_at: dt(-3600)
       }
 
-      pred = %Prediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: true}
+      pred = %SavedPrediction{fixture_id: 1, home_goals: 2, away_goals: 1, booster: true}
 
       result = %{
         fixture_total: 60,
@@ -244,7 +244,7 @@ defmodule Predictex.DashboardTest do
         kickoff_at: dt(3600)
       }
 
-      pred = %Prediction{fixture_id: 1, home_goals: 1, away_goals: 1, booster: false}
+      pred = %SavedPrediction{fixture_id: 1, home_goals: 1, away_goals: 1, booster: false}
       rounds = [round_with(1, :group, [fixture])]
 
       view =

@@ -11,7 +11,7 @@ defmodule Predictex.Scoring.Standings do
     * `rank/2` — pure: scores each completed, predicted fixture with `Engine.score/3`
       and awards the Round Bonus per game round via `Engine.round_total/2`.
 
-  Because `Engine.score/3` reads its inputs with `Map.get`, the `Prediction` and
+  Because `Engine.score/3` reads its inputs with `Map.get`, the `SavedPrediction` and
   `Fixture` structs are passed in directly — no intermediate mapping.
   """
 

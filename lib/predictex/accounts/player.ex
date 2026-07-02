@@ -11,7 +11,7 @@ defmodule Predictex.Accounts.Player do
     field :display_name, :string
     field :is_admin, :boolean, default: false
 
-    has_many :predictions, Predictex.Predictions.Prediction
+    has_many :predictions, Predictex.Predictions.SavedPrediction
 
     timestamps(type: :utc_datetime)
   end
