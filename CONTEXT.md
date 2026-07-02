@@ -7,29 +7,33 @@ seam, depth) see the architecture review tooling, not here.
 
 ## Prediction intake
 
-**Pick row**:
-The validated representation of one player's prediction for one fixture, ready to persist:
-`%{fixture_id, home_goals, away_goals, first_scorer_side, first_scorer_player, booster}`. The
-shared shape every intake producer (member form, admin form, FIFA import) emits.
-_Avoid_: form row, params map, write row.
+**Prediction** (the value):
+A player's guess for one **fixture**, validated and ready to persist:
+`%{fixture_id, home_goals, away_goals, first_scorer_side, first_scorer_player, booster}` — the
+struct `Predictions.Prediction`, the shared shape every **producer** (member form, admin form,
+FIFA import) emits through the **prediction-intake boundary**. Distinct from the persisted
+**saved prediction** (the Ecto record). _Avoid_: pick (a prediction is a guess about a future
+event, not a selection from a fixed set of options), pick row, form row, params map, write row.
 
 **Prediction-intake boundary**:
-The pure anti-corruption layer that turns a producer's raw input into validated **pick rows**
-and owns the intake invariants (notably **booster**-needs-a-**scoreline**). Returns
-`{:ok, [pick row]} | {:error, reason}`; does no persistence. `validate_pick_rows/1` is its
-authoritative core, shared by the form parser and FIFA import. Persistence trusts its output.
+The pure anti-corruption layer that turns a producer's raw input into validated **predictions**
+(the value) and owns the intake invariants (notably **booster**-needs-a-**scoreline**). Returns
+`{:ok, [prediction]} | {:error, reason}`; does no persistence. `validate_predictions/1` (renamed
+from `validate_pick_rows/1`) is its authoritative core, shared by the form parser and FIFA import.
+Persistence trusts its output and writes a **saved prediction**.
 _Avoid_: parser, validator (too narrow — it owns invariants, not just shape).
 
 **Producer**:
-A source of intake that emits **pick rows** through the **prediction-intake boundary**. Three
-exist: the member entry form, the admin-on-behalf form, and FIFA import.
+A source of intake that emits **predictions** (the value) through the **prediction-intake
+boundary**. Three exist: the member entry form, the admin-on-behalf form, and FIFA import.
 
 ## Core
 
-**Prediction**:
-A player's saved pick for a single **fixture** — a **scoreline**, plus (knockout only) first
-team and first player to score, and optionally a **booster**. At most one per player per fixture.
-_Avoid_: guess, bet, entry.
+**Saved prediction**:
+The persisted, scored record of a **prediction** — the Ecto entity (today `Predictions.Prediction`;
+renamed to `Predictions.SavedPrediction` under this model). At most one per player per **fixture**.
+Persistence turns a validated **prediction** (value) into a saved prediction (entity); scoring and
+the **leaderboard** read saved predictions. _Avoid_: prediction row, record (too technical), pick.
 
 **Scoreline**:
 A player's predicted home–away goal pair for a fixture. The only thing predicted in the group
@@ -38,7 +42,7 @@ _Avoid_: score, result.
 
 **Booster**:
 A player's once-per-**round** multiplier placed on one **fixture**'s prediction. Invariant: a
-booster requires a **scoreline** — a booster on a blank pick is rejected (booster-on-blank).
+booster requires a **scoreline** — a booster on a blank **prediction** is rejected (booster-on-blank).
 _Avoid_: power-up, multiplier, joker.
 
 **Round**:

@@ -2,6 +2,7 @@ defmodule Predictex.PredictionsAdminTest do
   use Predictex.DataCase, async: true
 
   alias Predictex.{Predictions, Tournament}
+  alias Predictex.Predictions.Prediction
   import Predictex.AccountsFixtures
 
   defp fixture!(round, attrs \\ %{}) do
@@ -129,9 +130,9 @@ defmodule Predictex.PredictionsAdminTest do
     half = fixture!(round)
 
     rows = [
-      %{fixture_id: full.id, home_goals: 2, away_goals: 1, booster: false},
-      %{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: false},
-      %{fixture_id: half.id, home_goals: 1, away_goals: nil, booster: false}
+      %Prediction{fixture_id: full.id, home_goals: 2, away_goals: 1, booster: false},
+      %Prediction{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: false},
+      %Prediction{fixture_id: half.id, home_goals: 1, away_goals: nil, booster: false}
     ]
 
     {:ok, results} = Predictions.admin_save_round_predictions(player.id, round.id, rows)
@@ -149,15 +150,15 @@ defmodule Predictex.PredictionsAdminTest do
 
     {:ok, _} =
       Predictions.admin_save_round_predictions(player.id, round.id, [
-        %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true},
-        %{fixture_id: b.id, home_goals: 0, away_goals: 0, booster: false}
+        %Prediction{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true},
+        %Prediction{fixture_id: b.id, home_goals: 0, away_goals: 0, booster: false}
       ])
 
     # Move the booster to B in a second save.
     {:ok, _} =
       Predictions.admin_save_round_predictions(player.id, round.id, [
-        %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: false},
-        %{fixture_id: b.id, home_goals: 0, away_goals: 0, booster: true}
+        %Prediction{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: false},
+        %Prediction{fixture_id: b.id, home_goals: 0, away_goals: 0, booster: true}
       ])
 
     boosted = Repo.all(from p in Predictex.Predictions.SavedPrediction, where: p.booster == true)
@@ -200,15 +201,15 @@ defmodule Predictex.PredictionsAdminTest do
     # Player already has a valid booster on A.
     {:ok, _} =
       Predictions.admin_save_round_predictions(player.id, round.id, [
-        %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true}
+        %Prediction{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: true}
       ])
 
     # Admin fumbles: moves the booster onto a blank row. This must NOT silently
     # destroy A's booster — the whole save rolls back.
     assert {:error, {:booster_on_blank, results}} =
              Predictions.admin_save_round_predictions(player.id, round.id, [
-               %{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: false},
-               %{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: true}
+               %Prediction{fixture_id: a.id, home_goals: 1, away_goals: 0, booster: false},
+               %Prediction{fixture_id: blank.id, home_goals: nil, away_goals: nil, booster: true}
              ])
 
     assert results[blank.id] == {:error, :booster_on_blank}

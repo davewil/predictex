@@ -2,6 +2,7 @@ defmodule Predictex.Fifa.ImportTest do
   use ExUnit.Case, async: true
 
   alias Predictex.Fifa.Import
+  alias Predictex.Predictions.Prediction
   alias Predictex.Tournament.Fixture
 
   defp fixture(id, team1, team2, kickoff, round_id),
@@ -208,7 +209,7 @@ defmodule Predictex.Fifa.ImportTest do
     end
   end
 
-  describe "to_write_rows/1" do
+  describe "to_predictions/1" do
     test "groups matched entries by round_id, stripped to the write contract" do
       matched = [
         %{
@@ -240,14 +241,16 @@ defmodule Predictex.Fifa.ImportTest do
         }
       ]
 
-      grouped = Import.to_write_rows(matched)
+      grouped = Import.to_predictions(matched)
 
       assert grouped[1] == [
-               %{fixture_id: 7, home_goals: 2, away_goals: 0, booster: true},
-               %{fixture_id: 8, home_goals: 1, away_goals: 1, booster: false}
+               %Prediction{fixture_id: 7, home_goals: 2, away_goals: 0, booster: true},
+               %Prediction{fixture_id: 8, home_goals: 1, away_goals: 1, booster: false}
              ]
 
-      assert grouped[2] == [%{fixture_id: 9, home_goals: 0, away_goals: 0, booster: false}]
+      assert grouped[2] == [
+               %Prediction{fixture_id: 9, home_goals: 0, away_goals: 0, booster: false}
+             ]
     end
   end
 end

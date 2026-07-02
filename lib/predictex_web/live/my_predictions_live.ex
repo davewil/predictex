@@ -68,7 +68,7 @@ defmodule PredictexWeb.MyPredictionsLive do
 
     if native_ko_round?(active, player) do
       with {:ok, rows} <-
-             Predictions.parse_pick_rows(params["picks"] || %{}, params["booster_fixture_id"]) do
+             Predictions.parse_predictions(params["picks"] || %{}, params["booster_fixture_id"]) do
         Predictions.save_round_predictions(
           player.id,
           active.round.id,
@@ -88,7 +88,7 @@ defmodule PredictexWeb.MyPredictionsLive do
 
     # The prediction-intake boundary (pure) parses params and owns the booster-on-blank
     # invariant; this view just routes the validated rows to persistence and renders the tag.
-    case Predictions.parse_pick_rows(params["picks"] || %{}, params["booster_fixture_id"]) do
+    case Predictions.parse_predictions(params["picks"] || %{}, params["booster_fixture_id"]) do
       {:ok, rows} ->
         # Resolve the flag and pass it as an independent write-path gate (defense in depth):
         # save_round_predictions/4 rejects when the flag is off for this actor, so a crafted

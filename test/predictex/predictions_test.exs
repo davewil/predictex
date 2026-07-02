@@ -2,6 +2,7 @@ defmodule Predictex.PredictionsTest do
   use Predictex.DataCase, async: true
 
   alias Predictex.{Predictions, Tournament}
+  alias Predictex.Predictions.Prediction
   alias Predictex.Tournament.Fixture
 
   import Predictex.AccountsFixtures
@@ -244,14 +245,14 @@ defmodule Predictex.PredictionsTest do
     end
 
     test "saves picks for unlocked fixtures", %{round: round, player: player, open: open} do
-      rows = [%{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: false}]
+      rows = [%Prediction{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: false}]
       assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[open.id] == :upserted
       assert Predictions.get_player_fixture_prediction(player.id, open.id).home_goals == 2
     end
 
     test "refuses to write a locked fixture", %{round: round, player: player, locked: locked} do
-      rows = [%{fixture_id: locked.id, home_goals: 9, away_goals: 9, booster: false}]
+      rows = [%Prediction{fixture_id: locked.id, home_goals: 9, away_goals: 9, booster: false}]
       assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[locked.id] == :locked
       assert Predictions.get_player_fixture_prediction(player.id, locked.id) == nil
@@ -273,7 +274,7 @@ defmodule Predictex.PredictionsTest do
           booster: true
         })
 
-      rows = [%{fixture_id: open.id, home_goals: 0, away_goals: 0, booster: false}]
+      rows = [%Prediction{fixture_id: open.id, home_goals: 0, away_goals: 0, booster: false}]
       assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows, true)
 
       # The locked fixture keeps its booster — the member can't move it.
@@ -292,7 +293,9 @@ defmodule Predictex.PredictionsTest do
 
       foreign_fixture = fixture!(other_round)
 
-      rows = [%{fixture_id: foreign_fixture.id, home_goals: 2, away_goals: 1, booster: false}]
+      rows = [
+        %Prediction{fixture_id: foreign_fixture.id, home_goals: 2, away_goals: 1, booster: false}
+      ]
 
       assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[foreign_fixture.id] == :unknown
@@ -305,7 +308,9 @@ defmodule Predictex.PredictionsTest do
     } do
       nonexistent_id = 999_999_999
 
-      rows = [%{fixture_id: nonexistent_id, home_goals: 2, away_goals: 1, booster: false}]
+      rows = [
+        %Prediction{fixture_id: nonexistent_id, home_goals: 2, away_goals: 1, booster: false}
+      ]
 
       assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[nonexistent_id] == :unknown
@@ -317,7 +322,7 @@ defmodule Predictex.PredictionsTest do
       player: player,
       open: open
     } do
-      rows = [%{fixture_id: open.id, home_goals: 3, away_goals: 0, booster: false}]
+      rows = [%Prediction{fixture_id: open.id, home_goals: 3, away_goals: 0, booster: false}]
       assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[open.id] == :upserted
       assert Predictions.get_player_fixture_prediction(player.id, open.id).home_goals == 3
@@ -331,7 +336,7 @@ defmodule Predictex.PredictionsTest do
       player: player,
       open: open
     } do
-      rows = [%{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: false}]
+      rows = [%Prediction{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: false}]
 
       assert {:error, :feature_disabled} =
                Predictions.save_round_predictions(player.id, round.id, rows, false)
@@ -343,7 +348,7 @@ defmodule Predictex.PredictionsTest do
          %{round: round, player: player} do
       future = DateTime.utc_now() |> DateTime.add(3600, :second) |> DateTime.truncate(:second)
       pending = fixture!(round, %{team1: "1A", team2: "2B", kickoff_at: future})
-      rows = [%{fixture_id: pending.id, home_goals: 2, away_goals: 1, booster: false}]
+      rows = [%Prediction{fixture_id: pending.id, home_goals: 2, away_goals: 1, booster: false}]
 
       assert {:ok, results} = Predictions.save_round_predictions(player.id, round.id, rows, true)
       assert results[pending.id] == :pending
@@ -363,7 +368,7 @@ defmodule Predictex.PredictionsTest do
         })
 
       # Now try to boost the still-open fixture.
-      rows = [%{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: true}]
+      rows = [%Prediction{fixture_id: open.id, home_goals: 2, away_goals: 1, booster: true}]
 
       assert {:error, :booster_locked} =
                Predictions.save_round_predictions(player.id, round.id, rows, true)
@@ -434,7 +439,7 @@ defmodule Predictex.PredictionsTest do
       f = fixture!(round)
       Tournament.subscribe_changes()
 
-      rows = [%{fixture_id: f.id, home_goals: 1, away_goals: 1, booster: false}]
+      rows = [%Prediction{fixture_id: f.id, home_goals: 1, away_goals: 1, booster: false}]
       assert {:ok, _} = Predictions.admin_save_round_predictions(player.id, round.id, rows)
 
       assert_received :fixtures_changed
@@ -445,7 +450,7 @@ defmodule Predictex.PredictionsTest do
       f = fixture!(round, %{kickoff_at: future})
       Tournament.subscribe_changes()
 
-      rows = [%{fixture_id: f.id, home_goals: 2, away_goals: 0, booster: false}]
+      rows = [%Prediction{fixture_id: f.id, home_goals: 2, away_goals: 0, booster: false}]
       assert {:ok, _} = Predictions.save_round_predictions(player.id, round.id, rows, true)
 
       assert_received :fixtures_changed
@@ -497,8 +502,8 @@ defmodule Predictex.PredictionsTest do
     end
   end
 
-  describe "parse_pick_rows/2 (pure prediction-intake boundary)" do
-    test "parses raw string params into typed pick rows" do
+  describe "parse_predictions/2 (pure prediction-intake boundary)" do
+    test "parses raw string params into typed predictions" do
       picks = %{
         "10" => %{
           "home_goals" => "2",
@@ -514,10 +519,10 @@ defmodule Predictex.PredictionsTest do
         }
       }
 
-      assert {:ok, rows} = Predictions.parse_pick_rows(picks, "10")
+      assert {:ok, rows} = Predictions.parse_predictions(picks, "10")
       by_id = Map.new(rows, &{&1.fixture_id, &1})
 
-      assert by_id[10] == %{
+      assert by_id[10] == %Prediction{
                fixture_id: 10,
                home_goals: 2,
                away_goals: 1,
@@ -527,7 +532,7 @@ defmodule Predictex.PredictionsTest do
                booster: true
              }
 
-      assert by_id[11] == %{
+      assert by_id[11] == %Prediction{
                fixture_id: 11,
                home_goals: 0,
                away_goals: 0,
@@ -541,7 +546,7 @@ defmodule Predictex.PredictionsTest do
     test "keeps blank-goal rows (the persistence layer decides to skip them)" do
       picks = %{"10" => %{"home_goals" => "", "away_goals" => ""}}
 
-      assert {:ok, [row]} = Predictions.parse_pick_rows(picks, nil)
+      assert {:ok, [row]} = Predictions.parse_predictions(picks, nil)
       assert row.fixture_id == 10
       assert row.home_goals == nil and row.away_goals == nil
       assert row.booster == false
@@ -549,7 +554,7 @@ defmodule Predictex.PredictionsTest do
 
     test "rejects a booster on a blank scoreline (booster-on-blank invariant)" do
       picks = %{"10" => %{"home_goals" => "", "away_goals" => ""}}
-      assert {:error, :booster_on_blank} = Predictions.parse_pick_rows(picks, "10")
+      assert {:error, :booster_on_blank} = Predictions.parse_predictions(picks, "10")
     end
 
     test "carries first_scorer_fifaid (parsed to integer) into the row" do
@@ -562,14 +567,14 @@ defmodule Predictex.PredictionsTest do
         }
       }
 
-      assert {:ok, [row]} = Predictions.parse_pick_rows(picks, nil)
+      assert {:ok, [row]} = Predictions.parse_predictions(picks, nil)
       assert row.first_scorer_player == "Neymar"
       assert row.first_scorer_fifaid == 100_002
     end
 
     test "blank first_scorer_fifaid parses to nil" do
       picks = %{"10" => %{"home_goals" => "1", "away_goals" => "0", "first_scorer_fifaid" => ""}}
-      assert {:ok, [row]} = Predictions.parse_pick_rows(picks, nil)
+      assert {:ok, [row]} = Predictions.parse_predictions(picks, nil)
       assert row.first_scorer_fifaid == nil
     end
 
@@ -579,24 +584,24 @@ defmodule Predictex.PredictionsTest do
         "10" => %{"home_goals" => "2", "away_goals" => "2"}
       }
 
-      assert {:ok, rows} = Predictions.parse_pick_rows(picks, nil)
+      assert {:ok, rows} = Predictions.parse_predictions(picks, nil)
       assert Enum.map(rows, & &1.fixture_id) == [10]
     end
   end
 
-  describe "validate_pick_rows/1 (pure invariant owner)" do
-    test "ok when no booster sits on a blank row" do
-      rows = [
-        %{fixture_id: 1, home_goals: 1, away_goals: 0, booster: true},
-        %{fixture_id: 2, home_goals: nil, away_goals: nil, booster: false}
+  describe "validate_predictions/1 (pure invariant owner)" do
+    test "ok when no booster sits on a blank prediction" do
+      predictions = [
+        %Prediction{fixture_id: 1, home_goals: 1, away_goals: 0, booster: true},
+        %Prediction{fixture_id: 2, home_goals: nil, away_goals: nil, booster: false}
       ]
 
-      assert {:ok, ^rows} = Predictions.validate_pick_rows(rows)
+      assert {:ok, ^predictions} = Predictions.validate_predictions(predictions)
     end
 
-    test "error when a booster sits on a blank row" do
-      rows = [%{fixture_id: 1, home_goals: nil, away_goals: nil, booster: true}]
-      assert {:error, :booster_on_blank} = Predictions.validate_pick_rows(rows)
+    test "error when a booster sits on a blank prediction" do
+      predictions = [%Prediction{fixture_id: 1, home_goals: nil, away_goals: nil, booster: true}]
+      assert {:error, :booster_on_blank} = Predictions.validate_predictions(predictions)
     end
   end
 

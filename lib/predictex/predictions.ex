@@ -10,6 +10,7 @@ defmodule Predictex.Predictions do
   import Ecto.Query, warn: false
 
   alias Predictex.Repo
+  alias Predictex.Predictions.Prediction
   alias Predictex.Predictions.SavedPrediction
   alias Predictex.Tournament
   alias Predictex.Tournament.Fixture
@@ -113,7 +114,7 @@ defmodule Predictex.Predictions do
 
       results =
         Enum.reduce(rows, %{}, fn row, acc ->
-          Map.put(acc, row.fixture_id, save_round_row(player_id, round_id, row))
+          Map.put(acc, row.fixture_id, save_prediction(player_id, round_id, row))
         end)
 
       if Enum.any?(results, fn {_id, r} -> r == {:error, :booster_on_blank} end) do
@@ -193,7 +194,7 @@ defmodule Predictex.Predictions do
 
       saved =
         Enum.reduce(editable, %{}, fn row, acc ->
-          Map.put(acc, row.fixture_id, save_round_row(player_id, round_id, row))
+          Map.put(acc, row.fixture_id, save_prediction(player_id, round_id, row))
         end)
 
       results =
@@ -298,34 +299,32 @@ defmodule Predictex.Predictions do
 
   @doc """
   Pure prediction-intake boundary: parse raw form params (the `picks` map plus the selected
-  `booster_fixture_id`) into validated pick rows.
+  `booster_fixture_id`) into validated `Prediction` values.
 
-  Returns `{:ok, [row]}`, each row
-  `%{fixture_id, home_goals, away_goals, first_scorer_side, first_scorer_player, booster}`,
-  or `{:error, :booster_on_blank}` when a booster sits on a blank scoreline. Blank-goal rows
-  are KEPT (the persistence layer decides to `:skip` them); a non-integer fixture key is
-  skipped rather than crashing. Pure — no `Repo`. The form LiveViews cross here; the invariant
-  itself is owned by `validate_pick_rows/1`.
+  Returns `{:ok, [%Prediction{}]}`, or `{:error, :booster_on_blank}` when a booster sits on a
+  blank scoreline. Blank-goal predictions are KEPT (the persistence layer decides to `:skip`
+  them); a non-integer fixture key is skipped rather than crashing. Pure — no `Repo`. The form
+  LiveViews cross here; the invariant itself is owned by `validate_predictions/1`.
   """
-  def parse_pick_rows(picks, booster_id_param) when is_map(picks) do
+  def parse_predictions(picks, booster_id_param) when is_map(picks) do
     boost_id = parse_int(booster_id_param)
 
     picks
-    |> Enum.flat_map(&parse_row(&1, boost_id))
-    |> validate_pick_rows()
+    |> Enum.flat_map(&parse_prediction(&1, boost_id))
+    |> validate_predictions()
   end
 
   @doc """
   Pure owner of the prediction-intake invariant: a booster requires a scoreline.
 
-  Returns `{:ok, rows}` unchanged, or `{:error, :booster_on_blank}` if any row carries a
-  booster on a blank (nil/nil) scoreline. Shared by `parse_pick_rows/2` (the form boundary)
-  and FIFA import, so every producer of pick rows is held to the same invariant.
+  Returns `{:ok, predictions}` unchanged, or `{:error, :booster_on_blank}` if any `Prediction`
+  carries a booster on a blank (nil/nil) scoreline. Shared by `parse_predictions/2` (the form
+  boundary) and FIFA import, so every producer of predictions is held to the same invariant.
   """
-  def validate_pick_rows(rows) when is_list(rows) do
-    if Enum.any?(rows, &booster_on_blank?/1),
+  def validate_predictions(predictions) when is_list(predictions) do
+    if Enum.any?(predictions, &booster_on_blank?/1),
       do: {:error, :booster_on_blank},
-      else: {:ok, rows}
+      else: {:ok, predictions}
   end
 
   # --- internals ---
@@ -379,36 +378,43 @@ defmodule Predictex.Predictions do
     |> Repo.update_all(set: [booster: false])
   end
 
-  defp save_round_row(_player_id, _round_id, %{home_goals: nil, away_goals: nil, booster: true}),
-    do: {:error, :booster_on_blank}
+  defp save_prediction(_player_id, _round_id, %Prediction{
+         home_goals: nil,
+         away_goals: nil,
+         booster: true
+       }),
+       do: {:error, :booster_on_blank}
 
-  defp save_round_row(_player_id, _round_id, %{home_goals: nil, away_goals: nil}), do: :skipped
+  defp save_prediction(_player_id, _round_id, %Prediction{home_goals: nil, away_goals: nil}),
+    do: :skipped
 
-  defp save_round_row(player_id, round_id, row) do
+  defp save_prediction(player_id, round_id, %Prediction{} = prediction) do
     attrs =
-      row
+      prediction
+      |> Map.from_struct()
       |> Map.put(:player_id, player_id)
       |> Map.put(:round_id, round_id)
 
-    existing = Repo.get_by(SavedPrediction, player_id: player_id, fixture_id: row.fixture_id)
+    existing =
+      Repo.get_by(SavedPrediction, player_id: player_id, fixture_id: prediction.fixture_id)
 
     case Repo.insert_or_update(SavedPrediction.changeset(existing || %SavedPrediction{}, attrs)) do
-      {:ok, _pred} -> :upserted
+      {:ok, _saved} -> :upserted
       {:error, cs} -> {:error, cs}
     end
   end
 
-  # --- pure pick-row parsing (the prediction-intake boundary) ---
+  # --- pure parsing into Prediction values (the prediction-intake boundary) ---
 
-  defp parse_row({fid, attrs}, boost_id) do
+  defp parse_prediction({fid, attrs}, boost_id) do
     case parse_int(fid) do
       nil -> []
-      fixture_id -> [build_row(fixture_id, attrs, boost_id)]
+      fixture_id -> [build_prediction(fixture_id, attrs, boost_id)]
     end
   end
 
-  defp build_row(fixture_id, attrs, boost_id) do
-    %{
+  defp build_prediction(fixture_id, attrs, boost_id) do
+    %Prediction{
       fixture_id: fixture_id,
       home_goals: parse_int(attrs["home_goals"]),
       away_goals: parse_int(attrs["away_goals"]),
@@ -419,7 +425,7 @@ defmodule Predictex.Predictions do
     }
   end
 
-  defp booster_on_blank?(%{booster: true, home_goals: nil, away_goals: nil}), do: true
+  defp booster_on_blank?(%Prediction{booster: true, home_goals: nil, away_goals: nil}), do: true
   defp booster_on_blank?(_), do: false
 
   defp parse_int(nil), do: nil

@@ -13,6 +13,7 @@ defmodule Predictex.Fifa.Import do
   require Logger
 
   alias Predictex.Fifa.Crosswalk
+  alias Predictex.Predictions.Prediction
 
   @group_rounds 1..3
 
@@ -155,11 +156,15 @@ defmodule Predictex.Fifa.Import do
       reason: reason
     }
 
-  @doc "Group matched entries by `round_id`, stripped to the `save_round_row/3` write contract."
-  def to_write_rows(matched) when is_list(matched) do
+  @doc """
+  Group matched entries by `round_id` into `Prediction` values — FIFA import is the third
+  producer of the prediction-intake value. First-scorer fields are left nil (group-stage
+  import predicts only the scoreline + booster).
+  """
+  def to_predictions(matched) when is_list(matched) do
     matched
     |> Enum.group_by(& &1.round_id, fn m ->
-      %{
+      %Prediction{
         fixture_id: m.fixture_id,
         home_goals: m.home_goals,
         away_goals: m.away_goals,

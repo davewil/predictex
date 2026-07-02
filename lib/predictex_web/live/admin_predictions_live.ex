@@ -65,7 +65,7 @@ defmodule PredictexWeb.AdminPredictionsLive do
     end
 
     # Parse + validate at the shared prediction-intake boundary (pure); persist on success.
-    case Predictions.parse_pick_rows(params["rows"] || %{}, params["booster_fixture_id"]) do
+    case Predictions.parse_predictions(params["rows"] || %{}, params["booster_fixture_id"]) do
       {:ok, rows} ->
         AdminWriteResult.handle(
           socket,
